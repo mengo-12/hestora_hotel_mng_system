@@ -1,0 +1,133 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(RECEPTIONIST)
+  createdAt DateTime @default(now())
+  bookings  Booking[] 
+}
+
+enum Role {
+  ADMIN
+  RECEPTIONIST
+  ACCOUNTANT
+  HOUSEKEEPING
+}
+
+model Guest {
+  id         String    @id @default(cuid())
+  fullName   String
+  nationalId String?
+  phone      String
+  email      String?
+  notes      String?
+  bookings   Booking[]
+  createdAt  DateTime  @default(now())
+}
+
+model Room {
+  id           String    @id @default(cuid())
+  roomNumber   String    @unique
+  floor        Int
+  type         RoomType
+  status       RoomStatus @default(VACANT)
+  pricePerNight Float
+  bookings     Booking[]
+}
+
+enum RoomType {
+  SINGLE
+  DOUBLE
+  SUITE
+}
+
+enum RoomStatus {
+  VACANT
+  OCCUPIED
+  CLEANING
+  OUT_OF_SERVICE
+}
+
+model Booking {
+  id            String        @id @default(cuid())
+  guest         Guest         @relation(fields: [guestId], references: [id])
+  guestId       String
+  room          Room          @relation(fields: [roomId], references: [id])
+  roomId        String
+  createdBy     User?         @relation(fields: [createdById], references: [id])
+  createdById   String?
+  checkInDate   DateTime
+  checkOutDate  DateTime
+  status        BookingStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(UNPAID)
+  createdAt     DateTime      @default(now())
+  invoice       Invoice?
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+}
+
+model Invoice {
+  id        String     @id @default(cuid())
+  booking   Booking    @relation(fields: [bookingId], references: [id])
+  bookingId String     @unique
+  amount    Float
+  status    InvoiceStatus @default(OPEN)
+  createdAt DateTime   @default(now())
+  payments  Payment[]
+}
+
+enum InvoiceStatus {
+  OPEN
+  PAID
+  CANCELLED
+}
+
+model Payment {
+  id            String      @id @default(cuid())
+  invoice       Invoice     @relation(fields: [invoiceId], references: [id])
+  invoiceId     String
+  method        PaymentMethod
+  amount        Float
+  status        PaymentStatusGeneric @default(PENDING)
+  transactionId String?
+  createdAt     DateTime    @default(now())
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  ONLINE
+}
+
+enum PaymentStatusGeneric {
+  PENDING
+  COMPLETED
+  FAILED
+}

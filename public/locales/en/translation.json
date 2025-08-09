@@ -1,0 +1,120 @@
+{
+
+        "Welcome": "Welcome",
+        "Title": "I’m Hamdan, a passionate developer and designer specializing in websites and apps. If you're looking for someone to bring your ideas to life using the latest technologies, you’ve come to the right place!Feel free to explore my projects, and if you’re interested in collaborating on your next project or have an idea you want to develop, don’t hesitate to get in touch.",
+        "Button": "click Here",
+
+
+
+
+
+        "Home": "Home",
+        "Services": "services",
+        "OurWork": "our work",
+        "Faq": "Faq",
+        "AboutMe":"About me",
+
+
+
+
+
+        "OurServices": "services",
+        "TextOurServices":"Looking to turn your ideas into innovative digital solutions? In my Services section, I offer the best tech solutions tailored to your needs. Whether you need mobile app development, stunning website design, or improving the user experience, I'm here to help you create an unforgettable digital experience",
+        "TextOurServices2": "I provide comprehensive services ranging from SEO optimization, to developing outstanding web applications, and offering tech consultations to achieve your digital goals with the highest quality and professionalism. Let me help you reach your audience and increase your digital impact",
+        
+        "App":"Application Development",
+        "TitleApp": "I develop professional mobile apps for Android and iOS, designed to deliver a smooth and engaging user experience. My service also includes full integration with your website or backend system, ensuring consistent performance and seamless communication across all platforms.",
+
+        "WepDevlopment": "Web development",
+        "TitleWepDevlopment": "I design modern, responsive websites tailored to reflect your brand identity and provide a seamless user experience. Whether you need a personal website, an e-commerce platform, or a service-based portal, I deliver professional designs optimized for all devices and built to support your business growth online.",
+        
+        "Support": "UI/UX Designer",
+        "TitleSupport": "I design user interfaces and experiences that focus on clarity, elegance, and intuitive navigation. Every element is crafted with purpose—whether it's to attract attention, enhance engagement, or boost conversions. Great UX starts with a deep understanding of your audience, and I’m here to turn that understanding into effective, impactful design.",
+
+
+
+
+
+        "TitleAboutMe": "dsdsfdfs",
+
+
+
+
+
+        "TitleCard1": "My Education",
+        "TextCard1": "I hold a diploma in Information Technology (IT), focusing on programming and UI development.",
+
+
+        
+        "TitleCard2": "My Work",
+        "TextCard2": "I work as a frontend developer and mobile app programmer using React, Next.js, and React Native.",
+
+
+        "TitleCard3": "My Skills",
+        "TextCard3": "I use my technical expertise to build efficient and seamless digital solutions, with a strong focus on user experience and modern market needs.",
+
+
+        
+        "TitleCard4": "My Goals",
+        "TextCard4": "I aspire to be one of the best programmers in my field, creating innovative digital solutions for individuals and businesses.",
+
+        
+
+
+
+
+        "LastWork": "Last work",
+        "TitleLastWork": "Explore my work samples and discover how I can add real value to your brand.",
+        "Loading": "loading...",
+
+        "FaqTitle": "Faq",
+
+        
+
+        "faq": [
+        {
+
+                "question": "What services do you offer?",
+                "answer": "I offer custom website and app design & development services, along with UI/UX design and SEO optimization."
+        },
+
+        {
+
+                "question": "Are the websites you build responsive?",
+                "answer": "Yes, all projects are fully responsive and work smoothly on all devices (mobile, tablet, desktop)."
+        },
+
+        {
+
+                "question": "Can I request a custom design based on my needs?",
+                "answer": "Absolutely! I create designs that align with your brand and specific requirements professionally."
+        },
+
+        {
+
+                "question": "How long does it take to complete a project?",
+                "answer": "The timeline depends on the project’s size and complexity. A clear schedule is set before starting."
+
+        }
+        ],
+
+
+        
+        "footer": {
+                "title": "Stay Connected",
+                "description": "Feel free to contact us through the following platforms.",
+                "copyright": "All rights reserved © 2025",
+                "privacy": "Privacy Policy",
+                "terms": "Terms of Service"
+        },
+
+        
+        "Mobile": "0555719382",
+        "MobileTitle": "Available 24 hours a day",
+        "ُEmailTitle": "Online support",
+        "Location": "Makkah, KSA",
+        "LocationTitle": "jeddah",
+        
+        "SocialMedia": "Connect with us on social media"
+
+}   
