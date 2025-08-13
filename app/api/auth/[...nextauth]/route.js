@@ -1,18 +1,74 @@
+// import NextAuth from "next-auth";
+// import CredentialsProvider from "next-auth/providers/credentials";
+// import prisma from "../../../../lib/prisma"; // تأكد مسار الاستيراد
+// import bcrypt from "bcryptjs";
+
+// export const authOptions = {
+//     providers: [
+//         CredentialsProvider({
+//             name: "Credentials",
+//             credentials: {
+//                 email: { label: "البريد الإلكتروني", type: "email", placeholder: "example@example.com" },
+//                 password: { label: "كلمة المرور", type: "password" },
+//             },
+//             async authorize(credentials) {
+//                 const user = await prisma.user.findUnique({
+//                     where: { email: credentials.email },
+//                 });
+
+//                 if (!user) {
+//                     throw new Error("البريد الإلكتروني غير موجود");
+//                 }
+
+//                 const isValid = await bcrypt.compare(credentials.password, user.password);
+//                 if (!isValid) {
+//                     throw new Error("كلمة المرور غير صحيحة");
+//                 }
+
+//                 return { id: user.id, name: user.name, email: user.email };
+//             },
+//         }),
+//     ],
+//     session: {
+//         strategy: "jwt",
+//     },
+//     jwt: {
+//         secret: process.env.NEXTAUTH_SECRET,
+//     },
+//     pages: {
+//         signIn: "/login",
+//     },
+//     callbacks: {
+//         async jwt({ token, user }) {
+//             if (user) {
+//                 token.id = user.id;
+//             }
+//             return token;
+//         },
+//         async session({ session, token }) {
+//             if (token) {
+//                 session.user.id = token.id;
+//             }
+//             return session;
+//         },
+//     },
+//     secret: process.env.NEXTAUTH_SECRET,
+// };
+
+// export default NextAuth(authOptions);
+
+
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcrypt";
-
-const prisma = new PrismaClient();
+import prisma from "../../../../lib/prisma"; // تأكد مسار الاستيراد
+import bcrypt from "bcryptjs";
 
 export const authOptions = {
-    adapter: PrismaAdapter(prisma),
     providers: [
         CredentialsProvider({
             name: "Credentials",
             credentials: {
-                email: { label: "البريد الإلكتروني", type: "text", placeholder: "email@example.com" },
+                email: { label: "البريد الإلكتروني", type: "email", placeholder: "example@example.com" },
                 password: { label: "كلمة المرور", type: "password" },
             },
             async authorize(credentials) {
@@ -21,30 +77,32 @@ export const authOptions = {
                 });
 
                 if (!user) {
-                    throw new Error("البريد الإلكتروني غير موجود");
+                    // بدل رمي الخطأ، ارجع null ليظهر رسالة خطأ مناسبة في الواجهة
+                    return null;
                 }
 
                 const isValid = await bcrypt.compare(credentials.password, user.password);
                 if (!isValid) {
-                    throw new Error("كلمة المرور غير صحيحة");
+                    return null;
                 }
 
-                return {
-                    id: user.id,
-                    name: user.name,
-                    email: user.email,
-                    role: user.role,
-                };
+                return { id: user.id, name: user.name, email: user.email };
             },
         }),
     ],
     session: {
         strategy: "jwt",
     },
+    jwt: {
+        secret: process.env.NEXTAUTH_SECRET,
+    },
+    pages: {
+        signIn: "/login",
+        error: "/login",  // توجيه أخطاء الدخول لصفحة تسجيل الدخول نفسها
+    },
     callbacks: {
         async jwt({ token, user }) {
             if (user) {
-                token.role = user.role;
                 token.id = user.id;
             }
             return token;
@@ -52,16 +110,14 @@ export const authOptions = {
         async session({ session, token }) {
             if (token) {
                 session.user.id = token.id;
-                session.user.role = token.role;
             }
             return session;
         },
-    },
-    pages: {
-        signIn: "/login", // صفحة تسجيل الدخول المخصصة
     },
     secret: process.env.NEXTAUTH_SECRET,
 };
 
 const handler = NextAuth(authOptions);
+
+// تصدير دوال HTTP متوافقة مع App Router
 export { handler as GET, handler as POST };

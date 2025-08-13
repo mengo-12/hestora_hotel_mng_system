@@ -4,148 +4,105 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"  // أو "mysql" حسب اختيارك
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// أنواع المستخدمين في النظام
-enum UserRole {
-  ADMIN
-  RECEPTIONIST
-  GUEST
+// Room model (كما عندك)
+model Room {
+  id            String     @id @default(cuid())
+  roomNumber    String     @unique
+  roomType      String
+  status        RoomStatus @default(AVAILABLE)
+  pricePerNight Float
+  description   String?
+  needsCleaning Boolean  @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 }
 
-// حالة الحجز
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
-  COMPLETED
-}
-
-// حالة الدفع
-enum PaymentStatus {
-  UNPAID
-  PAID
-  REFUNDED
-}
-
-// حالة الغرفة
 enum RoomStatus {
   AVAILABLE
   OCCUPIED
   MAINTENANCE
 }
 
-// جدول المستخدمين (موظفين، مدراء، عملاء)
+// User model compatible with NextAuth - يحتوي حقل password لا يتعامل معه الـAdapter مباشرة
 model User {
-  id          String    @id @default(cuid())
-  name        String
-  email       String    @unique
-  password    String
-  role        UserRole
-  bookings    Booking[] @relation("CreatedBy")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String
+  role          String    @default("ADMIN")
+  createdAt     DateTime  @default(now())
+
+  // relations for NextAuth adapter
+  accounts Account[]
+  sessions Session[]
+}
+
+// NextAuth required models (from Prisma adapter template)
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  id         String  @id @default(cuid())
+  identifier String
+  token      String  @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 model Guest {
-  id             String    @id @default(cuid())
-  
-  // أسماء النزيل
-  firstName      String
-  middleName     String?   // اختياري
-  lastName       String
-  familyName     String?   // الاسم الأخير / لقب العائلة، اختياري
-  
-  birthDate      DateTime? // تاريخ الميلاد، اختياري
-  gender         Gender?   // الجنس، اختياري، نوع enum (ذكر، أنثى، آخر)
-
-  // تصنيف العميل
-  guestType      GuestType?
-
-  // معلومات التحقق
-  nationality    String?   // الجنسية
-  idType         IDType?   // نوع الهوية (مثلاً: بطاقة شخصية، جواز سفر، ...)
-
-  idNumber       String?   // رقم الهوية
-  
-  // بيانات الاتصال
-  phoneNumber    String?   
-  email          String?   @unique
-  address        String?   
-
-  bookings       Booking[]
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
-// أنواع محددة (enum) للجنس
-enum Gender {
-  MALE
-  FEMALE
-  OTHER
-}
-
-// تصنيف العميل (مثال: VIP، عادي، ... يمكنك التعديل حسب حاجتك)
-enum GuestType {
-  REGULAR
-  VIP
-  CORPORATE
-  OTHER
-}
-
-// أنواع الهوية
-enum IDType {
-  NATIONAL_ID
-  PASSPORT
-  DRIVER_LICENSE
-  OTHER
-}
-
-// جدول الغرف
-model Room {
-  id          String     @id @default(cuid())
-  roomNumber  String     @unique
-  type        String     // مثلاً: مفردة، مزدوجة، جناح
-  price       Float
-  status      RoomStatus @default(AVAILABLE)
-  bookings    Booking[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-}
-
-// جدول الحجوزات
-model Booking {
-  id            String        @id @default(cuid())
-  guestId       String
-  guest         Guest         @relation(fields: [guestId], references: [id])
-  roomId        String
-  room          Room          @relation(fields: [roomId], references: [id])
-  createdById   String
-  createdBy     User          @relation("CreatedBy", fields: [createdById], references: [id])
-  checkInDate   DateTime
-  checkOutDate  DateTime
-  status        BookingStatus
-  paymentStatus PaymentStatus
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  invoice       Invoice?      @relation("BookingInvoice") // بدون fields هنا
-}
-
-// جدول الفواتير
-model Invoice {
-  id          String    @id @default(cuid())
-  bookingId   String    @unique
-  booking     Booking   @relation("BookingInvoice", fields: [bookingId], references: [id])
-  amount      Float
-  paidAt      DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              String   @id @default(cuid())
+  firstName       String
+  lastName        String
+  gender          String
+  dateOfBirth     DateTime
+  nationality     String
+  maritalStatus   String?
+  phone           String
+  email           String?
+  address         String?
+  passportNumber  String
+  passportIssue   DateTime
+  passportExpiry  DateTime
+  passportPlace   String
+  nationalId      String?
+  notes           String?
+  preferences     String?
+  createdAt       DateTime @default(now())
 }
