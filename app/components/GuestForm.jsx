@@ -28,7 +28,6 @@ export default function GuestForm({ mode = 'add', guestData = {}, onSuccess }) {
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
 
-    // قائمة كل الجنسيات العالمية
     const nationalities = [
         '', 'أفغانستان', 'ألبانيا', 'الجزائر', 'أندورا', 'أنغولا', 'أنتيغوا وبربودا', 'الأرجنتين', 'أرمينيا', 'أستراليا', 'النمسا',
         'أذربيجان', 'البهاما', 'البحرين', 'بنغلاديش', 'باربادوس', 'بيلاروس', 'بلجيكا', 'بليز', 'بنين', 'بوتان', 'بوليفيا', 'البوسنة والهرسك',
@@ -51,27 +50,15 @@ export default function GuestForm({ mode = 'add', guestData = {}, onSuccess }) {
 
     useEffect(() => {
         if (mode === 'edit' && guestData) {
-            setFormData({
-                ...formData,
-                firstName: guestData.firstName || '',
-                lastName: guestData.lastName || '',
-                gender: guestData.gender || '',
-                dateOfBirth: guestData.dateOfBirth ? guestData.dateOfBirth.slice(0, 10) : '',
-                nationality: guestData.nationality || '',
-                maritalStatus: guestData.maritalStatus || '',
-                phone: guestData.phone || '',
-                email: guestData.email || '',
-                address: guestData.address || '',
-                passportNumber: guestData.passportNumber || '',
-                passportIssue: guestData.passportIssue ? guestData.passportIssue.slice(0, 10) : '',
-                passportExpiry: guestData.passportExpiry ? guestData.passportExpiry.slice(0, 10) : '',
-                passportPlace: guestData.passportPlace || '',
-                nationalId: guestData.nationalId || '',
-                notes: guestData.notes || '',
-                preferences: guestData.preferences || '',
-                checkIn: guestData.checkIn ? guestData.checkIn.slice(0, 10) : '',
-                checkOut: guestData.checkOut ? guestData.checkOut.slice(0, 10) : '',
-            });
+            setFormData(prev => ({
+                ...prev,
+                ...guestData,
+                dateOfBirth: guestData.dateOfBirth?.slice(0,10) || '',
+                passportIssue: guestData.passportIssue?.slice(0,10) || '',
+                passportExpiry: guestData.passportExpiry?.slice(0,10) || '',
+                checkIn: guestData.checkIn?.slice(0,10) || '',
+                checkOut: guestData.checkOut?.slice(0,10) || ''
+            }));
         }
     }, [mode, guestData]);
 
@@ -100,7 +87,9 @@ export default function GuestForm({ mode = 'add', guestData = {}, onSuccess }) {
             if (!res.ok) throw new Error(data.error || 'فشل العملية');
 
             setSuccessMsg(mode === 'add' ? 'تم إضافة النزيل بنجاح' : 'تم تحديث بيانات النزيل بنجاح');
-            if (onSuccess) onSuccess();
+
+            // إذا كان onSuccess موجود، أرسل النزيل الجديد
+            if (onSuccess && mode === 'add') onSuccess(data);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -114,19 +103,11 @@ export default function GuestForm({ mode = 'add', guestData = {}, onSuccess }) {
             className="space-y-4 p-6 w-full max-w-3xl mx-auto rounded-lg border shadow-md 
                  bg-gray-100 dark:bg-gray-800 border-gray-400 dark:border-gray-700"
         >
-            {error && (
-                <div className="p-3 border rounded text-red-900 bg-red-200 border-red-400 dark:bg-red-900 dark:text-red-200 dark:border-red-700">
-                    {error}
-                </div>
-            )}
-            {successMsg && (
-                <div className="p-3 border rounded text-green-900 bg-green-200 border-green-400 dark:bg-green-900 dark:text-green-200 dark:border-green-700">
-                    {successMsg}
-                </div>
-            )}
+            {error && <div className="p-3 border rounded text-red-900 bg-red-200 border-red-400 dark:bg-red-900 dark:text-red-200 dark:border-red-700">{error}</div>}
+            {successMsg && <div className="p-3 border rounded text-green-900 bg-green-200 border-green-400 dark:bg-green-900 dark:text-green-200 dark:border-green-700">{successMsg}</div>}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[
+                {[ 
                     { label: 'الاسم الأول', name: 'firstName', type: 'text', required: true },
                     { label: 'اسم العائلة', name: 'lastName', type: 'text', required: true },
                     { label: 'الجنسية', name: 'nationality', type: 'select', options: nationalities, required: true },
@@ -145,28 +126,15 @@ export default function GuestForm({ mode = 'add', guestData = {}, onSuccess }) {
                     <div key={idx}>
                         <label className="block mb-1 text-gray-800 dark:text-gray-200 font-medium">{field.label}</label>
                         {field.type === 'select' ? (
-                            <select
-                                name={field.name}
-                                value={formData[field.name]}
-                                onChange={handleChange}
-                                required={field.required}
-                                className="w-full px-3 py-2 rounded border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            >
+                            <select name={field.name} value={formData[field.name]} onChange={handleChange} required={field.required} 
+                                className="w-full px-3 py-2 rounded border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
                                 {field.options.map((opt, i) => (
-                                    <option key={i} value={opt}>
-                                        {opt === '' ? 'اختر الجنسية' : opt}
-                                    </option>
+                                    <option key={i} value={opt}>{opt === '' ? 'اختر' : opt}</option>
                                 ))}
                             </select>
                         ) : (
-                            <input
-                                type={field.type}
-                                name={field.name}
-                                value={formData[field.name]}
-                                onChange={handleChange}
-                                required={field.required}
-                                className="w-full px-3 py-2 rounded border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
+                            <input type={field.type} name={field.name} value={formData[field.name]} onChange={handleChange} required={field.required}
+                                className="w-full px-3 py-2 rounded border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500" />
                         )}
                     </div>
                 ))}
@@ -174,22 +142,14 @@ export default function GuestForm({ mode = 'add', guestData = {}, onSuccess }) {
                 {[{ label: 'العنوان', name: 'address' }, { label: 'ملاحظات', name: 'notes' }, { label: 'تفضيلات النزيل', name: 'preferences' }].map((field, idx) => (
                     <div className="sm:col-span-2" key={idx}>
                         <label className="block mb-1 text-gray-800 dark:text-gray-200 font-medium">{field.label}</label>
-                        <textarea
-                            name={field.name}
-                            value={formData[field.name]}
-                            onChange={handleChange}
-                            rows={field.name === 'address' ? 2 : 3}
-                            className="w-full px-3 py-2 rounded border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
+                        <textarea name={field.name} value={formData[field.name]} onChange={handleChange} rows={field.name === 'address' ? 2 : 3}
+                            className="w-full px-3 py-2 rounded border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500" />
                     </div>
                 ))}
             </div>
 
-            <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2 mt-4 rounded-md bg-blue-600 text-white font-semibold shadow-md hover:bg-blue-700 active:shadow-inner transition disabled:opacity-50"
-            >
+            <button type="submit" disabled={loading} 
+                className="w-full py-2 mt-4 rounded-md bg-blue-600 text-white font-semibold shadow-md hover:bg-blue-700 active:shadow-inner transition disabled:opacity-50">
                 {loading ? (mode === 'add' ? 'جارٍ الإضافة...' : 'جارٍ التحديث...') : mode === 'add' ? 'إضافة النزيل' : 'تحديث بيانات النزيل'}
             </button>
         </form>

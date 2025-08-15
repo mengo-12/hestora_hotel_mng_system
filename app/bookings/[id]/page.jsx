@@ -1,45 +1,51 @@
-"use client";
+'use client';
 
-import { useSession } from "next-auth/react";
-import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 
 export default function EditBookingPage() {
-    const { data: session, status } = useSession();
     const router = useRouter();
-    const params = useParams();
-    const bookingId = params.id;
+    const { id: bookingId } = useParams();
+    const { data: session, status } = useSession();
 
-    const [guestId, setGuestId] = useState("");
-    const [roomId, setRoomId] = useState("");
-    const [checkInDate, setCheckInDate] = useState("");
-    const [checkOutDate, setCheckOutDate] = useState("");
-    const [statusBooking, setStatusBooking] = useState("PENDING");
-    const [paymentStatus, setPaymentStatus] = useState("UNPAID");
+    const [guestId, setGuestId] = useState('');
+    const [roomId, setRoomId] = useState('');
+    const [checkInDate, setCheckInDate] = useState('');
+    const [checkOutDate, setCheckOutDate] = useState('');
+    const [statusBooking, setStatusBooking] = useState('PENDING');
+    const [paymentStatus, setPaymentStatus] = useState('UNPAID');
+    const [guests, setGuests] = useState([]);
+    const [rooms, setRooms] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
-    const [guests, setGuests] = useState([]);
-    const [rooms, setRooms] = useState([]);
-
+    // التحقق من تسجيل الدخول وصلاحية الدور
     useEffect(() => {
-        if (status === "loading") return;
+        if (status === 'loading') return;
 
-        if (!session) router.push("/login");
-        else if (!["ADMIN", "RECEPTIONIST"].includes(session.user.role)) {
-            alert("غير مصرح لك بالدخول لهذه الصفحة");
-            router.push("/dashboard");
-        } else {
-            fetchBooking();
-            fetchGuests();
-            fetchRooms();
+        if (!session) {
+            router.push('/login');
+            return;
         }
+
+        // السماح فقط للمستخدمين ADMIN و RECEPTIONIST
+        if (!['ADMIN', 'RECEPTIONIST'].includes(session.user.role)) {
+            alert('غير مصرح لك بالدخول لهذه الصفحة');
+            router.push('/dashboard');
+            return;
+        }
+
+        fetchBooking();
+        fetchGuests();
+        fetchRooms();
     }, [session, status, router]);
 
+    // جلب بيانات الحجز
     async function fetchBooking() {
         try {
             const res = await fetch(`/api/bookings/${bookingId}`);
-            if (!res.ok) throw new Error("فشل في جلب بيانات الحجز");
+            if (!res.ok) throw new Error('فشل في جلب بيانات الحجز');
             const data = await res.json();
             setGuestId(data.guestId);
             setRoomId(data.roomId);
@@ -49,16 +55,17 @@ export default function EditBookingPage() {
             setPaymentStatus(data.paymentStatus);
         } catch (error) {
             alert(error.message);
-            router.push("/dashboard/bookings");
+            router.push('/dashboard/bookings');
         } finally {
             setLoading(false);
         }
     }
 
+    // جلب النزلاء
     async function fetchGuests() {
         try {
-            const res = await fetch("/api/guests");
-            if (!res.ok) throw new Error("فشل في جلب النزلاء");
+            const res = await fetch('/api/guests');
+            if (!res.ok) throw new Error('فشل في جلب النزلاء');
             const data = await res.json();
             setGuests(data);
         } catch (error) {
@@ -66,10 +73,11 @@ export default function EditBookingPage() {
         }
     }
 
+    // جلب الغرف
     async function fetchRooms() {
         try {
-            const res = await fetch("/api/rooms");
-            if (!res.ok) throw new Error("فشل في جلب الغرف");
+            const res = await fetch('/api/rooms');
+            if (!res.ok) throw new Error('فشل في جلب الغرف');
             const data = await res.json();
             setRooms(data);
         } catch (error) {
@@ -77,14 +85,15 @@ export default function EditBookingPage() {
         }
     }
 
+    // تحديث بيانات الحجز
     async function handleSubmit(e) {
         e.preventDefault();
         setSaving(true);
 
         try {
             const res = await fetch(`/api/bookings/${bookingId}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     guestId,
                     roomId,
@@ -97,11 +106,11 @@ export default function EditBookingPage() {
 
             if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.message || "خطأ في تحديث بيانات الحجز");
+                throw new Error(err.message || 'خطأ في تحديث بيانات الحجز');
             }
 
-            alert("تم تحديث بيانات الحجز بنجاح");
-            router.push("/dashboard/bookings");
+            alert('تم تحديث بيانات الحجز بنجاح');
+            router.push('/dashboard/bookings');
         } catch (error) {
             alert(error.message);
         } finally {
@@ -109,7 +118,21 @@ export default function EditBookingPage() {
         }
     }
 
-    if (status === "loading" || loading) {
+    // حذف الحجز
+    async function handleDelete() {
+        if (!confirm('هل أنت متأكد من حذف هذا الحجز؟')) return;
+
+        try {
+            const res = await fetch(`/api/bookings/${bookingId}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('فشل في حذف الحجز');
+            alert('تم حذف الحجز بنجاح');
+            router.push('/dashboard/bookings');
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    if (status === 'loading' || loading) {
         return <p className="text-center mt-10">جاري تحميل بيانات الحجز...</p>;
     }
 
@@ -200,13 +223,23 @@ export default function EditBookingPage() {
                     </select>
                 </label>
 
-                <button
-                    type="submit"
-                    disabled={saving}
-                    className="bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-                >
-                    {saving ? "جاري الحفظ..." : "حفظ التعديلات"}
-                </button>
+                <div className="flex gap-4">
+                    <button
+                        type="submit"
+                        disabled={saving}
+                        className="bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50 flex-1"
+                    >
+                        {saving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={handleDelete}
+                        className="bg-red-600 text-white py-2 rounded hover:bg-red-700 flex-1"
+                    >
+                        حذف الحجز
+                    </button>
+                </div>
             </form>
         </div>
     );

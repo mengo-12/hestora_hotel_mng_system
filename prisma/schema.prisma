@@ -25,6 +25,8 @@ model Room {
   needsCleaning Boolean  @default(false)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
+
+  bookings      Booking[]   // <-- هذا الحقل يربط الغرفة بالحجوزات
 }
 
 enum RoomStatus {
@@ -109,4 +111,36 @@ model Guest {
   // إذا أردت استخدام checkIn و checkOut، أضفهم هنا:
   checkIn        DateTime?
   checkOut       DateTime?
+
+  bookings       Booking[]  // <-- هذا الحقل يربط النزيل بالحجوزات
+}
+
+
+// Booking model لإدارة الحجوزات
+model Booking {
+  id          String    @id @default(cuid())
+  guestId     String
+  guest       Guest     @relation(fields: [guestId], references: [id])
+  roomId      String
+  room        Room      @relation(fields: [roomId], references: [id])
+  
+  checkIn     DateTime
+  checkOut    DateTime
+  adults      Int       @default(1)
+  children    Int       @default(0)
+  status      BookingStatus @default(PENDING)
+  source      String?        // Walk-in / Online / OTA / Agent
+  totalPrice  Float?         
+  notes       String?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  CHECKED_IN
+  CHECKED_OUT
 }
