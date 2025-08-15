@@ -130,7 +130,7 @@ export async function POST(req) {
             },
         });
 
-        // تحديث حالة الغرفة إلى محجوزة
+        // تحديث حالة الغرفة إلى مشغولة
         await prisma.room.update({
             where: { id: data.roomId },
             data: { status: 'OCCUPIED' },
