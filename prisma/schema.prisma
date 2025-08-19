@@ -147,11 +147,14 @@ model Booking {
   paymentStatus String        @default("UNPAID")
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-
+  extraBeds     Int      @default(0)   // ← أضف هذا
   roomTypeId    String? // نوع الغرفة
   guestsCount   Int? // عدد النزلاء في الغرفة
   pricePerNight Float? // سعر الليلة
   totalNights   Int? // عدد الليالي
+  discountPercent Int      @default(0)
+  taxPercent      Int      @default(15)
+  extraServices   Json     @default("[]")
 
   extrasData     Json? // ⬅ هنا تحفظ الخدمات الإضافية يدويًا
   extras         BookingExtra[] // ⬅️ ربط الحجز بالخدمات الإضافية
