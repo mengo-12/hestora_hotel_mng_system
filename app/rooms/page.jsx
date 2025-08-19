@@ -6,24 +6,32 @@ import { useRouter } from 'next/navigation';
 export default function RoomsPage() {
     const router = useRouter();
     const [rooms, setRooms] = useState([]);
+    const [displayedRooms, setDisplayedRooms] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
     const [filterStatus, setFilterStatus] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
 
+    // ✅ جلب كل الغرف مرة واحدة
     async function fetchRooms() {
         setLoading(true);
         setError('');
         try {
-            const params = new URLSearchParams();
-            if (filterStatus) params.append('status', filterStatus);
-            if (searchQuery) params.append('q', searchQuery);
-
-            const res = await fetch('/api/rooms?' + params.toString());
+            const res = await fetch('/api/rooms');
             if (!res.ok) throw new Error('فشل جلب بيانات الغرف');
             const data = await res.json();
-            setRooms(data);
+
+            const roomsWithCurrentStatus = data.map(room => ({
+                ...room,
+                status:
+                    room.statusLogs && room.statusLogs.length > 0
+                        ? room.statusLogs[0].newStatus
+                        : room.status,
+            }));
+
+            setRooms(roomsWithCurrentStatus);
+            setDisplayedRooms(roomsWithCurrentStatus); // نعرض كل الغرف بالبداية
         } catch (err) {
             setError(err.message || 'حدث خطأ ما');
         } finally {
@@ -33,19 +41,32 @@ export default function RoomsPage() {
 
     useEffect(() => {
         fetchRooms();
-    }, [filterStatus]);
+    }, []);
 
-    const handleSearch = (e) => {
-        e.preventDefault();
-        fetchRooms();
-    };
+    // ✅ تحديث العرض حسب الفلتر أو البحث مباشرة
+    useEffect(() => {
+        let filtered = [...rooms];
+
+        if (filterStatus) {
+            filtered = filtered.filter(room => room.status === filterStatus);
+        }
+
+        if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            filtered = filtered.filter(
+                room =>
+                    room.roomNumber.toLowerCase().includes(q) ||
+                    room.roomType.toLowerCase().includes(q)
+            );
+        }
+
+        setDisplayedRooms(filtered);
+    }, [filterStatus, searchQuery, rooms]);
 
     async function handleDelete(id) {
         if (!confirm('هل أنت متأكد من حذف هذه الغرفة؟')) return;
         try {
-            const res = await fetch(`/api/rooms/${id}`, {
-                method: 'DELETE',
-            });
+            const res = await fetch(`/api/rooms/${id}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('فشل حذف الغرفة');
             alert('تم حذف الغرفة بنجاح');
             fetchRooms();
@@ -61,7 +82,6 @@ export default function RoomsPage() {
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-[#1e1e1e] p-8 font-sans">
             <div className="max-w-6xl mx-auto bg-white dark:bg-[#252526] rounded-lg shadow-lg p-6">
-                {/* رأس الصفحة */}
                 <div className="flex justify-between items-center mb-8">
                     <h1 className="text-4xl font-semibold text-gray-900 dark:text-gray-100 select-none">
                         قائمة الغرف
@@ -71,17 +91,15 @@ export default function RoomsPage() {
                         className="bg-green-600 hover:bg-green-700 active:bg-green-800 text-white px-5 py-2 rounded-md shadow-md
               transition
               select-none
-              focus:outline-none focus:ring-4 focus:ring-green-400
-              "
+              focus:outline-none focus:ring-4 focus:ring-green-400"
                         aria-label="إضافة غرفة جديدة"
                     >
                         + إضافة غرفة
                     </button>
                 </div>
 
-                {/* البحث والفلترة */}
                 <form
-                    onSubmit={handleSearch}
+                    onSubmit={e => e.preventDefault()}
                     className="flex flex-col sm:flex-row gap-4 mb-8 justify-center"
                     role="search"
                     aria-label="بحث وفلترة الغرف"
@@ -95,8 +113,7 @@ export default function RoomsPage() {
               bg-gray-50 dark:bg-[#3c3c3c] text-gray-900 dark:text-gray-100
               focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-400
               shadow-sm
-              transition
-            "
+              transition"
                         aria-label="بحث برقم الغرفة أو النوع"
                     />
                     <select
@@ -106,8 +123,7 @@ export default function RoomsPage() {
               bg-gray-50 dark:bg-[#3c3c3c] text-gray-900 dark:text-gray-100
               focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-400
               shadow-sm
-              transition
-            "
+              transition"
                         aria-label="اختيار حالة الغرفة"
                     >
                         <option value="">كل الحالات</option>
@@ -115,26 +131,13 @@ export default function RoomsPage() {
                         <option value="OCCUPIED">مشغولة</option>
                         <option value="MAINTENANCE">تحت الصيانة</option>
                     </select>
-                    <button
-                        type="submit"
-                        className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 active:bg-blue-800
-              text-white px-5 py-3 rounded-md shadow-md
-              transition
-              select-none
-              focus:outline-none focus:ring-4 focus:ring-blue-400
-              "
-                        aria-label="تنفيذ البحث"
-                    >
-                        بحث
-                    </button>
                 </form>
 
-                {/* المحتوى الرئيسي */}
                 {loading ? (
                     <p className="text-center text-gray-700 dark:text-gray-300 select-none">جار تحميل الغرف...</p>
                 ) : error ? (
                     <p className="text-center text-red-600 select-none">{error}</p>
-                ) : rooms.length === 0 ? (
+                ) : displayedRooms.length === 0 ? (
                     <p className="text-center text-gray-600 dark:text-gray-400 select-none">لا توجد غرف مطابقة للبحث.</p>
                 ) : (
                     <table className="w-full border-collapse border border-gray-300 dark:border-gray-600 text-center text-gray-900 dark:text-gray-100">
@@ -148,7 +151,7 @@ export default function RoomsPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {rooms.map(({ id, roomNumber, roomType, status, pricePerNight }) => (
+                            {displayedRooms.map(({ id, roomNumber, roomType, status, pricePerNight }) => (
                                 <tr
                                     key={id}
                                     className="hover:bg-gray-100 dark:hover:bg-[#2c2c2c] cursor-pointer transition"
@@ -174,8 +177,7 @@ export default function RoomsPage() {
                         text-white rounded-md shadow-md
                         transition
                         select-none
-                        focus:outline-none focus:ring-4 focus:ring-blue-400
-                        "
+                        focus:outline-none focus:ring-4 focus:ring-blue-400"
                                             aria-label={`تعديل الغرفة رقم ${roomNumber}`}
                                         >
                                             تعديل
@@ -186,8 +188,7 @@ export default function RoomsPage() {
                         text-white rounded-md shadow-md
                         transition
                         select-none
-                        focus:outline-none focus:ring-4 focus:ring-red-400
-                        "
+                        focus:outline-none focus:ring-4 focus:ring-red-400"
                                             aria-label={`حذف الغرفة رقم ${roomNumber}`}
                                         >
                                             حذف
@@ -202,3 +203,4 @@ export default function RoomsPage() {
         </div>
     );
 }
+

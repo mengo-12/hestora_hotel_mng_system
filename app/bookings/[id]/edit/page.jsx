@@ -9,6 +9,8 @@ export default function EditBookingPage() {
     const router = useRouter();
     const { id: bookingId } = useParams();
 
+    const EXTRA_BED_PRICE = 50; // سعر السرير الإضافي لكل ليلة
+
     const [formData, setFormData] = useState({
         guestId: "",
         roomId: "",
@@ -23,12 +25,15 @@ export default function EditBookingPage() {
         notes: "",
         discountPercent: 0,
         taxPercent: 0,
+        extraServices: [], // الخدمات الإضافية
     });
 
     const [guests, setGuests] = useState([]);
     const [rooms, setRooms] = useState([]);
+    const [extraServicesList, setExtraServicesList] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [roomStatus, setRoomStatus] = useState("AVAILABLE");
 
     const [dailyPrices, setDailyPrices] = useState([]);
     const [roomPrice, setRoomPrice] = useState(0);
@@ -52,6 +57,7 @@ export default function EditBookingPage() {
         fetchBooking();
         fetchGuests();
         fetchRooms();
+        fetchExtraServices();
     }, [session, status]);
 
     async function fetchBooking() {
@@ -59,7 +65,8 @@ export default function EditBookingPage() {
             const res = await fetch(`/api/bookings/${bookingId}`);
             if (!res.ok) throw new Error("فشل في جلب بيانات الحجز");
             const data = await res.json();
-            setFormData({
+            setFormData(prev => ({
+                ...prev,
                 guestId: data.guestId || "",
                 roomId: data.roomId || "",
                 checkInDate: data.checkIn ? data.checkIn.slice(0, 10) : "",
@@ -73,7 +80,9 @@ export default function EditBookingPage() {
                 notes: data.notes || "",
                 discountPercent: data.discountPercent || 0,
                 taxPercent: data.taxPercent || 0,
-            });
+                extraServices: data.extraServices || [],
+            }));
+            setRoomStatus(data.room?.status || "AVAILABLE");
         } catch (error) {
             alert(error.message);
             router.push("/bookings");
@@ -104,7 +113,18 @@ export default function EditBookingPage() {
         }
     }
 
-    // حساب الأسعار اليومية وتحديث الإجمالي
+    async function fetchExtraServices() {
+        try {
+            const res = await fetch("/api/extras");
+            if (!res.ok) throw new Error("فشل في جلب الخدمات الإضافية");
+            const data = await res.json();
+            setExtraServicesList(data || []);
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    // حساب الأسعار اليومية مع الخدمات والأسرة الإضافية
     useEffect(() => {
         if (formData.roomId && formData.checkInDate && formData.checkOutDate) {
             const room = rooms.find((r) => String(r.id) === String(formData.roomId));
@@ -115,10 +135,7 @@ export default function EditBookingPage() {
 
             const checkInDate = new Date(formData.checkInDate);
             const checkOutDate = new Date(formData.checkOutDate);
-            const nights = Math.max(
-                Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24)),
-                0
-            );
+            const nights = Math.max(Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24)), 0);
 
             const dailyArr = [];
             let total = 0;
@@ -127,13 +144,22 @@ export default function EditBookingPage() {
                 const current = new Date(checkInDate);
                 current.setDate(current.getDate() + i);
 
-                const discount = (basePrice * discountPct) / 100;
-                const tax = ((basePrice - discount) * taxPct) / 100;
-                const net = basePrice - discount + tax;
+                let extrasPrice = 0;
+                formData.extraServices.forEach((sid) => {
+                    const svc = extraServicesList.find((s) => String(s.id) === String(sid));
+                    if (svc) extrasPrice += Number(svc.price) || 0;
+                });
+
+                const extraBedsPrice = (formData.extraBeds || 0) * EXTRA_BED_PRICE;
+
+                const discount = ((basePrice + extrasPrice + extraBedsPrice) * discountPct) / 100;
+                const tax = ((basePrice + extrasPrice + extraBedsPrice - discount) * taxPct) / 100;
+                const net = basePrice + extrasPrice + extraBedsPrice - discount + tax;
 
                 dailyArr.push({
                     date: current.toISOString().slice(0, 10),
                     base: Number(basePrice.toFixed(2)),
+                    extras: Number(extrasPrice.toFixed(2)) + Number(extraBedsPrice.toFixed(2)),
                     discount: Number(discount.toFixed(2)),
                     tax: Number(tax.toFixed(2)),
                     net: Number(net.toFixed(2)),
@@ -155,10 +181,13 @@ export default function EditBookingPage() {
         formData.checkOutDate,
         formData.discountPercent,
         formData.taxPercent,
+        formData.extraBeds,
+        formData.extraServices,
         rooms,
+        extraServicesList,
     ]);
 
-    // جلب الحجوزات للغرفة لعرض التقويم
+    // تقويم الحجوزات
     useEffect(() => {
         async function fetchBookingsForRoom() {
             if (!formData.roomId) return;
@@ -183,29 +212,14 @@ export default function EditBookingPage() {
         });
     };
 
-    const prevMonth = () => {
-        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-    };
-    const nextMonth = () => {
-        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
-    };
-
-    if (status === "loading" || loading) {
-        return <p className="text-center mt-10">جاري تحميل بيانات الحجز...</p>;
-    }
-
-    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    const daysInMonth = Array.from({ length: endOfMonth.getDate() }, (_, i) => i + 1);
-    const startDay = startOfMonth.getDay();
-    const weekDays = ["أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"];
+    const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
-    // ... محتوى الصفحة كما لديك مع إضافة:
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSaving(true);
@@ -214,7 +228,8 @@ export default function EditBookingPage() {
                 ...formData,
                 checkIn: formData.checkInDate,
                 checkOut: formData.checkOutDate,
-                totalPrice: totalPrice, // أرسل السعر النهائي
+                totalPrice,
+                roomStatus,
             };
             delete payload.checkInDate;
             delete payload.checkOutDate;
@@ -231,13 +246,57 @@ export default function EditBookingPage() {
             }
 
             alert("تم تحديث بيانات الحجز بنجاح");
-            router.push("/bookings"); // بعد الحفظ، العودة للصفحة الرئيسية
+            router.push("/bookings");
         } catch (error) {
             alert(error.message);
         } finally {
             setSaving(false);
         }
     };
+
+const handleCheckOut = async () => {
+    if (!confirm("هل تريد إنهاء هذا الحجز وإنهاء إقامة النزيل؟")) return;
+    setSaving(true);
+    try {
+        const payload = {
+            status: "CHECKED_OUT",
+            roomStatus: "MAINTENANCE",
+            checkIn: formData.checkInDate,
+            checkOut: formData.checkOutDate,
+            totalPrice,
+        };
+
+        const res = await fetch(`/api/bookings/${bookingId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || "خطأ في إنهاء الحجز");
+        }
+
+        alert("تم إنهاء الحجز بنجاح. الغرفة الآن في الصيانة.");
+        router.push("/bookings");
+    } catch (error) {
+        alert(error.message);
+    } finally {
+        setSaving(false);
+    }
+};
+
+
+    if (status === "loading" || loading) {
+        return <p className="text-center mt-10">جاري تحميل بيانات الحجز...</p>;
+    }
+
+    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    const daysInMonth = Array.from({ length: endOfMonth.getDate() }, (_, i) => i + 1);
+    const startDay = startOfMonth.getDay();
+    const weekDays = ["أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"];
+
 
 
     return (
@@ -424,6 +483,40 @@ export default function EditBookingPage() {
                     </div>
                 </div>
 
+                {/* الخدمات الإضافية */}
+                {extraServicesList.length > 0 && (
+                    <div className="mt-4 mb-4">
+                        <label className="block mb-1 text-gray-800 dark:text-gray-200 font-medium">الخدمات الإضافية</label>
+                        <div className="flex flex-wrap gap-3">
+                            {extraServicesList.map(service => (
+                                <label
+                                    key={service.id}
+                                    className="flex items-center gap-2 border px-3 py-1 rounded cursor-pointer bg-white dark:bg-gray-700"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.extraServices.includes(service.id)}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    extraServices: [...prev.extraServices, service.id]
+                                                }));
+                                            } else {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    extraServices: prev.extraServices.filter(id => id !== service.id)
+                                                }));
+                                            }
+                                        }}
+                                    />
+                                    {service.name} (+{service.price} ر.س)
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* زر الحفظ */}
                 <button
                     type="submit"
@@ -433,6 +526,34 @@ export default function EditBookingPage() {
                 >
                     {saving ? "جارٍ الحفظ..." : "تحديث بيانات الحجز"}
                 </button>
+
+
+
+                {/* قسم تغيير حالة الغرفة */}
+                <div className="mb-6">
+                    <label className="block mb-2 font-medium">حالة الغرفة</label>
+                    <select
+                        value={roomStatus}
+                        onChange={(e) => setRoomStatus(e.target.value)}
+                        className="w-full px-3 py-2 rounded border bg-gray-800 text-white border-gray-600"
+                    >
+                        <option value="AVAILABLE">متاحة</option>
+                        <option value="OCCUPIED">مشغولة</option>
+                        <option value="MAINTENANCE">صيانة / تنظيف</option>
+                    </select>
+                </div>
+
+                {/* زر إنهاء الحجز */}
+                <button
+                    type="button"
+                    onClick={handleCheckOut}
+                    disabled={saving}
+                    className="w-full mt-4 py-3 rounded bg-red-600 hover:bg-red-700 text-white font-bold"
+                >
+                    {saving ? "جارٍ المعالجة..." : "إنهاء الحجز"}
+                </button>
+
+
             </form>
 
             {/* Calendar */}

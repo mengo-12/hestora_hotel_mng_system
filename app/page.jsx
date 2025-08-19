@@ -1,19 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useSession, signOut } from 'next-auth/react';
-import { ArrowRightIcon, ArrowLeftOnRectangleIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { useSession } from 'next-auth/react';
 import {
     HomeIcon,
     UsersIcon,
     ClipboardDocumentListIcon,
-    BellAlertIcon,
     WrenchScrewdriverIcon,
-    SunIcon,
-    MoonIcon,
-    LogoutIcon,
 } from '@heroicons/react/24/solid';
 
 export default function DashboardPage() {
@@ -27,23 +22,36 @@ export default function DashboardPage() {
         todaysBookings: 0,
     });
     const [bookings, setBookings] = useState([]);
-    const [alerts, setAlerts] = useState([]);
+    const [alerts, setAlerts] = useState({});
     const [darkMode, setDarkMode] = useState(false);
+    const [error, setError] = useState(null);
 
     // تحميل البيانات من API
     useEffect(() => {
-        fetch('/api/dashboard/stats')
-            .then((res) => res.json())
-            .then((data) => setStats(data))
-            .catch(() => { });
-        fetch('/api/dashboard/todays-bookings')
-            .then((res) => res.json())
-            .then((data) => setBookings(data))
-            .catch(() => { });
-        fetch('/api/dashboard/alerts')
-            .then((res) => res.json())
-            .then((data) => setAlerts(data))
-            .catch(() => { });
+        async function fetchData() {
+            try {
+                const resStats = await fetch('/api/dashboard/stats');
+                if (!resStats.ok) throw new Error('فشل تحميل الإحصائيات');
+                const statsData = await resStats.json();
+                setStats(statsData);
+
+                const resBookings = await fetch('/api/dashboard/todays-bookings');
+                if (resBookings.ok) {
+                    const bookingsData = await resBookings.json();
+                    setBookings(bookingsData);
+                }
+
+                const resAlerts = await fetch('/api/dashboard/alerts');
+                if (resAlerts.ok) {
+                    const alertsData = await resAlerts.json();
+                    setAlerts(alertsData);
+                }
+            } catch (err) {
+                console.error(err);
+                setError('⚠️ فشل تحميل البيانات، حاول مجددًا');
+            }
+        }
+        fetchData();
     }, []);
 
     // تحميل حالة الوضع الداكن من localStorage
@@ -56,21 +64,6 @@ export default function DashboardPage() {
             document.documentElement.classList.add('dark');
         }
     }, []);
-
-    // تبديل الوضع الداكن
-    // const toggleDarkMode = useCallback(() => {
-    //     setDarkMode((prev) => {
-    //         const newMode = !prev;
-    //         if (newMode) {
-    //             document.documentElement.classList.add('dark');
-    //             localStorage.setItem('theme', 'dark');
-    //         } else {
-    //             document.documentElement.classList.remove('dark');
-    //             localStorage.setItem('theme', 'light');
-    //         }
-    //         return newMode;
-    //     });
-    // }, []);
 
     // بيانات كاردز الإحصائيات
     const tiles = [
@@ -113,50 +106,12 @@ export default function DashboardPage() {
     }
 
     if (!session) {
-        // لو ما في جلسة مسجلة، يعيد التوجيه لصفحة تسجيل الدخول
         router.push('/login');
         return null;
     }
 
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col">
-            {/* الهيدر */}
-            {/* <header className="flex items-center justify-between bg-gray-200 dark:bg-gray-800 p-4 shadow-md">
-                <div>
-                    <h1 className="text-xl font-bold">لوحة التحكم</h1>
-                    <p className="text-sm mt-1">
-                        المستخدم: <span className="font-semibold">{session.user.name}</span> | الدور:{' '}
-                        <span className="font-semibold">{session.user.role ?? 'غير محدد'}</span>
-                    </p>
-                </div> */}
-
-                {/* <div className="flex items-center space-x-4"> */}
-                    {/* زر تبديل الوضع الداكن */}
-                    {/* <button
-                        aria-label="تبديل الوضع الداكن"
-                        onClick={toggleDarkMode}
-                        className="p-2 rounded hover:bg-gray-300 dark:hover:bg-gray-700 transition"
-                    >
-                        {darkMode ? (
-                            <SunIcon className="w-6 h-6 text-yellow-400" />
-                        ) : (
-                            <MoonIcon className="w-6 h-6 text-gray-800" />
-                        )}
-                    </button> */}
-
-                    {/* زر تسجيل الخروج */}
-                    {/* <button
-                        aria-label="تسجيل الخروج"
-                        onClick={() => signOut({ callbackUrl: '/login' })}
-                        className="p-2 rounded hover:bg-gray-300 dark:hover:bg-gray-700 transition flex items-center space-x-1"
-                    >
-                        <ArrowRightIcon className="w-6 h-6" />
-                        <span className="hidden sm:inline">تسجيل خروج</span>
-                    </button>
-                </div>
-            </header> */}
-
-            {/* المحتوى */}
             <main className="flex-1 p-6 space-y-8">
                 {/* إحصائيات */}
                 <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -165,11 +120,6 @@ export default function DashboardPage() {
                             key={i}
                             onClick={() => router.push(link)}
                             className={`${color} cursor-pointer rounded-xl p-6 flex items-center justify-between shadow-lg hover:scale-105 transform transition`}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') router.push(link);
-                            }}
                         >
                             <div>
                                 <h3 className="text-lg font-semibold">{title}</h3>
@@ -179,6 +129,13 @@ export default function DashboardPage() {
                         </div>
                     ))}
                 </section>
+
+                {/* رسالة خطأ */}
+                {error && (
+                    <div className="p-4 bg-red-500 text-white rounded-lg shadow">
+                        {error}
+                    </div>
+                )}
 
                 {/* حجوزات اليوم */}
                 <section>
@@ -195,17 +152,29 @@ export default function DashboardPage() {
                             </thead>
                             <tbody>
                                 {bookings.length > 0 ? (
-                                    bookings.map((b, i) => (
-                                        <tr key={i} className="border-b border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-                                            <td className="p-3">{b.guestName}</td>
-                                            <td className="p-3">{b.roomNumber}</td>
-                                            <td className="p-3">{new Date(b.checkIn).toLocaleString()}</td>
-                                            <td className="p-3">{new Date(b.checkOut).toLocaleString()}</td>
-                                        </tr>
-                                    ))
+                                    bookings.map((b, i) => {
+                                        const guestFullName = b.guest
+                                            ? `${b.guest.firstName} ${b.guest.lastName}`
+                                            : (b.guestName || "—");
+
+                                        return (
+                                            <tr
+                                                key={i}
+                                                className="border-b border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                            >
+                                                <td className="p-3">{guestFullName}</td>
+                                                <td className="p-3">{b.roomNumber}</td>
+                                                <td className="p-3">{new Date(b.checkIn).toLocaleString()}</td>
+                                                <td className="p-3">{new Date(b.checkOut).toLocaleString()}</td>
+                                            </tr>
+                                        );
+                                    })
                                 ) : (
                                     <tr>
-                                        <td colSpan="4" className="text-center p-6 text-gray-500 dark:text-gray-400">
+                                        <td
+                                            colSpan="4"
+                                            className="text-center p-6 text-gray-500 dark:text-gray-400"
+                                        >
                                             لا توجد حجوزات لليوم
                                         </td>
                                     </tr>
@@ -244,9 +213,10 @@ export default function DashboardPage() {
                             </div>
                         )}
 
-                        {alerts.cleaningNeeded?.length === 0 && alerts.upcomingBookings?.length === 0 && (
-                            <p className="text-gray-500 dark:text-gray-400">لا توجد تنبيهات حالياً</p>
-                        )}
+                        {(!alerts.cleaningNeeded || alerts.cleaningNeeded.length === 0) &&
+                            (!alerts.upcomingBookings || alerts.upcomingBookings.length === 0) && (
+                                <p className="text-gray-500 dark:text-gray-400">لا توجد تنبيهات حالياً</p>
+                            )}
                     </div>
                 </section>
 

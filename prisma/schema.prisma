@@ -22,17 +22,29 @@ model Room {
   status        RoomStatus @default(AVAILABLE)
   pricePerNight Float
   description   String?
-  needsCleaning Boolean  @default(false)
+  needsCleaning Boolean    @default(false)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-  bookings      Booking[]   // <-- هذا الحقل يربط الغرفة بالحجوزات
+  bookings   Booking[] // <-- هذا الحقل يربط الغرفة بالحجوزات
+  statusLogs RoomStatusLog[] // ⬅ إضافة الحقل العكسي
 }
 
 enum RoomStatus {
   AVAILABLE
   OCCUPIED
   MAINTENANCE
+}
+
+model RoomStatusLog {
+  id        String     @id @default(cuid())
+  roomId    String
+  oldStatus RoomStatus
+  newStatus RoomStatus
+  changedBy String     // يمكن تخزين معرف الموظف أو النظام
+  changedAt DateTime   @default(now())
+
+  room Room @relation(fields: [roomId], references: [id])
 }
 
 // User model compatible with NextAuth - يحتوي حقل password لا يتعامل معه الـAdapter مباشرة
@@ -52,18 +64,18 @@ model User {
 
 // NextAuth required models (from Prisma adapter template)
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?
-  access_token       String?
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -80,16 +92,16 @@ model Session {
 }
 
 model VerificationToken {
-  id         String  @id @default(cuid())
+  id         String   @id @default(cuid())
   identifier String
-  token      String  @unique
+  token      String   @unique
   expires    DateTime
 
   @@unique([identifier, token])
 }
 
 model Guest {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   firstName      String
   lastName       String
   gender         String
@@ -106,35 +118,45 @@ model Guest {
   nationalId     String?
   notes          String?
   preferences    String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
   // إذا أردت استخدام checkIn و checkOut، أضفهم هنا:
   checkIn        DateTime?
   checkOut       DateTime?
 
-  bookings       Booking[]  // <-- هذا الحقل يربط النزيل بالحجوزات
+  bookings      Booking[]
+  groupBookings GroupBooking[] @relation("GuestToGroupBookings")
 }
-
 
 // Booking model لإدارة الحجوزات
 model Booking {
-  id          String    @id @default(cuid())
-  guestId     String
-  guest       Guest     @relation(fields: [guestId], references: [id])
-  roomId      String
-  room        Room      @relation(fields: [roomId], references: [id])
-  
-  checkIn     DateTime
-  checkOut    DateTime
-  adults      Int       @default(1)
-  children    Int       @default(0)
-  status      BookingStatus @default(PENDING)
-  source      String?        // Walk-in / Online / OTA / Agent
-  totalPrice  Float?         
-  notes       String?
-  
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id      String @id @default(cuid())
+  guestId String
+  guest   Guest  @relation(fields: [guestId], references: [id])
+  roomId  String
+  room    Room   @relation(fields: [roomId], references: [id])
+
+  checkIn       DateTime
+  checkOut      DateTime
+  adults        Int           @default(1)
+  children      Int           @default(0)
+  status        BookingStatus @default(PENDING)
+  source        String? // Walk-in / Online / OTA / Agent
+  totalPrice    Float?
+  notes         String?
+  paymentStatus String        @default("UNPAID")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  roomTypeId    String? // نوع الغرفة
+  guestsCount   Int? // عدد النزلاء في الغرفة
+  pricePerNight Float? // سعر الليلة
+  totalNights   Int? // عدد الليالي
+
+  extrasData     Json? // ⬅ هنا تحفظ الخدمات الإضافية يدويًا
+  extras         BookingExtra[] // ⬅️ ربط الحجز بالخدمات الإضافية
+  groupBooking   GroupBooking?  @relation("GroupBookingToBookings", fields: [groupBookingId], references: [id])
+  groupBookingId String?
 }
 
 enum BookingStatus {
@@ -143,4 +165,36 @@ enum BookingStatus {
   CANCELLED
   CHECKED_IN
   CHECKED_OUT
+}
+
+model ExtraService {
+  id       String         @id @default(cuid())
+  name     String
+  price    Float
+  bookings BookingExtra[]
+}
+
+model BookingExtra {
+  id             String @id @default(cuid())
+  bookingId      String
+  extraServiceId String
+  quantity       Int    @default(1)
+
+  booking      Booking      @relation(fields: [bookingId], references: [id])
+  extraService ExtraService @relation(fields: [extraServiceId], references: [id])
+}
+
+model GroupBooking {
+  id         String   @id @default(cuid())
+  guestId    String
+  guest      Guest    @relation("GuestToGroupBookings", fields: [guestId], references: [id])
+  checkIn    DateTime
+  checkOut   DateTime
+  status     String   @default("CONFIRMED")
+  totalPrice Float    @default(0)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  bookings Booking[] @relation("GroupBookingToBookings")
 }

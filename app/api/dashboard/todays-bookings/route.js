@@ -1,43 +1,40 @@
-// app/api/dashboard/todays-bookings/route.js
-import prisma from "../../../../lib/prisma";
-import { getToken } from "next-auth/jwt";
-const secret = process.env.NEXTAUTH_SECRET;
+import { PrismaClient } from '@prisma/client';
 
-async function requireAuth(req) {
-    const token = await getToken({ req, secret });
-    if (!token) throw new Error("UNAUTHORIZED");
-    return token;
-}
+const prisma = new PrismaClient();
 
-export async function GET(req) {
+export async function GET() {
     try {
-        await requireAuth(req);
-
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
         const bookings = await prisma.booking.findMany({
-            where: { checkIn: { gte: today } },
-            include: {
-                guest: true,
-                room: true,
+            where: {
+                checkIn: {
+                    gte: today,
+                    lt: tomorrow,
+                },
             },
-            orderBy: { checkIn: "asc" },
+            include: {
+                guest: true,  // ✅ جلب بيانات الضيف
+                room: true,   // ✅ جلب بيانات الغرفة
+            },
+            orderBy: { checkIn: 'asc' },
         });
 
-        const formatted = bookings.map(b => ({
-            guestName: b.guest?.name,
-            roomNumber: b.room?.roomNumber,
+        // تجهيز البيانات بشكل مبسط
+        const result = bookings.map(b => ({
+            id: b.id,
+            guestName: b.guest ? `${b.guest.firstName} ${b.guest.lastName}` : '—',
+            roomNumber: b.room?.roomNumber || '—',
             checkIn: b.checkIn,
             checkOut: b.checkOut,
         }));
 
-        return new Response(JSON.stringify(formatted), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-        });
+        return new Response(JSON.stringify(result), { status: 200 });
     } catch (err) {
-        console.error(err);
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+        return new Response(JSON.stringify({ error: err.message }), { status: 500 });
     }
 }

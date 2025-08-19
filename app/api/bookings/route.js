@@ -1,116 +1,57 @@
-// import { PrismaClient } from '@prisma/client';
-
-// const prisma = new PrismaClient();
-
-// export async function GET(req) {
-//     try {
-//         const bookings = await prisma.booking.findMany({
-//             include: {
-//                 guest: true,
-//                 room: true,
-//             },
-//             orderBy: { createdAt: 'desc' },
-//         });
-//         return new Response(JSON.stringify(bookings), { status: 200 });
-//     } catch (err) {
-//         return new Response(JSON.stringify({ error: err.message }), { status: 500 });
-//     }
-// }
-
-// export async function POST(req) {
-//     try {
-//         const data = await req.json();
-
-//         // تحقق من الحقول المطلوبة
-//         if (!data.guestId || !data.roomId || !data.checkIn || !data.checkOut) {
-//             return new Response(JSON.stringify({ error: 'يرجى تعبئة جميع الحقول المطلوبة' }), { status: 400 });
-//         }
-
-//         // تحقق من توفر الغرفة
-//         const conflict = await prisma.booking.findFirst({
-//             where: {
-//                 roomId: data.roomId,
-//                 OR: [
-//                     {
-//                         checkIn: { lte: new Date(data.checkOut) },
-//                         checkOut: { gte: new Date(data.checkIn) },
-//                     },
-//                 ],
-//                 status: { not: 'CANCELLED' },
-//             },
-//         });
-
-//         if (conflict) {
-//             return new Response(JSON.stringify({ error: 'الغرفة محجوزة في هذه الفترة' }), { status: 400 });
-//         }
-
-//         const booking = await prisma.booking.create({
-//             data: {
-//                 guestId: data.guestId,
-//                 roomId: data.roomId,
-//                 checkIn: new Date(data.checkIn),
-//                 checkOut: new Date(data.checkOut),
-//                 status: data.status || 'PENDING',
-//                 totalPrice: data.totalPrice || 0,
-//                 notes: data.notes || '',
-//             },
-//             include: {
-//                 guest: true,
-//                 room: true,
-//             },
-//         });
-
-//         return new Response(JSON.stringify(booking), { status: 201 });
-//     } catch (err) {
-//         return new Response(JSON.stringify({ error: err.message }), { status: 500 });
-//     }
-// }
+import { NextResponse } from "next/server";
+import prisma from "../../../lib/prisma";
 
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
-
-export async function GET(req) {
+// GET: جلب كل الحجوزات مع بيانات النزيل والغرفة
+export async function GET() {
     try {
         const bookings = await prisma.booking.findMany({
             include: {
                 guest: true,
                 room: true,
             },
-            orderBy: { createdAt: 'desc' },
-        });
-        return new Response(JSON.stringify(bookings), { status: 200 });
-    } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 500 });
-    }
-}
-
-export async function POST(req) {
-    try {
-        const data = await req.json();
-
-        // تحقق من الحقول المطلوبة
-        if (!data.guestId || !data.roomId || !data.checkIn || !data.checkOut) {
-            return new Response(JSON.stringify({ error: 'يرجى تعبئة جميع الحقول المطلوبة' }), { status: 400 });
-        }
-
-        // تحقق من توفر الغرفة
-        const conflict = await prisma.booking.findFirst({
-            where: {
-                roomId: data.roomId,
-                OR: [
-                    {
-                        checkIn: { lte: new Date(data.checkOut) },
-                        checkOut: { gte: new Date(data.checkIn) },
-                    },
-                ],
-                status: { not: 'CANCELLED' },
+            orderBy: {
+                checkIn: "desc",
             },
         });
 
-        if (conflict) {
-            return new Response(JSON.stringify({ error: 'الغرفة محجوزة في هذه الفترة' }), { status: 400 });
+        return NextResponse.json(bookings);
+    } catch (error) {
+        console.error("Error fetching bookings:", error);
+        return NextResponse.json({ error: "فشل جلب الحجوزات" }, { status: 500 });
+    }
+}
+
+// إضافة حجز جديد
+export async function POST(req) {
+    try {
+        let data;
+
+        try {
+            data = await req.json();
+        } catch (err) {
+            return NextResponse.json({ error: "البيانات المرسلة غير صحيحة أو فاضية" }, { status: 400 });
+        }
+
+        if (!data || !data.checkIn || !data.checkOut) {
+            return NextResponse.json({ error: "يجب إدخال جميع البيانات المطلوبة" }, { status: 400 });
+        }
+
+        const checkIn = new Date(data.checkIn);
+        const checkOut = new Date(data.checkOut);
+
+        if (isNaN(checkIn) || isNaN(checkOut)) {
+            return NextResponse.json({ error: "صيغة التاريخ غير صحيحة" }, { status: 400 });
+        }
+
+        // التحقق من آخر حالة للغرفة
+        const lastStatusLog = await prisma.roomStatusLog.findFirst({
+            where: { roomId: data.roomId },
+            orderBy: { changedAt: "desc" },
+        });
+
+        if (lastStatusLog && lastStatusLog.newStatus !== "AVAILABLE") {
+            return NextResponse.json({ error: "⚠️ الغرفة غير متاحة للحجز" }, { status: 400 });
         }
 
         // إنشاء الحجز
@@ -118,53 +59,27 @@ export async function POST(req) {
             data: {
                 guestId: data.guestId,
                 roomId: data.roomId,
-                checkIn: new Date(data.checkIn),
-                checkOut: new Date(data.checkOut),
-                status: data.status || 'CONFIRMED',
-                totalPrice: data.totalPrice || 0,
-                notes: data.notes || '',
+                checkIn,
+                checkOut,
+                status: data.status || "CONFIRMED",
             },
-            include: {
-                guest: true,
-                room: true,
-            },
+            include: { room: true, guest: true },
         });
 
-        // تحديث حالة الغرفة إلى مشغولة
-        await prisma.room.update({
-            where: { id: data.roomId },
-            data: { status: 'OCCUPIED' },
-        });
-
-        return new Response(JSON.stringify(booking), { status: 201 });
-    } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 500 });
-    }
-}
-
-// إضافة PATCH لتحديث الحجز (تغيير حالة الغرفة عند الخروج)
-export async function PATCH(req, { params }) {
-    try {
-        const data = await req.json();
-        const bookingId = params.id;
-
-        const booking = await prisma.booking.update({
-            where: { id: bookingId },
+        // إضافة سجل حالة الغرفة بعد الحجز مباشرة
+        await prisma.roomStatusLog.create({
             data: {
-                status: data.status || 'CHECKED_OUT',
+                roomId: data.roomId,
+                oldStatus: lastStatusLog ? lastStatusLog.newStatus : "AVAILABLE",
+                newStatus: "OCCUPIED",
+                changedBy: "SYSTEM",
+                changedAt: new Date(),
             },
         });
 
-        // إذا تم تسجيل الخروج، تغيير حالة الغرفة إلى MAINTENANCE
-        if (booking.status === 'CHECKED_OUT') {
-            await prisma.room.update({
-                where: { id: booking.roomId },
-                data: { status: 'MAINTENANCE' },
-            });
-        }
-
-        return new Response(JSON.stringify(booking), { status: 200 });
-    } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+        return NextResponse.json(booking);
+    } catch (error) {
+        console.error("Error creating booking:", error);
+        return NextResponse.json({ error: "حدث خطأ أثناء إنشاء الحجز" }, { status: 500 });
     }
 }
