@@ -296,14 +296,49 @@ export async function PUT(req, { params }) {
     }
 }
 
-// DELETE: حذف الحجز (لا علاقة بحالة الغرفة)
+// =================== DELETE ===================
+// عند إنهاء الحجز -> تغيير الغرفة لصيانة
 export async function DELETE(req, { params }) {
-    const { id } = params;
     try {
-        await prisma.booking.delete({ where: { id } });
-        return NextResponse.json({ message: "تم حذف الحجز بنجاح" });
+        const id = params?.id; // نقرأ معرف الحجز من URL /api/bookings/[id]
+
+        if (!id) {
+            return NextResponse.json({ error: "معرف الحجز مطلوب" }, { status: 400 });
+        }
+
+        const result = await prisma.$transaction(async (tx) => {
+            const booking = await tx.booking.findUnique({ where: { id } });
+            if (!booking) throw new Error("الحجز غير موجود");
+
+            // تحديث سجل حالة الغرفة -> MAINTENANCE
+            await tx.roomStatusLog.create({
+                data: {
+                    roomId: booking.roomId,
+                    oldStatus: "OCCUPIED",
+                    newStatus: "MAINTENANCE",
+                    changedBy: "SYSTEM",
+                    changedAt: new Date(),
+                },
+            });
+
+            // تغيير حالة الغرفة الى صيانة
+            await tx.room.update({
+                where: { id: booking.roomId },
+                data: { status: "MAINTENANCE" },
+            });
+
+            // تحديث حالة الحجز -> COMPLETED
+            await tx.booking.update({
+                where: { id },
+                data: { status: "CHECKED_OUT" },
+            });
+
+            return booking;
+        });
+
+        return NextResponse.json({ success: true, booking: result });
     } catch (error) {
-        console.error("Error deleting booking:", error);
-        return NextResponse.json({ error: "فشل حذف الحجز" }, { status: 500 });
+        console.error("Error ending booking:", error);
+        return NextResponse.json({ error: "فشل إنهاء الحجز" }, { status: 500 });
     }
 }

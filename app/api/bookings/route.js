@@ -94,7 +94,7 @@
 import { NextResponse } from "next/server";
 import prisma from "../../../lib/prisma";
 
-// GET: قائمة الحجوزات أو حجوزات غرفة محددة (لتقويم الغرفة)
+// =================== GET ===================
 export async function GET(req) {
     try {
         const { searchParams } = new URL(req.url);
@@ -109,7 +109,6 @@ export async function GET(req) {
             return NextResponse.json(bookings);
         }
 
-        // كل الحجوزات (لصفحة الإدارة)
         const all = await prisma.booking.findMany({
             include: {
                 guest: true,
@@ -124,18 +123,10 @@ export async function GET(req) {
     }
 }
 
-// POST: إضافة حجز جديد + تحديث حالة الغرفة واللوج
+// =================== POST ===================
 export async function POST(req) {
     try {
-        let data;
-        try {
-            data = await req.json();
-        } catch {
-            return NextResponse.json(
-                { error: "البيانات المرسلة غير صحيحة أو فاضية" },
-                { status: 400 }
-            );
-        }
+        const data = await req.json();
 
         if (!data?.guestId || !data?.roomId || !data?.checkIn || !data?.checkOut) {
             return NextResponse.json(
@@ -146,12 +137,8 @@ export async function POST(req) {
 
         const checkIn = new Date(data.checkIn);
         const checkOut = new Date(data.checkOut);
-        if (isNaN(checkIn) || isNaN(checkOut)) {
-            return NextResponse.json({ error: "صيغة التاريخ غير صحيحة" }, { status: 400 });
-        }
 
         const result = await prisma.$transaction(async (tx) => {
-            // تحقق من آخر حالة للغرفة
             const lastStatusLog = await tx.roomStatusLog.findFirst({
                 where: { roomId: data.roomId },
                 orderBy: { changedAt: "desc" },
@@ -162,7 +149,6 @@ export async function POST(req) {
                 throw new Error("⚠️ الغرفة غير متاحة للحجز");
             }
 
-            // إنشاء الحجز
             const booking = await tx.booking.create({
                 data: {
                     guestId: data.guestId,
@@ -184,7 +170,6 @@ export async function POST(req) {
                 include: { guest: true, room: true },
             });
 
-            // تحديث حالة الغرفة -> OCCUPIED + تسجيل اللوج
             await tx.roomStatusLog.create({
                 data: {
                     roomId: data.roomId,
@@ -214,3 +199,124 @@ export async function POST(req) {
         return NextResponse.json({ error: message }, { status });
     }
 }
+
+// =================== PUT ===================
+// تعديل بيانات الحجز أو تغيير الغرفة
+export async function PUT(req) {
+    try {
+        const data = await req.json();
+
+        if (!data?.id) {
+            return NextResponse.json({ error: "معرف الحجز مطلوب" }, { status: 400 });
+        }
+
+        const result = await prisma.$transaction(async (tx) => {
+            const oldBooking = await tx.booking.findUnique({
+                where: { id: data.id },
+            });
+
+            if (!oldBooking) {
+                throw new Error("الحجز غير موجود");
+            }
+
+            // إذا تم تغيير الغرفة
+            if (data.roomId && data.roomId !== oldBooking.roomId) {
+                // الغرفة القديمة -> MAINTENANCE
+                await tx.roomStatusLog.create({
+                    data: {
+                        roomId: oldBooking.roomId,
+                        oldStatus: "OCCUPIED",
+                        newStatus: "MAINTENANCE",
+                        changedBy: "SYSTEM",
+                        changedAt: new Date(),
+                    },
+                });
+                await tx.room.update({
+                    where: { id: oldBooking.roomId },
+                    data: { status: "MAINTENANCE" },
+                });
+
+                // الغرفة الجديدة -> OCCUPIED
+                await tx.roomStatusLog.create({
+                    data: {
+                        roomId: data.roomId,
+                        oldStatus: "AVAILABLE",
+                        newStatus: "OCCUPIED",
+                        changedBy: "SYSTEM",
+                        changedAt: new Date(),
+                    },
+                });
+                await tx.room.update({
+                    where: { id: data.roomId },
+                    data: { status: "OCCUPIED" },
+                });
+            }
+
+            // تحديث بيانات الحجز
+            const booking = await tx.booking.update({
+                where: { id: data.id },
+                data: {
+                    ...data,
+                    updatedAt: new Date(),
+                },
+                include: { guest: true, room: true },
+            });
+
+            return booking;
+        });
+
+        return NextResponse.json(result);
+    } catch (error) {
+        console.error("Error updating booking:", error);
+        return NextResponse.json({ error: "فشل تعديل الحجز" }, { status: 500 });
+    }
+}
+
+// =================== DELETE ===================
+// =================== DELETE ===================
+// عند إنهاء الحجز -> تغيير الغرفة لصيانة
+export async function DELETE(req, { params }) {
+    try {
+        const id = params?.id; // نقرأ معرف الحجز من URL /api/bookings/[id]
+
+        if (!id) {
+            return NextResponse.json({ error: "معرف الحجز مطلوب" }, { status: 400 });
+        }
+
+        const result = await prisma.$transaction(async (tx) => {
+            const booking = await tx.booking.findUnique({ where: { id } });
+            if (!booking) throw new Error("الحجز غير موجود");
+
+            // تحديث سجل حالة الغرفة -> MAINTENANCE
+            await tx.roomStatusLog.create({
+                data: {
+                    roomId: booking.roomId,
+                    oldStatus: "OCCUPIED",
+                    newStatus: "MAINTENANCE",
+                    changedBy: "SYSTEM",
+                    changedAt: new Date(),
+                },
+            });
+
+            // تغيير حالة الغرفة الى صيانة
+            await tx.room.update({
+                where: { id: booking.roomId },
+                data: { status: "MAINTENANCE" },
+            });
+
+            // تحديث حالة الحجز -> COMPLETED
+            await tx.booking.update({
+                where: { id },
+                data: { status: "CHECKED_OUT" },
+            });
+
+            return booking;
+        });
+
+        return NextResponse.json({ success: true, booking: result });
+    } catch (error) {
+        console.error("Error ending booking:", error);
+        return NextResponse.json({ error: "فشل إنهاء الحجز" }, { status: 500 });
+    }
+}
+
