@@ -1,130 +1,3 @@
-// import { PrismaClient } from '@prisma/client';
-
-// const prisma = new PrismaClient();
-
-// // جلب بيانات حجز محدد
-// export async function GET(req, context) {
-//     try {
-//         const { params } = context;
-//         const id = params.id;
-
-//         const booking = await prisma.booking.findUnique({
-//             where: { id },
-//             include: {
-//                 guest: true,
-//                 room: true,
-//                 extras: { include: { extraService: true } },
-//             },
-//         });
-
-//         if (!booking) {
-//             return new Response(JSON.stringify({ error: 'الحجز غير موجود' }), { status: 404 });
-//         }
-
-//         const bookingWithRoomStatus = {
-//             ...booking,
-//             roomStatus: booking.room?.status || 'AVAILABLE',
-//         };
-
-//         return new Response(JSON.stringify(bookingWithRoomStatus), { status: 200 });
-//     } catch (err) {
-//         return new Response(JSON.stringify({ error: err.message }), { status: 500 });
-//     }
-// }
-
-// export async function PUT(req, context) {
-//     try {
-//         const { params } = context;
-//         const id = params.id;
-//         const data = await req.json();
-
-//         // التحقق من التعارض مع حجوزات أخرى لنفس الغرفة
-//         const conflict = await prisma.booking.findFirst({
-//             where: {
-//                 roomId: data.roomId,
-//                 id: { not: id },
-//                 OR: [
-//                     {
-//                         checkIn: { lte: new Date(data.checkOut) },
-//                         checkOut: { gte: new Date(data.checkIn) },
-//                     },
-//                 ],
-//                 status: { not: 'CANCELLED' },
-//             },
-//         });
-
-//         if (conflict) {
-//             return new Response(JSON.stringify({ error: '⚠️ الغرفة محجوزة بالفعل في هذه الفترة' }), { status: 400 });
-//         }
-
-//         const updatedBooking = await prisma.booking.update({
-//             where: { id },
-//             data: {
-//                 guestId: data.guestId,
-//                 roomId: data.roomId,
-//                 checkIn: new Date(data.checkIn),
-//                 checkOut: new Date(data.checkOut),
-//                 status: data.status,
-//                 totalPrice: data.totalPrice || 0,
-//                 notes: data.notes || '',
-//             },
-//             include: { guest: true, room: true },
-//         });
-
-//         // تحديث حالة الغرفة بناءً على حالة الحجز
-//         let newRoomStatus = 'AVAILABLE';
-//         if (data.roomStatus) newRoomStatus = data.roomStatus;
-//         else if (data.status === 'CHECKED_OUT') newRoomStatus = 'MAINTENANCE';
-//         else if (['CONFIRMED', 'ONGOING'].includes(data.status)) newRoomStatus = 'OCCUPIED';
-//         else if (data.status === 'CANCELLED') newRoomStatus = 'AVAILABLE';
-
-//         await prisma.room.update({
-//             where: { id: data.roomId },
-//             data: { status: newRoomStatus },
-//         });
-
-//         const updatedBookingWithRoomStatus = {
-//             ...updatedBooking,
-//             roomStatus: newRoomStatus,
-//         };
-
-//         return new Response(JSON.stringify(updatedBookingWithRoomStatus), { status: 200 });
-//     } catch (err) {
-//         return new Response(JSON.stringify({ error: err.message }), { status: 500 });
-//     }
-// }
-
-// // حذف الحجز
-// export async function DELETE(req, context) {
-//     try {
-//         const { params } = context;
-//         const id = params.id;
-
-//         const booking = await prisma.booking.findUnique({ where: { id } });
-
-//         if (!booking) {
-//             return new Response(JSON.stringify({ error: 'الحجز غير موجود' }), { status: 404 });
-//         }
-
-//         await prisma.booking.delete({ where: { id } });
-
-//         if (booking?.roomId) {
-//             await prisma.room.update({
-//                 where: { id: booking.roomId },
-//                 data: { status: 'AVAILABLE' },
-//             });
-//         }
-
-//         return new Response(JSON.stringify({ message: 'تم حذف الحجز' }), { status: 200 });
-//     } catch (err) {
-//         return new Response(JSON.stringify({ error: err.message }), { status: 500 });
-//     }
-// }
-
-// ----------------- قديم شغال ------------------------
-
-// ------------------ جديد تحت التجربة-------------------
-
 import { NextResponse } from "next/server";
 import prisma from "../../../../lib/prisma";
 
@@ -146,12 +19,16 @@ export async function GET(req, { params }) {
     }
 }
 
-// PUT: تحديث بيانات الحجز + تحديث حالة الغرفة واللوج
+// PUT: تحديث بيانات الحجز + تحديث حالة الغرفة
 export async function PUT(req, { params }) {
     const { id } = params;
 
     try {
         const data = await req.json();
+
+        // إصلاح صيغة التواريخ (Prisma يحتاج DateTime كامل)
+        const checkIn = data.checkIn ? new Date(data.checkIn) : undefined;
+        const checkOut = data.checkOut ? new Date(data.checkOut) : undefined;
 
         const result = await prisma.$transaction(async (tx) => {
             // الحجز الحالي
@@ -159,21 +36,19 @@ export async function PUT(req, { params }) {
                 where: { id },
                 include: { room: true },
             });
-            if (!existing) {
-                throw new Error("الحجز غير موجود");
-            }
+            if (!existing) throw new Error("الحجز غير موجود");
 
             const prevRoomId = existing.roomId;
             const nextRoomId = data.roomId ?? prevRoomId;
 
-            // تحديث بيانات الحجز أولاً
+            // تحديث بيانات الحجز
             const updatedBooking = await tx.booking.update({
                 where: { id },
                 data: {
                     guestId: data.guestId ?? existing.guestId,
                     roomId: nextRoomId,
-                    checkIn: data.checkIn ?? existing.checkIn,
-                    checkOut: data.checkOut ?? existing.checkOut,
+                    checkIn: checkIn ?? existing.checkIn,
+                    checkOut: checkOut ?? existing.checkOut,
                     adults: data.adults ?? existing.adults,
                     children: data.children ?? existing.children,
                     extraBeds: data.extraBeds ?? existing.extraBeds,
@@ -181,7 +56,6 @@ export async function PUT(req, { params }) {
                     paymentStatus: data.paymentStatus ?? existing.paymentStatus,
                     source: data.source ?? existing.source,
                     notes: data.notes ?? existing.notes,
-                    // لو عندك أعمدة إضافية (خصم / ضريبة / خدمات...) وسيماك يدعمها، اتركها:
                     discountPercent: data.discountPercent ?? existing.discountPercent,
                     taxPercent: data.taxPercent ?? existing.taxPercent,
                     extraServices: data.extraServices ?? existing.extraServices,
@@ -190,97 +64,78 @@ export async function PUT(req, { params }) {
                 include: { room: true },
             });
 
-            // 1) لو تغيّرت الغرفة: سجل خروج للقديمة ودخول للجديدة
+            // 1) لو تغيّرت الغرفة
             if (prevRoomId !== nextRoomId) {
                 // الغرفة القديمة => AVAILABLE
-                const lastOld = await tx.roomStatusLog.findFirst({
-                    where: { roomId: prevRoomId },
-                    orderBy: { changedAt: "desc" },
+                await tx.room.update({
+                    where: { id: prevRoomId },
+                    data: { status: "AVAILABLE" },
                 });
                 await tx.roomStatusLog.create({
                     data: {
                         roomId: prevRoomId,
-                        oldStatus: lastOld?.newStatus ?? "AVAILABLE",
+                        oldStatus: existing.room.status,
                         newStatus: "AVAILABLE",
                         changedBy: "SYSTEM",
                         changedAt: new Date(),
                     },
                 });
-                await tx.room.update({
-                    where: { id: prevRoomId },
-                    data: { status: "AVAILABLE" },
-                });
 
-                // الغرفة الجديدة => OCCUPIED إلا إذا الحجز منتهي/ملغي
-                const shouldOccupy =
-                    !["CHECKED_OUT", "CANCELLED"].includes(
-                        (updatedBooking.status || "").toUpperCase()
-                    );
-
+                // الغرفة الجديدة => OCCUPIED إلا إذا الحجز ملغي/منتهي
+                const shouldOccupy = !["CHECKED_OUT", "CANCELLED"].includes(
+                    (updatedBooking.status || "").toUpperCase()
+                );
                 const targetNewStatus = shouldOccupy ? "OCCUPIED" : "AVAILABLE";
-                const lastNew = await tx.roomStatusLog.findFirst({
-                    where: { roomId: nextRoomId },
-                    orderBy: { changedAt: "desc" },
+
+                await tx.room.update({
+                    where: { id: nextRoomId },
+                    data: { status: targetNewStatus },
                 });
                 await tx.roomStatusLog.create({
                     data: {
                         roomId: nextRoomId,
-                        oldStatus: lastNew?.newStatus ?? "AVAILABLE",
+                        oldStatus: "AVAILABLE",
                         newStatus: targetNewStatus,
                         changedBy: "SYSTEM",
                         changedAt: new Date(),
                     },
                 });
-                await tx.room.update({
-                    where: { id: nextRoomId },
-                    data: { status: targetNewStatus },
-                });
             }
 
-            // 2) لو تم إرسال roomStatus صراحةً من الواجهة، طبّقه على الغرفة الحالية (بعد التحديث)
+            // 2) لو تم إرسال roomStatus صراحةً من الواجهة
             if (data.roomStatus) {
-                const targetRoomId = nextRoomId;
-                const last = await tx.roomStatusLog.findFirst({
-                    where: { roomId: targetRoomId },
-                    orderBy: { changedAt: "desc" },
+                await tx.room.update({
+                    where: { id: nextRoomId },
+                    data: { status: data.roomStatus },
                 });
                 await tx.roomStatusLog.create({
                     data: {
-                        roomId: targetRoomId,
-                        oldStatus: last?.newStatus ?? "AVAILABLE",
+                        roomId: nextRoomId,
+                        oldStatus: updatedBooking.room.status,
                         newStatus: data.roomStatus,
                         changedBy: "SYSTEM",
                         changedAt: new Date(),
                     },
                 });
-                await tx.room.update({
-                    where: { id: targetRoomId },
-                    data: { status: data.roomStatus },
-                });
             }
 
-            // 3) لو الحجز اتغير إلى CHECKED_OUT ولم يُرسل roomStatus، خلّي الغرفة MAINTENANCE
+            // 3) لو الحجز CHECKED_OUT ولم يُرسل roomStatus => MAINTENANCE
             if (
                 (updatedBooking.status || "").toUpperCase() === "CHECKED_OUT" &&
                 !data.roomStatus
             ) {
-                const targetRoomId = nextRoomId;
-                const last = await tx.roomStatusLog.findFirst({
-                    where: { roomId: targetRoomId },
-                    orderBy: { changedAt: "desc" },
+                await tx.room.update({
+                    where: { id: nextRoomId },
+                    data: { status: "MAINTENANCE" },
                 });
                 await tx.roomStatusLog.create({
                     data: {
-                        roomId: targetRoomId,
-                        oldStatus: last?.newStatus ?? "AVAILABLE",
+                        roomId: nextRoomId,
+                        oldStatus: updatedBooking.room.status,
                         newStatus: "MAINTENANCE",
                         changedBy: "SYSTEM",
                         changedAt: new Date(),
                     },
-                });
-                await tx.room.update({
-                    where: { id: targetRoomId },
-                    data: { status: "MAINTENANCE" },
                 });
             }
 
