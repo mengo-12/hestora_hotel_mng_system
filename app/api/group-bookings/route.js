@@ -6,52 +6,84 @@ export async function POST(req) {
         const body = await req.json();
         const { mainGuestId, checkIn, checkOut, notes, groupRooms, discount = 0, taxRate = 0 } = body;
 
-        // حساب إجمالي السعر لكل غرفة مع الخصم والضريبة
+        // حساب إجمالي السعر للحجز الجماعي
         const totalPrice = groupRooms.reduce((sum, room) => {
             const extrasTotal = room.extraServices
-                .map(s => s.price || 0)
-                .reduce((a, b) => a + b, 0);
+                ?.map(s => s.price || 0)
+                .reduce((a, b) => a + b, 0) || 0;
+
             const roomTotal = (room.totalPrice || 0) + extrasTotal;
             return sum + roomTotal;
         }, 0);
 
-        // تطبيق الخصم
         const discounted = totalPrice - discount;
-        // إضافة الضريبة
         const finalTotal = discounted + (discounted * (taxRate / 100));
 
-        const groupBooking = await prisma.groupBooking.create({
-            data: {
-                guestId: mainGuestId,
-                checkIn: new Date(checkIn),
-                checkOut: new Date(checkOut),
-                notes,
-                totalPrice: finalTotal,
-                bookings: {
-                    create: groupRooms.map(room => ({
-                        guestId: room.guestId || mainGuestId,
-                        checkIn: new Date(checkIn),
-                        checkOut: new Date(checkOut),
+        const groupBooking = await prisma.$transaction(async (tx) => {
+            // إنشاء الحجز الجماعي
+            const createdGroup = await tx.groupBooking.create({
+                data: {
+                    guestId: mainGuestId,
+                    checkIn: new Date(checkIn),
+                    checkOut: new Date(checkOut),
+                    notes,
+                    totalPrice: finalTotal,
+                    bookings: {
+                        create: groupRooms.map(room => {
+                            // حساب سعر كل غرفة
+                            const extrasTotal = room.extraServices
+                                ?.map(s => s.price || 0)
+                                .reduce((a, b) => a + b, 0) || 0;
+
+                            const roomBaseTotal = (room.totalPrice || 0) + extrasTotal;
+                            const roomDiscounted = roomBaseTotal - (room.discount || 0);
+                            const roomFinal = roomDiscounted + (roomDiscounted * (taxRate / 100));
+
+                            return {
+                                guestId: room.guestId || mainGuestId,
+                                checkIn: new Date(checkIn),
+                                checkOut: new Date(checkOut),
+                                roomId: room.roomId,
+                                adults: room.adults || 1,
+                                children: room.children || 0,
+                                notes: room.notes || '',
+                                totalPrice: roomFinal, // ✅ السعر النهائي للغرفة
+                                status: room.status || 'CONFIRMED',
+                                extrasData: room.extraServices
+                                    ?.filter(s => s.name && s.price)
+                                    .map(s => ({
+                                        name: s.name,
+                                        price: s.price,
+                                        quantity: 1
+                                    })) || []
+                            };
+                        })
+                    }
+                },
+                include: {
+                    bookings: true,
+                    guest: true,
+                },
+            });
+
+            // تحديث حالة الغرف وإضافة سجل لكل غرفة
+            for (const room of groupRooms) {
+                await tx.room.update({
+                    where: { id: room.roomId },
+                    data: { status: "OCCUPIED" }
+                });
+
+                await tx.roomStatusLog.create({
+                    data: {
                         roomId: room.roomId,
-                        adults: room.adults || 1,
-                        children: room.children || 0,
-                        notes: room.notes || '',
-                        totalPrice: room.totalPrice || 0,
-                        status: room.status || 'CONFIRMED',
-                        extrasData: room.extraServices
-                            .filter(s => s.name && s.price)
-                            .map(s => ({
-                                name: s.name,
-                                price: s.price,
-                                quantity: 1
-                            }))
-                    }))
-                }
-            },
-            include: {
-                bookings: true,
-                guest: true,
-            },
+                        oldStatus: "AVAILABLE",
+                        newStatus: "OCCUPIED",
+                        changedBy: "System (Group Booking)"
+                    }
+                });
+            }
+
+            return createdGroup;
         });
 
         return NextResponse.json(groupBooking);
