@@ -212,33 +212,37 @@ export default function RoomsPage() {
     const [properties, setProperties] = useState([]);
     const socket = useSocket();
 
-    // جلب البيانات عند تحميل الصفحة
     useEffect(() => {
+        // جلب البيانات عند التحميل
         fetchRooms();
         fetchRoomTypes();
         fetchProperties();
-    }, []);
 
-    // الاشتراك في الأحداث العالمية عبر Socket.io
-    useEffect(() => {
-        if (!socket) return;
+        if (socket) {
+            // عند تغيير حالة الغرفة
+            socket.on("ROOM_STATUS_CHANGED", ({ roomId, newStatus }) => {
+                setRooms(prev =>
+                    prev.map(r => r.id === roomId ? { ...r, status: newStatus } : r)
+                );
+            });
 
-        const handleRoomCreated = (room) => setRooms(prev => [...prev, room]);
-        const handleRoomDeleted = (roomId) => setRooms(prev => prev.filter(r => r.id !== roomId));
-        const handleRoomStatusChanged = ({ roomId, newStatus }) => {
-            setRooms(prev =>
-                prev.map(r => r.id === roomId ? { ...r, status: newStatus } : r)
-            );
-        };
+            // عند إنشاء غرفة جديدة (عالمي)
+            socket.on("ROOM_CREATED", (room) => {
+                setRooms(prev => [...prev, room]);
+            });
 
-        socket.on("ROOM_CREATED", handleRoomCreated);
-        socket.on("ROOM_DELETED", handleRoomDeleted);
-        socket.on("ROOM_STATUS_CHANGED", handleRoomStatusChanged);
+            // عند حذف غرفة (عالمي)
+            socket.on("ROOM_DELETED", (roomId) => {
+                setRooms(prev => prev.filter(r => r.id !== roomId));
+            });
+        }
 
         return () => {
-            socket.off("ROOM_CREATED", handleRoomCreated);
-            socket.off("ROOM_DELETED", handleRoomDeleted);
-            socket.off("ROOM_STATUS_CHANGED", handleRoomStatusChanged);
+            if (socket) {
+                socket.off("ROOM_STATUS_CHANGED");
+                socket.off("ROOM_CREATED");
+                socket.off("ROOM_DELETED");
+            }
         };
     }, [socket]);
 
@@ -267,22 +271,6 @@ export default function RoomsPage() {
         MAINTENANCE: { bg: "bg-blue-500", text: "text-white" },
     };
 
-    const handleDeleteRoom = async (roomId, roomNumber) => {
-        if (!confirm(`Are you sure you want to delete Room ${roomNumber}?`)) return;
-        try {
-            const res = await fetch(`/api/rooms/${roomId}`, { method: "DELETE" });
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error || "Failed to delete room");
-            }
-            // محلياً تحديث سريع (سيتم التحديث مجدداً عبر Socket.io لكل التبويبات)
-            setRooms(prev => prev.filter(r => r.id !== roomId));
-        } catch (err) {
-            console.error(err);
-            alert(err.message);
-        }
-    };
-
     return (
         <div className="p-6">
             {/* زر إضافة غرفة */}
@@ -308,13 +296,31 @@ export default function RoomsPage() {
                             <div className="flex justify-between items-center">
                                 <h2 className="text-xl font-semibold">Room {room.number}</h2>
                                 <button
-                                    onClick={(e) => { e.stopPropagation(); setEditRoom(room); }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditRoom(room);
+                                    }}
                                     className="bg-white text-black text-xs px-2 py-1 rounded hover:bg-gray-200"
                                 >
                                     ✏️ Edit
                                 </button>
                                 <button
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteRoom(room.id, room.number); }}
+                                    onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (!confirm(`Are you sure you want to delete Room ${room.number}?`)) return;
+
+                                        try {
+                                            const res = await fetch(`/api/rooms/${room.id}`, { method: "DELETE" });
+                                            if (!res.ok) {
+                                                const data = await res.json();
+                                                throw new Error(data.error || "Failed to delete room");
+                                            }
+                                            setRooms(prev => prev.filter(r => r.id !== room.id));
+                                        } catch (err) {
+                                            console.error(err);
+                                            alert(err.message);
+                                        }
+                                    }}
                                     className="bg-red-500 text-white text-xs px-2 py-1 rounded hover:bg-red-600"
                                 >
                                     🗑 Delete
@@ -332,7 +338,7 @@ export default function RoomsPage() {
                 <AddRoomModal
                     isOpen={showAddModal}
                     onClose={() => setShowAddModal(false)}
-                    onSaved={(room) => setRooms(prev => [...prev, room])}
+                    // تم إزالة إضافة الغرفة محليًا مباشرة
                     properties={properties}
                     roomTypes={roomTypes}
                     userId={"currentUserId"}

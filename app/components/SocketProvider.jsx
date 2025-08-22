@@ -1,6 +1,6 @@
 // 'use client';
-// import { createContext, useContext, useEffect, useState } from "react";
 // import { io } from "socket.io-client";
+// import { createContext, useContext, useEffect, useState } from "react";
 
 // const SocketContext = createContext(null);
 
@@ -8,14 +8,18 @@
 //     const [socket, setSocket] = useState(null);
 
 //     useEffect(() => {
-//         const s = io("http://localhost:3001", {   // نفس بورت Next.js
+//         const socketInstance = io("http://localhost:3001", {
 //             path: "/api/socket",
 //         });
 
-//         setSocket(s);
+//         socketInstance.on("connect", () => {
+//             console.log("✅ Connected to socket:", socketInstance.id);
+//         });
+
+//         setSocket(socketInstance);
 
 //         return () => {
-//             s.disconnect();
+//             socketInstance.disconnect();
 //         };
 //     }, []);
 
@@ -27,6 +31,7 @@
 // };
 
 // export const useSocket = () => useContext(SocketContext);
+
 
 'use client';
 import { io } from "socket.io-client";
