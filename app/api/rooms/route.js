@@ -1,6 +1,6 @@
 // app/api/rooms/route.js
 import prisma from "@/lib/prisma";
-import { io } from "@/lib/socket"; // Socket.io server instance
+import { getIO } from "@/lib/socket";
 
 export async function GET() {
     const rooms = await prisma.room.findMany({
@@ -10,6 +10,7 @@ export async function GET() {
 }
 
 export async function POST(req) {
+    
     try {
         const { propertyId, number, roomTypeId, status, floor, notes, createdById } = await req.json();
 
@@ -49,13 +50,18 @@ export async function POST(req) {
             });
         }
 
-        // ---- Emit Socket Event ----
-        io.emit("ROOM_CREATED", room);
+        // ---- Emit عبر Socket.io ----
+        try {
+            const io = getIO(req);  // أهم خطوة: تمرير req لتهيئة io
+            io.emit("ROOM_CREATED", room);  // إرسال الحدث لكل العملاء
+        } catch (err) {
+            console.error("Socket emit failed:", err);
+        }
 
         return new Response(JSON.stringify(room), { status: 201 });
 
     } catch (err) {
-        console.error(err);
-        return new Response(JSON.stringify({ error: "Server error" }), { status: 500 });
+        console.error("Room creation failed:", err);
+        return new Response(JSON.stringify({ error: "Failed to create room" }), { status: 500 });
     }
 }

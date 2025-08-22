@@ -1,22 +1,33 @@
+// app/api/socket/route.js
 import { Server } from "socket.io";
+import { setIO } from "@/lib/socket";
 
-export const GET = async (req) => {
-    return new Response("Socket server is running");
-};
+let io;
 
-export const POST = async (req) => {
-    // فقط لتوافق App Router
-};
+export async function GET(req) {
+    if (!io) {
+        const httpServer = req?.socket?.server;
 
-export const runtime = 'edge';
+        if (httpServer?.io) {
+            io = httpServer.io;
+        } else {
+            io = new Server(httpServer, {
+                path: "/api/socket",
+                cors: { origin: "*" },
+            });
 
-export default function SocketHandler(req) {
-    if (!global.io) {
-        const io = new Server({
-            path: "/api/socket",
-            cors: { origin: "*" },
-        });
-        global.io = io;
+            httpServer.io = io;
+            setIO(io);
+
+            io.on("connection", (socket) => {
+                console.log("User connected:", socket.id);
+
+                socket.on("disconnect", () => {
+                    console.log("User disconnected:", socket.id);
+                });
+            });
+        }
     }
-    return new Response("Socket initialized");
+
+    return new Response("Socket.io server is running", { status: 200 });
 }

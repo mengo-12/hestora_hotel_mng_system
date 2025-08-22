@@ -10,7 +10,44 @@
 //     const [editRoom, setEditRoom] = useState(null);
 //     const [showAddModal, setShowAddModal] = useState(false);
 //     const [roomTypes, setRoomTypes] = useState([]);
+//     const [properties, setProperties] = useState([]);
 //     const socket = useSocket();
+
+
+//     useEffect(() => {
+//         // جلب البيانات عند التحميل
+//         fetchRooms();
+//         fetchRoomTypes();
+//         fetchProperties();
+
+//         if (socket) {
+//             // عند تغيير حالة الغرفة
+//             socket.on("ROOM_STATUS_CHANGED", ({ roomId, newStatus }) => {
+//                 setRooms(prev =>
+//                     prev.map(r => r.id === roomId ? { ...r, status: newStatus } : r)
+//                 );
+//             });
+
+//             // عند إنشاء غرفة جديدة
+//             socket.on("ROOM_CREATED", (room) => {
+//                 setRooms(prev => [...prev, room]);
+//             });
+
+//             // عند حذف غرفة
+//             socket.on("ROOM_DELETED", (roomId) => {
+//                 setRooms(prev => prev.filter(r => r.id !== roomId));
+//             });
+//         }
+
+//         return () => {
+//             if (socket) {
+//                 socket.off("ROOM_STATUS_CHANGED");
+//                 socket.off("ROOM_CREATED");
+//                 socket.off("ROOM_DELETED");
+//             }
+//         };
+//     }, [socket]);
+
 
 //     // جلب غرف
 //     const fetchRooms = async () => {
@@ -33,30 +70,6 @@
 //         setProperties(data);
 //     };
 
-//     useEffect(() => {
-//         fetchRooms();
-//         fetchRoomTypes();
-//         fetchProperties();
-//         if (socket) {
-//             socket.on("ROOM_STATUS_CHANGED", ({ roomId, newStatus }) => {
-//                 setRooms(prev =>
-//                     prev.map(r =>
-//                         r.id === roomId ? { ...r, status: newStatus } : r
-//                     )
-//                 );
-//             });
-//             socket.on("ROOM_CREATED", (room) => {
-//                 setRooms(prev => [...prev, room]);
-//             });
-//         }
-
-//         return () => {
-//             if (socket) {
-//                 socket.off("ROOM_STATUS_CHANGED");
-//                 socket.off("ROOM_CREATED");
-//             }
-//         };
-//     }, [socket]);
 
 //     const statusConfig = {
 //         VACANT: { bg: "bg-green-500", text: "text-white" },
@@ -81,7 +94,6 @@
 //             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 //                 {rooms.map(room => {
 //                     const config = statusConfig[room.status] || { bg: "bg-gray-300", text: "text-black" };
-
 //                     return (
 //                         <div
 //                             key={room.id}
@@ -89,9 +101,7 @@
 //                             onClick={() => setSelectedRoom(room)}
 //                         >
 //                             <div className="flex justify-between items-center">
-//                                 <h2 className="text-xl font-semibold">
-//                                     Room {room.number}
-//                                 </h2>
+//                                 <h2 className="text-xl font-semibold">Room {room.number}</h2>
 //                                 <button
 //                                     onClick={(e) => {
 //                                         e.stopPropagation();
@@ -101,6 +111,35 @@
 //                                 >
 //                                     ✏️ Edit
 //                                 </button>
+//                                 {/* زر الحذف */}
+//                                 <button
+//                                     onClick={async (e) => {
+//                                         e.stopPropagation();
+//                                         if (!confirm(`Are you sure you want to delete Room ${room.number}?`)) return;
+
+//                                         try {
+//                                             const res = await fetch(`/api/rooms/${room.id}`, {
+//                                                 method: "DELETE",
+//                                             });
+
+//                                             if (!res.ok) {
+//                                                 const data = await res.json();
+//                                                 throw new Error(data.error || "Failed to delete room");
+//                                             }
+
+//                                             // تحديث محلي فوري
+//                                             setRooms(prev => prev.filter(r => r.id !== room.id));
+//                                         } catch (err) {
+//                                             console.error(err);
+//                                             alert(err.message);
+//                                         }
+//                                     }}
+//                                     className="bg-red-500 text-white text-xs px-2 py-1 rounded hover:bg-red-600"
+//                                 >
+//                                     🗑 Delete
+//                                 </button>
+
+
 //                             </div>
 //                             <p className="mt-2">Type: {room.roomType?.name || "N/A"}</p>
 //                             <p>Status: {room.status}</p>
@@ -109,15 +148,29 @@
 //                 })}
 //             </div>
 
-//             {/* Popup Add Room */}
+//             {/* Add Room Modal */}
 //             {showAddModal && (
 //                 <AddRoomModal
 //                     isOpen={showAddModal}
 //                     onClose={() => setShowAddModal(false)}
 //                     onSaved={(room) => setRooms(prev => [...prev, room])}
-//                     properties={[]} // تمرير قائمة properties إذا كانت موجودة
-//                     roomTypes={[]}  // تمرير قائمة roomTypes إذا كانت موجودة
-//                     userId={"currentUserId"} // تمرير معرف المستخدم الحالي
+//                     properties={properties}       // البيانات من API
+//                     roomTypes={roomTypes}         // البيانات من API
+//                     userId={"currentUserId"}
+//                 />
+//             )}
+
+//             {/* Edit Room Modal */}
+//             {editRoom && (
+//                 <EditRoomModal
+//                     room={editRoom}
+//                     isOpen={!!editRoom}
+//                     onClose={() => setEditRoom(null)}
+//                     onSaved={(updatedRoom) =>
+//                         setRooms(prev => prev.map(r => r.id === updatedRoom.id ? updatedRoom : r))
+//                     }
+//                     roomTypes={roomTypes}
+//                     properties={properties}
 //                 />
 //             )}
 
@@ -139,24 +192,9 @@
 //                     </div>
 //                 </div>
 //             )}
-
-
-//             {/* Popup تعديل الغرفة */}
-//             {editRoom && (
-//                 <EditRoomModal
-//                     room={editRoom}
-//                     isOpen={!!editRoom}
-//                     onClose={() => setEditRoom(null)}
-//                     onSaved={(updatedRoom) =>
-//                         setRooms(prev => prev.map(r => r.id === updatedRoom.id ? updatedRoom : r))
-//                     }
-//                     roomTypes={roomTypes}
-//                 />
-//             )}
 //         </div>
 //     );
 // }
-
 
 
 'use client';
@@ -174,56 +212,75 @@ export default function RoomsPage() {
     const [properties, setProperties] = useState([]);
     const socket = useSocket();
 
-    // جلب غرف
+    // جلب البيانات عند تحميل الصفحة
+    useEffect(() => {
+        fetchRooms();
+        fetchRoomTypes();
+        fetchProperties();
+    }, []);
+
+    // الاشتراك في الأحداث العالمية عبر Socket.io
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleRoomCreated = (room) => setRooms(prev => [...prev, room]);
+        const handleRoomDeleted = (roomId) => setRooms(prev => prev.filter(r => r.id !== roomId));
+        const handleRoomStatusChanged = ({ roomId, newStatus }) => {
+            setRooms(prev =>
+                prev.map(r => r.id === roomId ? { ...r, status: newStatus } : r)
+            );
+        };
+
+        socket.on("ROOM_CREATED", handleRoomCreated);
+        socket.on("ROOM_DELETED", handleRoomDeleted);
+        socket.on("ROOM_STATUS_CHANGED", handleRoomStatusChanged);
+
+        return () => {
+            socket.off("ROOM_CREATED", handleRoomCreated);
+            socket.off("ROOM_DELETED", handleRoomDeleted);
+            socket.off("ROOM_STATUS_CHANGED", handleRoomStatusChanged);
+        };
+    }, [socket]);
+
     const fetchRooms = async () => {
         const res = await fetch("/api/rooms");
         const data = await res.json();
         setRooms(data);
     };
 
-    // جلب Room Types
     const fetchRoomTypes = async () => {
         const res = await fetch("/api/roomTypes");
         const data = await res.json();
         setRoomTypes(data);
     };
 
-    // جلب Properties
     const fetchProperties = async () => {
         const res = await fetch("/api/properties");
         const data = await res.json();
         setProperties(data);
     };
 
-    useEffect(() => {
-        fetchRooms();
-        fetchRoomTypes();
-        fetchProperties();
-
-        if (socket) {
-            socket.on("ROOM_STATUS_CHANGED", ({ roomId, newStatus }) => {
-                setRooms(prev =>
-                    prev.map(r => r.id === roomId ? { ...r, status: newStatus } : r)
-                );
-            });
-            socket.on("ROOM_CREATED", (room) => {
-                setRooms(prev => [...prev, room]);
-            });
-        }
-
-        return () => {
-            if (socket) {
-                socket.off("ROOM_STATUS_CHANGED");
-                socket.off("ROOM_CREATED");
-            }
-        };
-    }, [socket]);
-
     const statusConfig = {
         VACANT: { bg: "bg-green-500", text: "text-white" },
         OCCUPIED: { bg: "bg-red-500", text: "text-white" },
         CLEANING: { bg: "bg-yellow-400", text: "text-black" },
         MAINTENANCE: { bg: "bg-blue-500", text: "text-white" },
+    };
+
+    const handleDeleteRoom = async (roomId, roomNumber) => {
+        if (!confirm(`Are you sure you want to delete Room ${roomNumber}?`)) return;
+        try {
+            const res = await fetch(`/api/rooms/${roomId}`, { method: "DELETE" });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || "Failed to delete room");
+            }
+            // محلياً تحديث سريع (سيتم التحديث مجدداً عبر Socket.io لكل التبويبات)
+            setRooms(prev => prev.filter(r => r.id !== roomId));
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        }
     };
 
     return (
@@ -251,13 +308,16 @@ export default function RoomsPage() {
                             <div className="flex justify-between items-center">
                                 <h2 className="text-xl font-semibold">Room {room.number}</h2>
                                 <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditRoom(room);
-                                    }}
+                                    onClick={(e) => { e.stopPropagation(); setEditRoom(room); }}
                                     className="bg-white text-black text-xs px-2 py-1 rounded hover:bg-gray-200"
                                 >
                                     ✏️ Edit
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteRoom(room.id, room.number); }}
+                                    className="bg-red-500 text-white text-xs px-2 py-1 rounded hover:bg-red-600"
+                                >
+                                    🗑 Delete
                                 </button>
                             </div>
                             <p className="mt-2">Type: {room.roomType?.name || "N/A"}</p>
@@ -273,8 +333,8 @@ export default function RoomsPage() {
                     isOpen={showAddModal}
                     onClose={() => setShowAddModal(false)}
                     onSaved={(room) => setRooms(prev => [...prev, room])}
-                    properties={properties}       // البيانات من API
-                    roomTypes={roomTypes}         // البيانات من API
+                    properties={properties}
+                    roomTypes={roomTypes}
                     userId={"currentUserId"}
                 />
             )}
