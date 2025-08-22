@@ -1,20 +1,21 @@
+// app/layout.jsx
 import './globals.css';
+import { Inter } from 'next/font/google';
+import Sidebar from './components/Sidebar';
 
-import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import { Providers } from './components/Providers';
-import Header from './components/Header';
+const inter = Inter({ subsets: ['latin'] });
 
+export const metadata = {
+    title: 'Hestora Hotel PMS',
+    description: 'Hotel Management System',
+};
 
 export default function RootLayout({ children }) {
     return (
-        <html lang="ar" dir="rtl">
-            <body>
-                <Providers>
-                    <Header/>
-                    <ToastContainer position="top-right" />
-                    {children}
-                </Providers>
+        <html lang="en">
+            <body className={`${inter.className} flex h-screen bg-gray-100`}>
+                <Sidebar />
+                <main className="flex-1 p-6 overflow-auto">{children}</main>
             </body>
         </html>
     );

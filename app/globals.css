@@ -47,10 +47,12 @@
   }
 }
 
-html {
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Inter', sans-serif;
   scroll-behavior: smooth;
 }
-
 
 
 @custom-variant dark (&:where(.dark, .dark *));

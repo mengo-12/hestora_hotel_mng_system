@@ -14,190 +14,267 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Room model (كما عندك)
-model Room {
-  id            String     @id @default(cuid())
-  roomNumber    String     @unique
-  roomType      String
-  status        RoomStatus @default(AVAILABLE)
-  pricePerNight Float
-  description   String?
-  needsCleaning Boolean    @default(false)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+//////////////////////////////////
+// Properties (Hotels)
+//////////////////////////////////
+model Property {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  timezone  String
+  currency  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  bookings   Booking[] // <-- هذا الحقل يربط الغرفة بالحجوزات
-  statusLogs RoomStatusLog[] // ⬅ إضافة الحقل العكسي
+  rooms        Room[]
+  roomTypes    RoomType[]
+  bookings     Booking[]
+  users        User[]
+  ratePlans    RatePlan[]
+  housekeeping HousekeepingTask[]
+  companies    Company[]
+  inventory    Inventory[]
 }
 
-enum RoomStatus {
-  AVAILABLE
-  OCCUPIED
-  MAINTENANCE
+//////////////////////////////////
+// Room Types & Rooms
+//////////////////////////////////
+model RoomType {
+  id         String      @id @default(cuid())
+  property   Property    @relation(fields: [propertyId], references: [id])
+  propertyId String
+  code       String
+  name       String
+  capacity   Int
+  basePrice  Decimal
+  amenities  String?
+  rooms      Room[]
+  ratePlans  RatePlan[]
+  Inventory  Inventory[]
+
+  @@unique([propertyId, code])
+}
+
+model Room {
+  id                String             @id @default(cuid())
+  property          Property           @relation(fields: [propertyId], references: [id])
+  propertyId        String
+  number            String
+  roomType          RoomType           @relation(fields: [roomTypeId], references: [id])
+  roomTypeId        String
+  status            String             @default("VACANT") // VACANT, OCCUPIED, CLEANING, MAINTENANCE
+  floor             Int?
+  notes             String?
+  logs              RoomStatusLog[]
+  bookings          Booking[]
+  housekeepingTasks HousekeepingTask[]
+
+  @@unique([propertyId, number])
 }
 
 model RoomStatusLog {
-  id        String     @id @default(cuid())
-  roomId    String
-  oldStatus RoomStatus
-  newStatus RoomStatus
-  changedBy String     // يمكن تخزين معرف الموظف أو النظام
-  changedAt DateTime   @default(now())
-
-  room Room @relation(fields: [roomId], references: [id])
+  id          String   @id @default(cuid())
+  room        Room     @relation(fields: [roomId], references: [id])
+  roomId      String
+  oldStatus   String
+  newStatus   String
+  changedBy   User     @relation(fields: [changedById], references: [id])
+  changedById String
+  changedAt   DateTime @default(now())
 }
 
-// User model compatible with NextAuth - يحتوي حقل password لا يتعامل معه الـAdapter مباشرة
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  password      String
-  role          String    @default("ADMIN")
-  createdAt     DateTime  @default(now())
-
-  // relations for NextAuth adapter
-  accounts Account[]
-  sessions Session[]
-}
-
-// NextAuth required models (from Prisma adapter template)
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  id         String   @id @default(cuid())
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
+//////////////////////////////////
+// Guests
+//////////////////////////////////
 model Guest {
   id             String    @id @default(cuid())
   firstName      String
   lastName       String
-  gender         String
-  dateOfBirth    DateTime
-  nationality    String
-  maritalStatus  String?
-  phone          String
+  phone          String?
+  nationality    String?
+  passportNumber String?
+  dateOfBirth    DateTime?
   email          String?
-  address        String?
-  passportNumber String
-  passportIssue  DateTime
-  passportExpiry DateTime
-  passportPlace  String
-  nationalId     String?
-  notes          String?
-  preferences    String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  // إذا أردت استخدام checkIn و checkOut، أضفهم هنا:
-  checkIn        DateTime?
-  checkOut       DateTime?
-
-  bookings      Booking[]
-  groupBookings GroupBooking[] @relation("GuestToGroupBookings")
+  bookings       Booking[]
+  folios         Folio[]
 }
 
-// Booking model لإدارة الحجوزات
+//////////////////////////////////
+// Bookings / Reservations
+//////////////////////////////////
 model Booking {
-  id      String @id @default(cuid())
-  guestId String
-  guest   Guest  @relation(fields: [guestId], references: [id])
-  roomId  String
-  room    Room   @relation(fields: [roomId], references: [id])
+  id              String    @id @default(cuid())
+  property        Property  @relation(fields: [propertyId], references: [id])
+  propertyId      String
+  guest           Guest     @relation(fields: [guestId], references: [id])
+  guestId         String
+  room            Room?     @relation(fields: [roomId], references: [id])
+  roomId          String?
+  checkIn         DateTime
+  checkOut        DateTime
+  status          String    @default("Booked") // Booked, InHouse, CheckedOut, NoShow
+  ratePlan        RatePlan? @relation(fields: [ratePlanId], references: [id])
+  ratePlanId      String?
+  adults          Int
+  children        Int
+  specialRequests String?
+  folio           Folio?
 
-  checkIn       DateTime
-  checkOut      DateTime
-  adults        Int           @default(1)
-  children      Int           @default(0)
-  status        BookingStatus @default(PENDING)
-  source        String? // Walk-in / Online / OTA / Agent
-  totalPrice    Float?
-  notes         String?
-  paymentStatus String        @default("UNPAID")
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  extraBeds     Int      @default(0)   // ← أضف هذا
-  roomTypeId    String? // نوع الغرفة
-  guestsCount   Int? // عدد النزلاء في الغرفة
-  pricePerNight Float? // سعر الليلة
-  totalNights   Int? // عدد الليالي
-  discountPercent Int      @default(0)
-  taxPercent      Int      @default(15)
-  extraServices   Json     @default("[]")
-
-  extrasData     Json? // ⬅ هنا تحفظ الخدمات الإضافية يدويًا
-  extras         BookingExtra[] // ⬅️ ربط الحجز بالخدمات الإضافية
-  groupBooking   GroupBooking?  @relation("GroupBookingToBookings", fields: [groupBookingId], references: [id])
-  groupBookingId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Company   Company? @relation(fields: [companyId], references: [id])
+  companyId String?
 }
 
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
-  CHECKED_IN
-  CHECKED_OUT
+//////////////////////////////////
+// Rate Plans & Rules
+//////////////////////////////////
+model RatePlan {
+  id         String     @id @default(cuid())
+  property   Property   @relation(fields: [propertyId], references: [id])
+  propertyId String
+  roomType   RoomType   @relation(fields: [roomTypeId], references: [id])
+  roomTypeId String
+  code       String
+  name       String
+  basePrice  Decimal
+  currency   String
+  isPublic   Boolean    @default(true)
+  rateRules  RateRule[]
+  bookings   Booking[]
+
+  @@unique([propertyId, code])
 }
 
-model ExtraService {
-  id       String         @id @default(cuid())
-  name     String
-  price    Float
-  bookings BookingExtra[]
+model RateRule {
+  id                String   @id @default(cuid())
+  ratePlan          RatePlan @relation(fields: [ratePlanId], references: [id])
+  ratePlanId        String
+  date              DateTime
+  priceOverride     Decimal?
+  minLOS            Int?
+  maxLOS            Int?
+  closedToArrival   Boolean  @default(false)
+  closedToDeparture Boolean  @default(false)
 }
 
-model BookingExtra {
-  id             String @id @default(cuid())
-  bookingId      String
-  extraServiceId String
-  quantity       Int    @default(1)
-
-  booking      Booking      @relation(fields: [bookingId], references: [id])
-  extraService ExtraService @relation(fields: [extraServiceId], references: [id])
-}
-
-model GroupBooking {
+//////////////////////////////////
+// Inventory (عدد الغرف المتاحة يومياً لكل RoomType)
+//////////////////////////////////
+model Inventory {
   id         String   @id @default(cuid())
-  guestId    String
-  guest      Guest    @relation("GuestToGroupBookings", fields: [guestId], references: [id])
-  checkIn    DateTime
-  checkOut   DateTime
-  status     String   @default("CONFIRMED")
-  totalPrice Float    @default(0)
-  notes      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  property   Property @relation(fields: [propertyId], references: [id])
+  propertyId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id])
+  roomTypeId String
+  date       DateTime
+  allotment  Int
+  sold       Int      @default(0)
+  stopSell   Boolean  @default(false)
+}
 
-  bookings Booking[] @relation("GroupBookingToBookings")
+//////////////////////////////////
+// Housekeeping
+//////////////////////////////////
+model HousekeepingTask {
+  id           String    @id @default(cuid())
+  room         Room      @relation(fields: [roomId], references: [id])
+  roomId       String
+  type         String // Clean, Inspect, Maintenance
+  status       String    @default("Open") // Open, InProgress, Done
+  assignedTo   User?     @relation(fields: [assignedToId], references: [id])
+  assignedToId String?
+  priority     String?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  Property     Property? @relation(fields: [propertyId], references: [id])
+  propertyId   String?
+}
+
+//////////////////////////////////
+// Folio / Billing
+//////////////////////////////////
+model Folio {
+  id        String    @id @default(cuid())
+  booking   Booking   @relation(fields: [bookingId], references: [id])
+  bookingId String    @unique // <--- أضف هذه الخاصية
+  guest     Guest     @relation(fields: [guestId], references: [id])
+  guestId   String
+  status    String    @default("Open") // Open, Closed
+  charges   Charge[]
+  payments  Payment[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Charge {
+  id          String   @id @default(cuid())
+  folio       Folio    @relation(fields: [folioId], references: [id])
+  folioId     String
+  code        String
+  description String
+  amount      Decimal
+  tax         Decimal?
+  postedAt    DateTime @default(now())
+  postedBy    User     @relation(fields: [postedById], references: [id])
+  postedById  String
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  folio      Folio    @relation(fields: [folioId], references: [id])
+  folioId    String
+  method     String
+  amount     Decimal
+  ref        String?
+  postedAt   DateTime @default(now())
+  postedBy   User     @relation(fields: [postedById], references: [id])
+  postedById String
+}
+
+//////////////////////////////////
+// Companies / Contracts
+//////////////////////////////////
+model Company {
+  id            String    @id @default(cuid())
+  property      Property  @relation(fields: [propertyId], references: [id])
+  propertyId    String
+  code          String    @unique
+  name          String
+  creditLimit   Decimal?
+  rateAgreement String?
+  bookings      Booking[]
+}
+
+//////////////////////////////////
+// Users / Roles
+//////////////////////////////////
+model User {
+  id               String             @id @default(cuid())
+  property         Property           @relation(fields: [propertyId], references: [id])
+  propertyId       String
+  email            String             @unique
+  password         String
+  name             String
+  role             String             @default("FrontDesk") // Admin, FrontDesk, HK, Manager
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  RoomStatusLog    RoomStatusLog[]
+  HousekeepingTask HousekeepingTask[]
+  Charge           Charge[]
+  Payment          Payment[]
+  AuditLog         AuditLog[]
+}
+
+//////////////////////////////////
+// Audit Logs
+//////////////////////////////////
+model AuditLog {
+  id        String   @id @default(cuid())
+  actor     User     @relation(fields: [actorId], references: [id])
+  actorId   String
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now())
 }
