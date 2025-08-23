@@ -206,13 +206,13 @@ export default function BookingsPage() {
     const [selectedBooking, setSelectedBooking] = useState(null);
     const [editBooking, setEditBooking] = useState(null);
     const [showAddModal, setShowAddModal] = useState(false);
-    const [showBulkModal, setShowBulkModal] = useState(false); // حالة المودال الجماعي
+    const [showBulkModal, setShowBulkModal] = useState(false);
     const [properties, setProperties] = useState([]);
     const [guests, setGuests] = useState([]);
     const [rooms, setRooms] = useState([]);
     const [ratePlans, setRatePlans] = useState([]);
     const [companies, setCompanies] = useState([]);
-    const [deletingId, setDeletingId] = useState(null);
+    const [processingId, setProcessingId] = useState(null); // لجميع العمليات
     const socket = useSocket();
 
     useEffect(() => {
@@ -227,12 +227,9 @@ export default function BookingsPage() {
             socket.on("BOOKING_CREATED", (booking) =>
                 setBookings(prev => [...prev, booking])
             );
-
             socket.on("BOOKING_UPDATED", (updatedBooking) =>
                 setBookings(prev => prev.map(b => b.id === updatedBooking.id ? updatedBooking : b))
             );
-
-            // ندعم الحالتين: إما يرسل id مباشرة، أو ككائن { id }
             socket.on("BOOKING_DELETED", (payload) => {
                 const id = typeof payload === "string" ? payload : payload?.id;
                 if (!id) return;
@@ -259,74 +256,36 @@ export default function BookingsPage() {
         }
     };
 
-    const fetchProperties = async () => {
-        try {
-            const res = await fetch("/api/properties");
-            setProperties(await res.json());
-        } catch {
-            setProperties([]);
-        }
-    };
+    const fetchProperties = async () => { try { setProperties(await (await fetch("/api/properties")).json()); } catch { setProperties([]); } };
+    const fetchGuests = async () => { try { setGuests(await (await fetch("/api/guests")).json()); } catch { setGuests([]); } };
+    const fetchRooms = async () => { try { setRooms(await (await fetch("/api/rooms")).json()); } catch { setRooms([]); } };
+    const fetchRatePlans = async () => { try { setRatePlans(await (await fetch("/api/ratePlans")).json()); } catch { setRatePlans([]); } };
+    const fetchCompanies = async () => { try { setCompanies(await (await fetch("/api/companies")).json()); } catch { setCompanies([]); } };
 
-    const fetchGuests = async () => {
+    const handleAction = async (id, action) => {
+        if (action === "delete" && !confirm("هل أنت متأكد من حذف الحجز؟")) return;
+        setProcessingId(id);
         try {
-            const res = await fetch("/api/guests");
-            setGuests(await res.json());
-        } catch {
-            setGuests([]);
-        }
-    };
-
-    const fetchRooms = async () => {
-        try {
-            const res = await fetch("/api/rooms");
-            setRooms(await res.json());
-        } catch {
-            setRooms([]);
-        }
-    };
-
-    const fetchRatePlans = async () => {
-        try {
-            const res = await fetch("/api/ratePlans");
-            setRatePlans(await res.json());
-        } catch {
-            setRatePlans([]);
-        }
-    };
-
-    const fetchCompanies = async () => {
-        try {
-            const res = await fetch("/api/companies");
-            setCompanies(await res.json());
-        } catch {
-            setCompanies([]);
-        }
-    };
-
-    const handleDelete = async (id) => {
-        if (!confirm("هل أنت متأكد من حذف الحجز؟")) return;
-
-        try {
-            setDeletingId(id);
-            const res = await fetch(`/api/bookings/${id}`, { method: "DELETE" });
+            const method = action === "delete" ? "DELETE" : "POST";
+            const res = await fetch(`/api/bookings/${id}/${action === "delete" ? "" : action}`, { method });
             if (!res.ok) {
                 const errBody = await res.json().catch(() => ({}));
-                const msg = errBody?.error || "Failed to delete booking";
+                const msg = errBody?.error || `${action} failed`;
                 throw new Error(msg);
             }
+            const data = action === "delete" ? null : await res.json();
 
-            // تفريغ محلي سريع + تحديث من السيرفر (اختياري)
-            setBookings(prev => prev.filter(b => b.id !== id));
-            // بإمكانك الاعتماد على البث أو تعمل إعادة تحميل:
-            // await fetchBookings();
-
-            alert("Booking deleted successfully");
+            if (action === "delete") {
+                setBookings(prev => prev.filter(b => b.id !== id));
+                alert("Booking deleted successfully");
+            } else {
+                setBookings(prev => prev.map(b => b.id === id ? data : b));
+            }
         } catch (err) {
             console.error(err);
-            alert(err.message || "Failed to delete booking");
+            alert(err.message || "Operation failed");
         } finally {
-            setDeletingId(null);
+            setProcessingId(null);
         }
     };
 
@@ -335,50 +294,23 @@ export default function BookingsPage() {
             <div className="flex justify-between items-center mb-6 gap-2">
                 <h1 className="text-2xl font-bold dark:text-white">Bookings</h1>
                 <div className="flex gap-2">
-                    <button
-                        onClick={() => setShowAddModal(true)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
-                        + Add Booking
-                    </button>
-                    <button
-                        onClick={() => setShowBulkModal(true)}
-                        className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
-                    >
-                        + Bulk Booking
-                    </button>
+                    <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">+ Add Booking</button>
+                    <button onClick={() => setShowBulkModal(true)} className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">+ Bulk Booking</button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {bookings.map(b => (
-                    <div
-                        key={b.id}
-                        className="p-4 rounded-lg shadow cursor-pointer dark:bg-gray-700 bg-white text-black dark:text-white transition transform hover:scale-105"
-                        onClick={() => setSelectedBooking(b)}
-                    >
+                    <div key={b.id} className="p-4 rounded-lg shadow cursor-pointer dark:bg-gray-700 bg-white text-black dark:text-white transition transform hover:scale-105" onClick={() => setSelectedBooking(b)}>
                         <div className="flex justify-between items-center mb-2">
-                            <h2 className="text-lg font-semibold">
-                                {b.guest?.firstName} {b.guest?.lastName}
-                            </h2>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setEditBooking(b); }}
-                                    className="bg-white text-black text-xs px-2 py-1 rounded hover:bg-gray-200"
-                                >
-                                    ✏️ Edit
-                                </button>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); handleDelete(b.id); }} // ✅ إصلاح هنا
-                                    disabled={deletingId === b.id}
-                                    className={`text-xs px-2 py-1 rounded ${
-                                        deletingId === b.id
-                                            ? "bg-gray-400 text-white cursor-not-allowed"
-                                            : "bg-red-500 text-white hover:bg-red-600"
-                                    }`}
-                                >
-                                    {deletingId === b.id ? "Deleting..." : "🗑 Delete"}
-                                </button>
+                            <h2 className="text-lg font-semibold">{b.guest?.firstName} {b.guest?.lastName}</h2>
+                            <div className="flex gap-1 flex-wrap">
+                                <button onClick={e => { e.stopPropagation(); setEditBooking(b); }} className="bg-white text-black text-xs px-2 py-1 rounded hover:bg-gray-200">✏️ Edit</button>
+                                <button onClick={e => { e.stopPropagation(); handleAction(b.id, "checkin"); }} disabled={processingId === b.id} className={`text-xs px-2 py-1 rounded ${processingId === b.id ? "bg-gray-400 cursor-not-allowed" : "bg-green-500 text-white hover:bg-green-600"}`}>Check-in</button>
+                                <button onClick={e => { e.stopPropagation(); handleAction(b.id, "checkout"); }} disabled={processingId === b.id} className={`text-xs px-2 py-1 rounded ${processingId === b.id ? "bg-gray-400 cursor-not-allowed" : "bg-blue-500 text-white hover:bg-blue-600"}`}>Check-out</button>
+                                <button onClick={e => { e.stopPropagation(); handleAction(b.id, "cancel"); }} disabled={processingId === b.id} className={`text-xs px-2 py-1 rounded ${processingId === b.id ? "bg-gray-400 cursor-not-allowed" : "bg-yellow-500 text-white hover:bg-yellow-600"}`}>Cancel</button>
+                                <button onClick={e => { e.stopPropagation(); handleAction(b.id, "noshow"); }} disabled={processingId === b.id} className={`text-xs px-2 py-1 rounded ${processingId === b.id ? "bg-gray-400 cursor-not-allowed" : "bg-red-500 text-white hover:bg-red-600"}`}>NoShow</button>
+                                <button onClick={e => { e.stopPropagation(); handleAction(b.id, "delete"); }} disabled={processingId === b.id} className={`text-xs px-2 py-1 rounded ${processingId === b.id ? "bg-gray-400 cursor-not-allowed" : "bg-gray-700 text-white hover:bg-gray-800"}`}>{processingId === b.id ? "Processing..." : "🗑 Delete"}</button>
                             </div>
                         </div>
                         <p><b>Room:</b> {b.room?.number || "N/A"}</p>
@@ -389,53 +321,16 @@ export default function BookingsPage() {
                 ))}
             </div>
 
-            {/* مودال الإضافة الفردي */}
-            {showAddModal && (
-                <AddBookingModal
-                    isOpen={showAddModal}
-                    onClose={() => setShowAddModal(false)}
-                    properties={properties}
-                    guests={guests}
-                    rooms={rooms}
-                    ratePlans={ratePlans}
-                    companies={companies}
-                />
-            )}
+            {/* Modals */}
+            {showAddModal && <AddBookingModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} properties={properties} guests={guests} rooms={rooms} ratePlans={ratePlans} companies={companies} />}
+            {showBulkModal && <BulkBookingModal isOpen={showBulkModal} onClose={() => setShowBulkModal(false)} properties={properties} guests={guests} rooms={rooms} ratePlans={ratePlans} companies={companies} />}
+            {editBooking && <EditBookingModal booking={editBooking} isOpen={!!editBooking} onClose={() => setEditBooking(null)} properties={properties} guests={guests} rooms={rooms} ratePlans={ratePlans} companies={companies} />}
 
-            {/* مودال الإضافة الجماعي */}
-            {showBulkModal && (
-                <BulkBookingModal
-                    isOpen={showBulkModal}
-                    onClose={() => setShowBulkModal(false)}
-                    properties={properties}
-                    guests={guests}
-                    rooms={rooms}
-                    ratePlans={ratePlans}
-                    companies={companies}
-                />
-            )}
-
-            {/* مودال التعديل */}
-            {editBooking && (
-                <EditBookingModal
-                    booking={editBooking}
-                    isOpen={!!editBooking}
-                    onClose={() => setEditBooking(null)}
-                    properties={properties}
-                    guests={guests}
-                    rooms={rooms}
-                    ratePlans={ratePlans}
-                    companies={companies}
-                />
-            )}
-
-            {/* تفاصيل الحجز عند الضغط */}
+            {/* Booking Details */}
             {selectedBooking && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-96 max-h-[90vh] overflow-y-auto">
-                        <h2 className="text-xl font-bold mb-4">
-                            {selectedBooking.guest?.firstName} {selectedBooking.guest?.lastName}
-                        </h2>
+                        <h2 className="text-xl font-bold mb-4">{selectedBooking.guest?.firstName} {selectedBooking.guest?.lastName}</h2>
                         <p><b>Property:</b> {selectedBooking.property?.name}</p>
                         <p><b>Room:</b> {selectedBooking.room?.number || "N/A"}</p>
                         <p><b>Check-In:</b> {new Date(selectedBooking.checkIn).toLocaleString()}</p>
@@ -447,12 +342,7 @@ export default function BookingsPage() {
                         <p><b>Company:</b> {selectedBooking.company?.name || "N/A"}</p>
                         <p><b>Special Requests:</b> {selectedBooking.specialRequests || "None"}</p>
                         <div className="mt-4 text-right">
-                            <button
-                                onClick={() => setSelectedBooking(null)}
-                                className="px-4 py-2 bg-gray-500 text-white rounded"
-                            >
-                                Close
-                            </button>
+                            <button onClick={() => setSelectedBooking(null)} className="px-4 py-2 bg-gray-500 text-white rounded">Close</button>
                         </div>
                     </div>
                 </div>
