@@ -21,6 +21,7 @@ export default function EditRoomModal({ room, isOpen, onClose, onSaved, properti
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+                propertyId: room.propertyId, // ⚡ أضف هذا
                 number,
                 roomTypeId,
                 status,
