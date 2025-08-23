@@ -1,12 +1,32 @@
 import prisma from "@/lib/prisma";
 import { getIO } from "@/lib/socket";
 
-export async function GET() {
-    const rooms = await prisma.room.findMany({
-        include: { roomType: true, property: true }
-    });
-    return new Response(JSON.stringify(rooms), { status: 200 });
+export async function GET(req) {
+    try {
+        // جلب الغرف مع نوع الغرفة والحجز الجاري
+        const rooms = await prisma.room.findMany({
+            include: {
+                roomType: true,
+                bookings: {
+                    where: {
+                        status: "Booked",
+                        checkIn: { lte: new Date() },
+                        checkOut: { gte: new Date() },
+                    },
+                    take: 1, // لو تريد آخر حجز جاري فقط
+                },
+            },
+        });
+
+        return new Response(JSON.stringify(rooms), { status: 200 });
+    } catch (err) {
+        console.error("Failed to fetch rooms:", err);
+        return new Response(JSON.stringify({ error: "Failed to fetch rooms" }), { status: 500 });
+    }
 }
+
+
+
 
 export async function POST(req) {
     try {

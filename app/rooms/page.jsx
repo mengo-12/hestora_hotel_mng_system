@@ -221,7 +221,9 @@ export default function RoomsPage() {
                 );
             });
             socket.on("ROOM_CREATED", (room) => setRooms(prev => [...prev, room]));
-            socket.on("ROOM_UPDATED", (updatedRoom) => setRooms(prev => prev.map(r => r.id === updatedRoom.id ? updatedRoom : r)));
+            socket.on("ROOM_UPDATED", (updatedRoom) => setRooms(prev =>
+                prev.map(r => r.id === updatedRoom.id ? updatedRoom : r)
+            ));
             socket.on("ROOM_DELETED", (roomId) => setRooms(prev => prev.filter(r => r.id !== roomId)));
         }
 
@@ -237,35 +239,25 @@ export default function RoomsPage() {
 
     const fetchRooms = async () => {
         try {
-            const res = await fetch("/api/rooms?includeBooking=true");
+            const res = await fetch("/api/rooms");
             const data = await res.json();
-            const now = new Date();
-
-            const roomsWithBooking = data.map(room => {
-                const currentBooking = room.bookings?.find(b => {
-                    const checkIn = new Date(b.checkIn);
-                    const checkOut = new Date(b.checkOut);
-                    return checkIn <= now && now <= checkOut;
-                });
-                return { ...room, bookingId: currentBooking?.id || null, bookingStatus: currentBooking?.status || null };
-            });
-
-            setRooms(roomsWithBooking);
+            setRooms(Array.isArray(data) ? data : []);
         } catch (err) {
-            console.error("Failed to fetch rooms:", err);
+            console.error(err);
+            setRooms([]);
         }
     };
 
     const fetchRoomTypes = async () => {
         const res = await fetch("/api/roomTypes");
         const data = await res.json();
-        setRoomTypes(data);
+        setRoomTypes(Array.isArray(data) ? data : []);
     };
 
     const fetchProperties = async () => {
         const res = await fetch("/api/properties");
         const data = await res.json();
-        setProperties(data);
+        setProperties(Array.isArray(data) ? data : []);
     };
 
     const statusConfig = {
@@ -273,12 +265,13 @@ export default function RoomsPage() {
         OCCUPIED: { bg: "bg-red-500", text: "text-white" },
         CLEANING: { bg: "bg-yellow-400", text: "text-black" },
         MAINTENANCE: { bg: "bg-blue-500", text: "text-white" },
+        BOOKED: { bg: "bg-purple-500", text: "text-white" },
     };
 
-    const handleCheckIn = async (bookingId) => {
+    const handleCheckIn = async (roomId) => {
         try {
-            const res = await fetch(`/api/bookings/${bookingId}/checkin`, { method: "POST" });
-            if (!res.ok) throw new Error("Check-in failed");
+            const res = await fetch(`/api/bookings/${roomId}/checkin`, { method: "POST" });
+            if (!res.ok) throw new Error("Check-In failed");
             fetchRooms();
         } catch (err) {
             console.error(err);
@@ -286,10 +279,10 @@ export default function RoomsPage() {
         }
     };
 
-    const handleCheckOut = async (bookingId) => {
+    const handleCheckOut = async (roomId) => {
         try {
-            const res = await fetch(`/api/bookings/${bookingId}/checkout`, { method: "POST" });
-            if (!res.ok) throw new Error("Check-out failed");
+            const res = await fetch(`/api/bookings/${roomId}/checkout`, { method: "POST" });
+            if (!res.ok) throw new Error("Check-Out failed");
             fetchRooms();
         } catch (err) {
             console.error(err);
@@ -299,6 +292,7 @@ export default function RoomsPage() {
 
     return (
         <div className="p-6">
+            {/* زر إضافة غرفة */}
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold dark:text-white">Rooms</h1>
                 <button
@@ -309,94 +303,54 @@ export default function RoomsPage() {
                 </button>
             </div>
 
+            {/* قائمة الغرف */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {rooms.map(room => {
+                {Array.isArray(rooms) && rooms.map(room => {
                     const config = statusConfig[room.status] || { bg: "bg-gray-300", text: "text-black" };
+                    const booking = room.currentBooking?.[0]; // افترضنا أن currentBooking موجود في API
                     return (
-                        <div
-                            key={room.id}
-                            className={`p-4 rounded-lg shadow cursor-pointer transition transform hover:scale-105 ${config.bg} ${config.text}`}
-                            onClick={() => setSelectedRoom(room)}
-                        >
-                            <div className="flex justify-between items-center mb-2">
-                                <h2 className="text-xl font-semibold">Room {room.number}</h2>
+                        <div key={room.id} className={`p-4 rounded-lg shadow cursor-pointer transition transform hover:scale-105 ${config.bg} ${config.text}`} onClick={() => setSelectedRoom(room)}>
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-xl font-semibold">{room.number}</h2>
                                 <div className="flex gap-1">
-                                    <button
-                                        onClick={e => { e.stopPropagation(); setEditRoom(room); }}
-                                        className="bg-white text-black text-xs px-2 py-1 rounded hover:bg-gray-200"
-                                    >
-                                        ✏️ Edit
-                                    </button>
-                                    <button
-                                        onClick={async e => {
-                                            e.stopPropagation();
-                                            if (!confirm(`Delete Room ${room.number}?`)) return;
-                                            try {
-                                                const res = await fetch(`/api/rooms/${room.id}`, { method: "DELETE" });
-                                                if (!res.ok) {
-                                                    const data = await res.json();
-                                                    throw new Error(data.error || "Failed to delete room");
-                                                }
-                                                setRooms(prev => prev.filter(r => r.id !== room.id));
-                                            } catch (err) {
-                                                console.error(err);
-                                                alert(err.message);
-                                            }
-                                        }}
-                                        className="bg-red-500 text-white text-xs px-2 py-1 rounded hover:bg-red-600"
-                                    >
-                                        🗑 Delete
-                                    </button>
+                                    <button onClick={e => { e.stopPropagation(); setEditRoom(room); }} className="bg-white text-black text-xs px-2 py-1 rounded hover:bg-gray-200">✏️ Edit</button>
+                                    <button onClick={async e => {
+                                        e.stopPropagation();
+                                        if (!confirm(`Are you sure you want to delete Room ${room.number}?`)) return;
+                                        try {
+                                            const res = await fetch(`/api/rooms/${room.id}`, { method: "DELETE" });
+                                            if (!res.ok) throw new Error("Delete failed");
+                                            setRooms(prev => prev.filter(r => r.id !== room.id));
+                                        } catch (err) {
+                                            console.error(err);
+                                            alert(err.message);
+                                        }
+                                    }} className="bg-red-500 text-white text-xs px-2 py-1 rounded hover:bg-red-600">🗑 Delete</button>
                                 </div>
                             </div>
 
-                            <p>Type: {room.roomType?.name || "N/A"}</p>
+                            <p className="mt-2">Type: {room.roomType?.name || "N/A"}</p>
                             <p>Status: {room.status}</p>
 
-                            {room.bookingId && room.bookingStatus === "Booked" && (
-                                <button
-                                    onClick={e => { e.stopPropagation(); handleCheckIn(room.bookingId); }}
-                                    className="mt-2 px-3 py-1 bg-green-500 text-white rounded"
-                                >
-                                    Check-In
-                                </button>
-                            )}
-                            {room.bookingId && room.bookingStatus === "InHouse" && (
-                                <button
-                                    onClick={e => { e.stopPropagation(); handleCheckOut(room.bookingId); }}
-                                    className="mt-2 px-3 py-1 bg-red-500 text-white rounded"
-                                >
-                                    Check-Out
-                                </button>
+                            {/* أزرار Check-In / Check-Out */}
+                            {booking && room.status === "BOOKED" && (
+                                <div className="mt-2 flex gap-2">
+                                    <button onClick={e => { e.stopPropagation(); handleCheckIn(room.id); }} className="px-2 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700">Check-In</button>
+                                    <button onClick={e => { e.stopPropagation(); handleCheckOut(room.id); }} className="px-2 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700">Check-Out</button>
+                                </div>
                             )}
                         </div>
                     );
                 })}
             </div>
 
-            {showAddModal && (
-                <AddRoomModal
-                    isOpen={showAddModal}
-                    onClose={() => setShowAddModal(false)}
-                    properties={properties}
-                    roomTypes={roomTypes}
-                    userId={"currentUserId"}
-                />
-            )}
-
-            {editRoom && (
-                <EditRoomModal
-                    room={editRoom}
-                    isOpen={!!editRoom}
-                    onClose={() => setEditRoom(null)}
-                    onSaved={() => setEditRoom(null)}
-                    roomTypes={roomTypes}
-                    properties={properties}
-                />
-            )}
-
+            {/* Add Room Modal */}
+            {showAddModal && <AddRoomModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} properties={properties} roomTypes={roomTypes} userId={"currentUserId"} />}
+            {/* Edit Room Modal */}
+            {editRoom && <EditRoomModal room={editRoom} isOpen={!!editRoom} onClose={() => setEditRoom(null)} onSaved={() => setEditRoom(null)} roomTypes={roomTypes} properties={properties} />}
+            {/* Popup تفاصيل الغرفة */}
             {selectedRoom && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-96">
                         <h2 className="text-xl font-bold mb-4">Room {selectedRoom.number}</h2>
                         <p><b>Type:</b> {selectedRoom.roomType?.name || "N/A"}</p>
@@ -410,4 +364,6 @@ export default function RoomsPage() {
         </div>
     );
 }
+
+
 

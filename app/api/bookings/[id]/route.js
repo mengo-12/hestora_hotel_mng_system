@@ -71,13 +71,19 @@ export async function PUT(req, { params }) {
     }
 }
 
-export async function DELETE(req, { params }) {
-    try {
-        const { id } = params;
 
+
+export async function DELETE(req, context) {
+    try {
+        const id = context.params.id;
+
+        // ✅ حذف أي سجلات مرتبطة (إن لم يكن عندك onDelete Cascade)
+        await prisma.folio.deleteMany({ where: { bookingId: id } });
+
+        // ✅ حذف الحجز نفسه
         await prisma.booking.delete({ where: { id } });
 
-        // ---- Broadcast عالمي ----
+        // ✅ إرسال Broadcast
         try {
             await fetch("http://localhost:3001/api/broadcast", {
                 method: "POST",
@@ -94,3 +100,4 @@ export async function DELETE(req, { params }) {
         return new Response(JSON.stringify({ error: "Failed to delete booking" }), { status: 500 });
     }
 }
+
