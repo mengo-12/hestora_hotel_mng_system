@@ -1,36 +1,26 @@
-'use client';
+
+"use client";
 import { useEffect, useState } from "react";
+import { getSession } from "next-auth/react";
 import { useSocket } from "@/app/components/SocketProvider";
-import { useParams } from "next/navigation";
 
-export default function FolioPage() {
-    const params = useParams();
+export default function FolioPage({ params }) {
     const bookingId = params.bookingId;
-    const socket = useSocket();
 
+    const [sessionUser, setSessionUser] = useState(null);
     const [folio, setFolio] = useState(null);
     const [loading, setLoading] = useState(true);
-
+    const [darkMode, setDarkMode] = useState(false);
     const [newCharge, setNewCharge] = useState({ code: "", description: "", amount: "", tax: "" });
     const [newPayment, setNewPayment] = useState({ method: "", amount: "", ref: "" });
-    const [processing, setProcessing] = useState(false);
+    const socket = useSocket();
 
-    useEffect(() => {
-        fetchFolio();
-
-        if (socket) {
-            socket.on("FOLIO_UPDATED", (updatedFolio) => {
-                if (updatedFolio.bookingId === bookingId) setFolio(updatedFolio);
-            });
-        }
-
-        return () => {
-            if (socket) socket.off("FOLIO_UPDATED");
-        };
-    }, [socket]);
+    const fetchSessionUser = async () => {
+        const session = await getSession();
+        if (session?.user) setSessionUser(session.user);
+    };
 
     const fetchFolio = async () => {
-        setLoading(true);
         try {
             const res = await fetch(`/api/folios/${bookingId}`);
             if (!res.ok) throw new Error("Failed to fetch folio");
@@ -38,186 +28,265 @@ export default function FolioPage() {
             setFolio(data);
         } catch (err) {
             console.error(err);
-            setFolio(null);
         } finally {
             setLoading(false);
         }
     };
 
+    useEffect(() => {
+        fetchSessionUser();
+        if (bookingId) fetchFolio();
+    }, [bookingId]);
+
+    // الاستماع لأحداث الـ socket مع منع التكرار
+    useEffect(() => {
+        if (!socket || !folio?.id) return;
+
+        const onChargeAdded = ({ folioId, charge }) => {
+            if (folioId !== folio.id) return;
+            setFolio(prev => {
+                if (!prev) return prev;
+                if (prev.charges.some(c => c.id === charge.id)) return prev;
+                return { ...prev, charges: [...prev.charges, charge] };
+            });
+        };
+
+        const onChargeDeleted = ({ folioId, chargeId }) => {
+            if (folioId !== folio.id) return;
+            setFolio(prev => ({
+                ...prev,
+                charges: prev.charges.filter(c => c.id !== chargeId)
+            }));
+        };
+
+        const onPaymentAdded = ({ folioId, payment }) => {
+            if (folioId !== folio.id) return;
+            setFolio(prev => {
+                if (prev.payments.some(p => p.id === payment.id)) return prev;
+                return { ...prev, payments: [...prev.payments, payment] };
+            });
+        };
+
+        const onPaymentDeleted = ({ folioId, paymentId }) => {
+            if (folioId !== folio.id) return;
+            setFolio(prev => ({
+                ...prev,
+                payments: prev.payments.filter(p => p.id !== paymentId)
+            }));
+        };
+
+        const onFolioClosed = ({ folioId }) => {
+            if (folioId !== folio.id) return;
+            setFolio(prev => ({ ...prev, status: "Closed" }));
+        };
+
+        socket.on("CHARGE_ADDED", onChargeAdded);
+        socket.on("CHARGE_DELETED", onChargeDeleted);
+        socket.on("PAYMENT_ADDED", onPaymentAdded);
+        socket.on("PAYMENT_DELETED", onPaymentDeleted);
+        socket.on("FOLIO_CLOSED", onFolioClosed);
+
+        return () => {
+            socket.off("CHARGE_ADDED", onChargeAdded);
+            socket.off("CHARGE_DELETED", onChargeDeleted);
+            socket.off("PAYMENT_ADDED", onPaymentAdded);
+            socket.off("PAYMENT_DELETED", onPaymentDeleted);
+            socket.off("FOLIO_CLOSED", onFolioClosed);
+        };
+    }, [socket, folio?.id]);
+
+    if (loading) return <p className="text-center mt-4">جاري التحميل...</p>;
+    if (!folio) return <p className="text-center mt-4">الفاتورة غير موجودة</p>;
+
+    const userId = sessionUser?.id;
+    const totalCharges = folio?.charges.reduce((sum, c) => sum + Number(c.amount) + Number(c.tax || 0), 0) || 0;
+    const totalPayments = folio?.payments.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+    const balance = totalCharges - totalPayments;
+
     const handleAddCharge = async () => {
-        if (!newCharge.code || !newCharge.amount) return alert("Code and amount required");
-        setProcessing(true);
+        if (!userId) return alert("يجب تسجيل الدخول لإضافة Charge");
         try {
             const res = await fetch(`/api/folios/${bookingId}/charges`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(newCharge)
+                body: JSON.stringify({
+                    ...newCharge,
+                    amount: Number(newCharge.amount),
+                    tax: Number(newCharge.tax || 0),
+                    postedById: userId  // إضافة هذا السطر
+                    
+                }),
             });
-            if (!res.ok) throw new Error("Failed to add charge");
+            if (!res.ok) throw new Error(await res.text());
             setNewCharge({ code: "", description: "", amount: "", tax: "" });
         } catch (err) {
             console.error(err);
             alert(err.message);
-        } finally { setProcessing(false); }
+        }
     };
 
     const handleDeleteCharge = async (chargeId) => {
-        if (!confirm("Are you sure to delete this charge?")) return;
-        setProcessing(true);
         try {
-            const res = await fetch(`/api/folios/${bookingId}/charges/${chargeId}`, { method: "DELETE" });
-            if (!res.ok) throw new Error("Failed to delete charge");
+            const res = await fetch(`/api/folios/${bookingId}/charges`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chargeId }),
+            });
+            if (!res.ok) throw new Error(await res.text());
         } catch (err) {
             console.error(err);
             alert(err.message);
-        } finally { setProcessing(false); }
+        }
     };
 
     const handleAddPayment = async () => {
-        if (!newPayment.method || !newPayment.amount) return alert("Method and amount required");
-        setProcessing(true);
+        if (!userId) return alert("يجب تسجيل الدخول لإضافة Payment");
         try {
             const res = await fetch(`/api/folios/${bookingId}/payments`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(newPayment)
+                body: JSON.stringify({ ...newPayment, amount: Number(newPayment.amount), postedById: userId }),
             });
-            if (!res.ok) throw new Error("Failed to add payment");
+            if (!res.ok) throw new Error(await res.text());
             setNewPayment({ method: "", amount: "", ref: "" });
         } catch (err) {
             console.error(err);
             alert(err.message);
-        } finally { setProcessing(false); }
+        }
     };
 
     const handleDeletePayment = async (paymentId) => {
-        if (!confirm("Are you sure to delete this payment?")) return;
-        setProcessing(true);
         try {
-            const res = await fetch(`/api/folios/${bookingId}/payments/${paymentId}`, { method: "DELETE" });
-            if (!res.ok) throw new Error("Failed to delete payment");
+            const res = await fetch(`/api/folios/${bookingId}/payments`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ paymentId }),
+            });
+            if (!res.ok) throw new Error(await res.text());
         } catch (err) {
             console.error(err);
             alert(err.message);
-        } finally { setProcessing(false); }
+        }
     };
 
-    const handleCloseFolio = async () => {
-        if (!confirm("Close this folio? Once closed, no more charges/payments allowed.")) return;
-        setProcessing(true);
+    const toggleFolioStatus = async () => {
         try {
             const res = await fetch(`/api/folios/${bookingId}/close`, { method: "POST" });
             if (!res.ok) throw new Error("Failed to close folio");
         } catch (err) {
             console.error(err);
-            alert(err.message);
-        } finally { setProcessing(false); }
+        }
     };
 
-    if (loading) return <div className="p-6">Loading folio...</div>;
-    if (!folio) return <div className="p-6">No folio found for this booking.</div>;
-
-    const totalCharges = folio.charges?.reduce((sum, c) => sum + parseFloat(c.amount), 0) || 0;
-    const totalPayments = folio.payments?.reduce((sum, p) => sum + parseFloat(p.amount), 0) || 0;
-    const balance = totalCharges - totalPayments;
+    const handlePrint = () => window.print();
 
     return (
-        <div className="p-6">
-            <h1 className="text-2xl font-bold mb-4">Folio for {folio.guest?.firstName} {folio.guest?.lastName}</h1>
-            <p><b>Status:</b> {folio.status}</p>
-            <p><b>Booking ID:</b> {folio.bookingId}</p>
+        <div className={`${darkMode ? "dark" : ""}`}>
+            <div className="p-6 space-y-6 max-w-5xl mx-auto dark:bg-gray-900 dark:text-gray-200 min-h-screen">
+                {/* ملخص الفاتورة */}
+                <div className="bg-white dark:bg-gray-800 rounded shadow p-4">
+                    <h2 className="text-2xl font-bold mb-3">Folio Summary</h2>
+                    <p>Status: <span className="font-semibold">{folio.status}</span></p>
+                    <p>Total Charges: <span className="text-red-600 font-bold">{totalCharges.toFixed(2)}</span></p>
+                    <p>Total Payments: <span className="text-green-600 font-bold">{totalPayments.toFixed(2)}</span></p>
+                    <p>Balance: <span className="text-blue-600 font-bold">{balance.toFixed(2)}</span></p>
+                    <div className="flex gap-3 mt-4 flex-wrap">
+                        <button onClick={toggleFolioStatus} className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">
+                            {folio.status === "Open" ? "Close Folio" : "Reopen Folio"}
+                        </button>
+                        <button onClick={handlePrint} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+                            Print Folio
+                        </button>
+                    </div>
+                </div>
 
-            {/* Charges */}
-            <div className="mt-6">
-                <h2 className="text-xl font-semibold mb-2">Charges</h2>
-                <table className="w-full border-collapse border border-gray-300 dark:border-gray-600">
-                    <thead>
-                        <tr className="bg-gray-200 dark:bg-gray-700">
-                            <th className="border p-2">Code</th>
-                            <th className="border p-2">Description</th>
-                            <th className="border p-2">Amount</th>
-                            <th className="border p-2">Tax</th>
-                            <th className="border p-2">Posted By</th>
-                            <th className="border p-2">Posted At</th>
-                            <th className="border p-2">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {folio.charges?.map(c => (
-                            <tr key={c.id} className="hover:bg-gray-100 dark:hover:bg-gray-800">
-                                <td className="border p-2">{c.code}</td>
-                                <td className="border p-2">{c.description}</td>
-                                <td className="border p-2">{c.amount}</td>
-                                <td className="border p-2">{c.tax || 0}</td>
-                                <td className="border p-2">{c.postedBy?.name || "N/A"}</td>
-                                <td className="border p-2">{new Date(c.postedAt).toLocaleString()}</td>
-                                <td className="border p-2">
-                                    <button onClick={() => handleDeleteCharge(c.id)} disabled={processing} className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600">Delete</button>
-                                </td>
-                            </tr>
-                        ))}
-                        {folio.status === "Open" && (
+                {/* Charges */}
+                <div className="bg-white dark:bg-gray-800 rounded shadow p-4">
+                    <h3 className="text-xl font-semibold mb-3">Charges</h3>
+                    <table className="w-full border text-sm">
+                        <thead className="bg-gray-100 dark:bg-gray-700">
                             <tr>
-                                <td className="border p-2"><input type="text" placeholder="Code" value={newCharge.code} onChange={e => setNewCharge({...newCharge, code: e.target.value})} className="w-full border p-1"/></td>
-                                <td className="border p-2"><input type="text" placeholder="Description" value={newCharge.description} onChange={e => setNewCharge({...newCharge, description: e.target.value})} className="w-full border p-1"/></td>
-                                <td className="border p-2"><input type="number" placeholder="Amount" value={newCharge.amount} onChange={e => setNewCharge({...newCharge, amount: e.target.value})} className="w-full border p-1"/></td>
-                                <td className="border p-2"><input type="number" placeholder="Tax" value={newCharge.tax} onChange={e => setNewCharge({...newCharge, tax: e.target.value})} className="w-full border p-1"/></td>
-                                <td className="border p-2"></td>
-                                <td className="border p-2"></td>
-                                <td className="border p-2"><button onClick={handleAddCharge} disabled={processing} className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600">Add</button></td>
+                                <th className="border p-2">Code</th>
+                                <th className="border p-2">Description</th>
+                                <th className="border p-2">Amount</th>
+                                <th className="border p-2">Tax</th>
+                                <th className="border p-2">Posted At</th>
+                                <th className="border p-2">By</th>
+                                <th className="border p-2">Action</th>
                             </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody>
+                            {folio.charges.map(c => (
+                                <tr key={c.id} className="even:bg-gray-50 dark:even:bg-gray-700">
+                                    <td className="border p-2">{c.code}</td>
+                                    <td className="border p-2">{c.description}</td>
+                                    <td className="border p-2">{c.amount}</td>
+                                    <td className="border p-2">{c.tax}</td>
+                                    <td className="border p-2">{new Date(c.postedAt).toLocaleString()}</td>
+                                    <td className="border p-2">{c.postedBy?.name || "System"}</td>
+                                    <td className="border p-2 text-center">
+                                        <button onClick={() => handleDeleteCharge(c.id)} className="text-red-500 hover:text-red-700">حذف</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                        <input placeholder="Code" className="border p-2 rounded flex-1 dark:bg-gray-700 dark:text-white" value={newCharge.code} onChange={e => setNewCharge({ ...newCharge, code: e.target.value })} />
+                        <input placeholder="Description" className="border p-2 rounded flex-1 dark:bg-gray-700 dark:text-white" value={newCharge.description} onChange={e => setNewCharge({ ...newCharge, description: e.target.value })} />
+                        <input placeholder="Amount" type="number" className="border p-2 rounded w-24 dark:bg-gray-700 dark:text-white" value={newCharge.amount} onChange={e => setNewCharge({ ...newCharge, amount: e.target.value })} />
+                        <input placeholder="Tax" type="number" className="border p-2 rounded w-24 dark:bg-gray-700 dark:text-white" value={newCharge.tax} onChange={e => setNewCharge({ ...newCharge, tax: e.target.value })} />
+                        <button onClick={handleAddCharge} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add</button>
+                    </div>
+                </div>
 
-            {/* Payments */}
-            <div className="mt-6">
-                <h2 className="text-xl font-semibold mb-2">Payments</h2>
-                <table className="w-full border-collapse border border-gray-300 dark:border-gray-600">
-                    <thead>
-                        <tr className="bg-gray-200 dark:bg-gray-700">
-                            <th className="border p-2">Method</th>
-                            <th className="border p-2">Amount</th>
-                            <th className="border p-2">Reference</th>
-                            <th className="border p-2">Posted By</th>
-                            <th className="border p-2">Posted At</th>
-                            <th className="border p-2">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {folio.payments?.map(p => (
-                            <tr key={p.id} className="hover:bg-gray-100 dark:hover:bg-gray-800">
-                                <td className="border p-2">{p.method}</td>
-                                <td className="border p-2">{p.amount}</td>
-                                <td className="border p-2">{p.ref || "-"}</td>
-                                <td className="border p-2">{p.postedBy?.name || "N/A"}</td>
-                                <td className="border p-2">{new Date(p.postedAt).toLocaleString()}</td>
-                                <td className="border p-2">
-                                    <button onClick={() => handleDeletePayment(p.id)} disabled={processing} className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600">Delete</button>
-                                </td>
-                            </tr>
-                        ))}
-                        {folio.status === "Open" && (
+                {/* Payments */}
+                <div className="bg-white dark:bg-gray-800 rounded shadow p-4">
+                    <h3 className="text-xl font-semibold mb-3">Payments</h3>
+                    <table className="w-full border text-sm">
+                        <thead className="bg-gray-100 dark:bg-gray-700">
                             <tr>
-                                <td className="border p-2"><input type="text" placeholder="Method" value={newPayment.method} onChange={e => setNewPayment({...newPayment, method: e.target.value})} className="w-full border p-1"/></td>
-                                <td className="border p-2"><input type="number" placeholder="Amount" value={newPayment.amount} onChange={e => setNewPayment({...newPayment, amount: e.target.value})} className="w-full border p-1"/></td>
-                                <td className="border p-2"><input type="text" placeholder="Reference" value={newPayment.ref} onChange={e => setNewPayment({...newPayment, ref: e.target.value})} className="w-full border p-1"/></td>
-                                <td className="border p-2"></td>
-                                <td className="border p-2"></td>
-                                <td className="border p-2"><button onClick={handleAddPayment} disabled={processing} className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Add</button></td>
+                                <th className="border p-2">Method</th>
+                                <th className="border p-2">Amount</th>
+                                <th className="border p-2">Reference</th>
+                                <th className="border p-2">Posted At</th>
+                                <th className="border p-2">By</th>
+                                <th className="border p-2">Action</th>
                             </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-
-            <div className="mt-6 text-right">
-                <p><b>Total Charges:</b> {totalCharges}</p>
-                <p><b>Total Payments:</b> {totalPayments}</p>
-                <p><b>Balance:</b> {balance}</p>
-                {folio.status === "Open" && <button onClick={handleCloseFolio} disabled={processing} className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 mt-2">Close Folio</button>}
+                        </thead>
+                        <tbody>
+                            {folio.payments.map(p => (
+                                <tr key={p.id} className="even:bg-gray-50 dark:even:bg-gray-700">
+                                    <td className="border p-2">{p.method}</td>
+                                    <td className="border p-2">{p.amount}</td>
+                                    <td className="border p-2">{p.ref || "-"}</td>
+                                    <td className="border p-2">{new Date(p.postedAt).toLocaleString()}</td>
+                                    <td className="border p-2">{p.postedBy?.name || "System"}</td>
+                                    <td className="border p-2 text-center">
+                                        <button onClick={() => handleDeletePayment(p.id)} className="text-red-500 hover:text-red-700">حذف</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                        <input placeholder="Method" className="border p-2 rounded flex-1 dark:bg-gray-700 dark:text-white" value={newPayment.method} onChange={e => setNewPayment({ ...newPayment, method: e.target.value })} />
+                        <input placeholder="Amount" type="number" className="border p-2 rounded w-24 dark:bg-gray-700 dark:text-white" value={newPayment.amount} onChange={e => setNewPayment({ ...newPayment, amount: e.target.value })} />
+                        <input placeholder="Reference (اختياري)" className="border p-2 rounded flex-1 dark:bg-gray-700 dark:text-white" value={newPayment.ref} onChange={e => setNewPayment({ ...newPayment, ref: e.target.value })} />
+                        <button onClick={handleAddPayment} className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Add</button>
+                    </div>
+                </div>
             </div>
         </div>
     );
 }
+
+
+
+
+
+
+
+
+
+

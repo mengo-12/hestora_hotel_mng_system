@@ -22,15 +22,34 @@ export const authOptions = {
 
                 if (!user) return null;
 
-                const isValid = await bcrypt.compare(credentials.password, user.hashedPassword);
+                const isValid = await bcrypt.compare(credentials.password, user.password);
                 if (!isValid) return null;
 
+                // 👇 نرجع الـ user مع الـ id ليكون متاح في session
                 return { id: user.id, name: user.name, email: user.email, role: user.role };
             },
         }),
     ],
     session: {
         strategy: "jwt",
+    },
+    callbacks: {
+        // تضمين الـ id في الـ JWT
+        async jwt({ token, user }) {
+            if (user) {
+                token.id = user.id;
+                token.role = user.role;
+            }
+            return token;
+        },
+        // تضمين الـ id في الـ session
+        async session({ session, token }) {
+            if (token) {
+                session.user.id = token.id;
+                session.user.role = token.role;
+            }
+            return session;
+        },
     },
     pages: {
         signIn: "/auth/signin",

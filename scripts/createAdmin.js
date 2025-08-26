@@ -1,29 +1,28 @@
-// scripts/createAdmin.js
-import bcrypt from 'bcrypt'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import prisma from "../lib/prisma.js";
+import bcrypt from "bcrypt";
 
 async function main() {
-    const hashedPassword = await bcrypt.hash('admin123', 10) // غير كلمة السر حسب رغبتك
+    const hashedPassword = await bcrypt.hash("admin123", 10); // 🔑 تشفير كلمة المرور
 
-    const admin = await prisma.user.create({
-        data: {
-            name: 'Admin',
-            email: 'admin@example.com', // غير البريد إذا تريد
-            password: hashedPassword,
-            role: 'ADMIN',
+    const user = await prisma.user.upsert({
+        where: { email: "admin@example.com" },
+        update: {},
+        create: {
+            name: "Admin",
+            email: "admin@example.com",
+            password: hashedPassword, // ✅ نخزن كلمة مرور مشفرة
+            role: "ADMIN",
+            propertyId: "cmem62khn0000m1ecwp7p7xap", // 🔴 لازم تعطيه propertyId صالح من جدول Property
         },
-    })
+    });
 
-    console.log('تم إنشاء حساب أدمن:', admin)
+    console.log("✅ Admin created:", user);
 }
 
 main()
-    .catch(e => {
-        console.error(e)
-        process.exit(1)
-    })
-    .finally(async () => {
-        await prisma.$disconnect()
-    })
+    .then(() => prisma.$disconnect())
+    .catch(async (e) => {
+        console.error(e);
+        await prisma.$disconnect();
+        process.exit(1);
+    });
