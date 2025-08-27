@@ -32,15 +32,15 @@ model HotelGroup {
 // Properties (Hotels)
 //////////////////////////////////
 model Property {
-  id           String     @id @default(cuid())
-  code         String     @unique
+  id           String      @id @default(cuid())
+  code         String      @unique
   name         String
   timezone     String
   currency     String
   hotelGroup   HotelGroup? @relation(fields: [hotelGroupId], references: [id])
-  hotelGroupId String?    // مؤقتًا nullable لتجنب مشاكل الترحيل
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  hotelGroupId String? // مؤقتًا nullable لتجنب مشاكل الترحيل
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   rooms        Room[]
   roomTypes    RoomType[]
@@ -107,7 +107,7 @@ model RoomStatusLog {
 model Guest {
   id             String      @id @default(cuid())
   property       Property?   @relation(fields: [propertyId], references: [id])
-  propertyId     String?     // مؤقتًا nullable لتجنب مشاكل الترحيل
+  propertyId     String? // مؤقتًا nullable لتجنب مشاكل الترحيل
   hotelGroup     HotelGroup? @relation("HotelGroupGuests", fields: [hotelGroupId], references: [id])
   hotelGroupId   String?
   firstName      String
@@ -201,21 +201,20 @@ model Inventory {
 // Housekeeping
 //////////////////////////////////
 model HousekeepingTask {
-  id           String   @id @default(cuid())
-  room         Room     @relation(fields: [roomId], references: [id])
+  id           String    @id @default(cuid())
+  room         Room      @relation(fields: [roomId], references: [id])
   roomId       String
   type         String
-  status       String   @default("Open")
-  assignedTo   User?    @relation(fields: [assignedToId], references: [id])
+  status       String    @default("Open")
+  assignedTo   User?     @relation(fields: [assignedToId], references: [id])
   assignedToId String?
   priority     String?
   notes        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   property     Property? @relation(fields: [propertyId], references: [id])
-  propertyId   String?   // مؤقتًا nullable لتجنب مشاكل الترحيل
+  propertyId   String? // مؤقتًا nullable لتجنب مشاكل الترحيل
 }
-
 
 //////////////////////////////////
 // Folio / Billing

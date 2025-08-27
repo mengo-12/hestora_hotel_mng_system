@@ -114,7 +114,7 @@ export default function FolioPage({ params }) {
                     amount: Number(newCharge.amount),
                     tax: Number(newCharge.tax || 0),
                     postedById: userId  // إضافة هذا السطر
-                    
+
                 }),
             });
             if (!res.ok) throw new Error(await res.text());
@@ -178,7 +178,13 @@ export default function FolioPage({ params }) {
         }
     };
 
-    const handlePrint = () => window.print();
+
+    const handlePrint = (folioId) => {
+        if (!folioId) return alert("لم يتم تحديد الفاتورة للطباعة");
+        const printWindow = window.open(`/invoice/${folioId}`, "_blank");
+        printWindow.focus();
+    };
+
 
     return (
         <div className={`${darkMode ? "dark" : ""}`}>
@@ -194,7 +200,7 @@ export default function FolioPage({ params }) {
                         <button onClick={toggleFolioStatus} className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">
                             {folio.status === "Open" ? "Close Folio" : "Reopen Folio"}
                         </button>
-                        <button onClick={handlePrint} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+                        <button onClick={() => handlePrint(folio.id)} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
                             Print Folio
                         </button>
                     </div>
