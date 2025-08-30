@@ -119,6 +119,7 @@ model Guest {
   email          String?
   bookings       Booking[]
   folios         Folio[]
+  extras         Extra[] // الحقل العكسي
 }
 
 //////////////////////////////////
@@ -146,6 +147,7 @@ model Booking {
   updatedAt DateTime @updatedAt
   company   Company? @relation(fields: [companyId], references: [id])
   companyId String?
+  extras    Extra[] // هذا هو الحقل العكسي
 }
 
 //////////////////////////////////
@@ -230,6 +232,7 @@ model Folio {
   payments  Payment[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  extras    Extra[] // الحقل العكسي
 }
 
 model Charge {
@@ -293,6 +296,36 @@ model User {
   AuditLog         AuditLog[]
 
   hotelGroupsOwned HotelGroup[] @relation("OwnerHotelGroups")
+}
+
+//////////////////////////////////
+// Extras / Add-ons
+//////////////////////////////////
+model Extra {
+  id String @id @default(cuid())
+
+  // علاقة مع Booking
+  booking   Booking @relation(fields: [bookingId], references: [id])
+  bookingId String
+
+  // علاقة مع Guest (اختياري)
+  guest   Guest?  @relation(fields: [guestId], references: [id])
+  guestId String?
+
+  // بيانات الخدمة
+  name        String
+  description String?
+  unitPrice   Decimal
+  quantity    Int      @default(1)
+  tax         Decimal?
+  status      String   @default("Unpaid")
+
+  // ربط Folio (اختياري)
+  folio   Folio?  @relation(fields: [folioId], references: [id])
+  folioId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 //////////////////////////////////

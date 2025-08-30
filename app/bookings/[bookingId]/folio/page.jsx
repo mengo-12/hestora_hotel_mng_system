@@ -1,6 +1,5 @@
-
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getSession } from "next-auth/react";
 import { useSocket } from "@/app/components/SocketProvider";
 
@@ -15,12 +14,12 @@ export default function FolioPage({ params }) {
     const [newPayment, setNewPayment] = useState({ method: "", amount: "", ref: "" });
     const socket = useSocket();
 
-    const fetchSessionUser = async () => {
+    const fetchSessionUser = useCallback(async () => {
         const session = await getSession();
         if (session?.user) setSessionUser(session.user);
-    };
+    }, []);
 
-    const fetchFolio = async () => {
+    const fetchFolio = useCallback(async () => {
         try {
             const res = await fetch(`/api/folios/${bookingId}`);
             if (!res.ok) throw new Error("Failed to fetch folio");
@@ -31,55 +30,82 @@ export default function FolioPage({ params }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [bookingId]);
 
     useEffect(() => {
         fetchSessionUser();
         if (bookingId) fetchFolio();
-    }, [bookingId]);
+    }, [bookingId, fetchFolio, fetchSessionUser]);
 
-    // الاستماع لأحداث الـ socket مع منع التكرار
+    // ======= Socket listeners (مع إعادة الجلب عند الحاجة) =======
     useEffect(() => {
-        if (!socket || !folio?.id) return;
+        if (!socket || !bookingId) return;
 
+        // لو السيرفر أرسل BOOKING_UPDATED لما تضيف/تعدل الخدمات من صفحة الحجز
+        const onBookingUpdated = (payload) => {
+            const updatedBookingId = String(payload?.id || payload?.bookingId || "");
+            if (updatedBookingId !== String(bookingId)) return;
+            // أهم خطوة: إجبار الصفحة تجيب أحدث Folio من السيرفر
+            fetchFolio();
+        };
+
+        // أحداث الفوليو المباشرة (charges/payments/close)
         const onChargeAdded = ({ folioId, charge }) => {
-            if (folioId !== folio.id) return;
-            setFolio(prev => {
-                if (!prev) return prev;
-                if (prev.charges.some(c => c.id === charge.id)) return prev;
-                return { ...prev, charges: [...prev.charges, charge] };
-            });
+            // إن كانت نفس الفاتورة المعروضة، حدّث محليًا
+            if (folio?.id && folioId === folio.id) {
+                setFolio((prev) => {
+                    if (!prev) return prev;
+                    if (prev.charges.some((c) => c.id === charge.id)) return prev;
+                    return { ...prev, charges: [...prev.charges, charge] };
+                });
+            } else {
+                // احتياط: إن ما كانت نفس الفاتورة أو ما وصل folio بعد، رجّع جلب
+                fetchFolio();
+            }
         };
 
         const onChargeDeleted = ({ folioId, chargeId }) => {
-            if (folioId !== folio.id) return;
-            setFolio(prev => ({
-                ...prev,
-                charges: prev.charges.filter(c => c.id !== chargeId)
-            }));
+            if (folio?.id && folioId === folio.id) {
+                setFolio((prev) => ({
+                    ...prev,
+                    charges: prev.charges.filter((c) => c.id !== chargeId),
+                }));
+            } else {
+                fetchFolio();
+            }
         };
 
         const onPaymentAdded = ({ folioId, payment }) => {
-            if (folioId !== folio.id) return;
-            setFolio(prev => {
-                if (prev.payments.some(p => p.id === payment.id)) return prev;
-                return { ...prev, payments: [...prev.payments, payment] };
-            });
+            if (folio?.id && folioId === folio.id) {
+                setFolio((prev) => {
+                    if (prev.payments.some((p) => p.id === payment.id)) return prev;
+                    return { ...prev, payments: [...prev.payments, payment] };
+                });
+            } else {
+                fetchFolio();
+            }
         };
 
         const onPaymentDeleted = ({ folioId, paymentId }) => {
-            if (folioId !== folio.id) return;
-            setFolio(prev => ({
-                ...prev,
-                payments: prev.payments.filter(p => p.id !== paymentId)
-            }));
+            if (folio?.id && folioId === folio.id) {
+                setFolio((prev) => ({
+                    ...prev,
+                    payments: prev.payments.filter((p) => p.id !== paymentId),
+                }));
+            } else {
+                fetchFolio();
+            }
         };
 
         const onFolioClosed = ({ folioId }) => {
-            if (folioId !== folio.id) return;
-            setFolio(prev => ({ ...prev, status: "Closed" }));
+            if (folio?.id && folioId === folio.id) {
+                setFolio((prev) => ({ ...prev, status: "Closed" }));
+            } else {
+                fetchFolio();
+            }
         };
 
+        socket.on("BOOKING_UPDATED", onBookingUpdated);
         socket.on("CHARGE_ADDED", onChargeAdded);
         socket.on("CHARGE_DELETED", onChargeDeleted);
         socket.on("PAYMENT_ADDED", onPaymentAdded);
@@ -87,22 +113,32 @@ export default function FolioPage({ params }) {
         socket.on("FOLIO_CLOSED", onFolioClosed);
 
         return () => {
+            socket.off("BOOKING_UPDATED", onBookingUpdated);
             socket.off("CHARGE_ADDED", onChargeAdded);
             socket.off("CHARGE_DELETED", onChargeDeleted);
             socket.off("PAYMENT_ADDED", onPaymentAdded);
             socket.off("PAYMENT_DELETED", onPaymentDeleted);
             socket.off("FOLIO_CLOSED", onFolioClosed);
         };
-    }, [socket, folio?.id]);
+    }, [socket, bookingId, folio?.id, fetchFolio]);
 
     if (loading) return <p className="text-center mt-4">جاري التحميل...</p>;
     if (!folio) return <p className="text-center mt-4">الفاتورة غير موجودة</p>;
 
     const userId = sessionUser?.id;
-    const totalCharges = folio?.charges.reduce((sum, c) => sum + Number(c.amount) + Number(c.tax || 0), 0) || 0;
-    const totalPayments = folio?.payments.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+
+    const totalCharges =
+        folio?.charges.reduce(
+            (sum, c) => sum + Number(c.amount || 0) + Number(c.tax || 0),
+            0
+        ) || 0;
+
+    const totalPayments =
+        folio?.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
+
     const balance = totalCharges - totalPayments;
 
+    // ======= Mutations + fallback refetch =======
     const handleAddCharge = async () => {
         if (!userId) return alert("يجب تسجيل الدخول لإضافة Charge");
         try {
@@ -113,12 +149,13 @@ export default function FolioPage({ params }) {
                     ...newCharge,
                     amount: Number(newCharge.amount),
                     tax: Number(newCharge.tax || 0),
-                    postedById: userId  // إضافة هذا السطر
-
+                    postedById: userId,
                 }),
             });
             if (!res.ok) throw new Error(await res.text());
             setNewCharge({ code: "", description: "", amount: "", tax: "" });
+            // fallback: في حال ما جاش سوكت لأي سبب
+            fetchFolio();
         } catch (err) {
             console.error(err);
             alert(err.message);
@@ -133,6 +170,7 @@ export default function FolioPage({ params }) {
                 body: JSON.stringify({ chargeId }),
             });
             if (!res.ok) throw new Error(await res.text());
+            fetchFolio();
         } catch (err) {
             console.error(err);
             alert(err.message);
@@ -145,10 +183,15 @@ export default function FolioPage({ params }) {
             const res = await fetch(`/api/folios/${bookingId}/payments`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...newPayment, amount: Number(newPayment.amount), postedById: userId }),
+                body: JSON.stringify({
+                    ...newPayment,
+                    amount: Number(newPayment.amount),
+                    postedById: userId,
+                }),
             });
             if (!res.ok) throw new Error(await res.text());
             setNewPayment({ method: "", amount: "", ref: "" });
+            fetchFolio();
         } catch (err) {
             console.error(err);
             alert(err.message);
@@ -163,6 +206,7 @@ export default function FolioPage({ params }) {
                 body: JSON.stringify({ paymentId }),
             });
             if (!res.ok) throw new Error(await res.text());
+            fetchFolio();
         } catch (err) {
             console.error(err);
             alert(err.message);
@@ -173,34 +217,50 @@ export default function FolioPage({ params }) {
         try {
             const res = await fetch(`/api/folios/${bookingId}/close`, { method: "POST" });
             if (!res.ok) throw new Error("Failed to close folio");
+            fetchFolio();
         } catch (err) {
             console.error(err);
         }
     };
 
-
     const handlePrint = (folioId) => {
         if (!folioId) return alert("لم يتم تحديد الفاتورة للطباعة");
         const printWindow = window.open(`/invoice/${folioId}`, "_blank");
-        printWindow.focus();
+        printWindow?.focus();
     };
-
 
     return (
         <div className={`${darkMode ? "dark" : ""}`}>
             <div className="p-6 space-y-6 max-w-5xl mx-auto dark:bg-gray-900 dark:text-gray-200 min-h-screen">
-                {/* ملخص الفاتورة */}
+                {/* Summary */}
                 <div className="bg-white dark:bg-gray-800 rounded shadow p-4">
                     <h2 className="text-2xl font-bold mb-3">Folio Summary</h2>
-                    <p>Status: <span className="font-semibold">{folio.status}</span></p>
-                    <p>Total Charges: <span className="text-red-600 font-bold">{totalCharges.toFixed(2)}</span></p>
-                    <p>Total Payments: <span className="text-green-600 font-bold">{totalPayments.toFixed(2)}</span></p>
-                    <p>Balance: <span className="text-blue-600 font-bold">{balance.toFixed(2)}</span></p>
+                    <p>
+                        Status: <span className="font-semibold">{folio.status}</span>
+                    </p>
+                    <p>
+                        Total Charges:{" "}
+                        <span className="text-red-600 font-bold">{totalCharges.toFixed(2)}</span>
+                    </p>
+                    <p>
+                        Total Payments:{" "}
+                        <span className="text-green-600 font-bold">{totalPayments.toFixed(2)}</span>
+                    </p>
+                    <p>
+                        Balance:{" "}
+                        <span className="text-blue-600 font-bold">{balance.toFixed(2)}</span>
+                    </p>
                     <div className="flex gap-3 mt-4 flex-wrap">
-                        <button onClick={toggleFolioStatus} className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">
+                        <button
+                            onClick={toggleFolioStatus}
+                            className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+                        >
                             {folio.status === "Open" ? "Close Folio" : "Reopen Folio"}
                         </button>
-                        <button onClick={() => handlePrint(folio.id)} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+                        <button
+                            onClick={() => handlePrint(folio.id)}
+                            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+                        >
                             Print Folio
                         </button>
                     </div>
@@ -222,7 +282,7 @@ export default function FolioPage({ params }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {folio.charges.map(c => (
+                            {folio.charges.map((c) => (
                                 <tr key={c.id} className="even:bg-gray-50 dark:even:bg-gray-700">
                                     <td className="border p-2">{c.code}</td>
                                     <td className="border p-2">{c.description}</td>
@@ -231,18 +291,50 @@ export default function FolioPage({ params }) {
                                     <td className="border p-2">{new Date(c.postedAt).toLocaleString()}</td>
                                     <td className="border p-2">{c.postedBy?.name || "System"}</td>
                                     <td className="border p-2 text-center">
-                                        <button onClick={() => handleDeleteCharge(c.id)} className="text-red-500 hover:text-red-700">حذف</button>
+                                        <button
+                                            onClick={() => handleDeleteCharge(c.id)}
+                                            className="text-red-500 hover:text-red-700"
+                                        >
+                                            حذف
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                     <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                        <input placeholder="Code" className="border p-2 rounded flex-1 dark:bg-gray-700 dark:text-white" value={newCharge.code} onChange={e => setNewCharge({ ...newCharge, code: e.target.value })} />
-                        <input placeholder="Description" className="border p-2 rounded flex-1 dark:bg-gray-700 dark:text-white" value={newCharge.description} onChange={e => setNewCharge({ ...newCharge, description: e.target.value })} />
-                        <input placeholder="Amount" type="number" className="border p-2 rounded w-24 dark:bg-gray-700 dark:text-white" value={newCharge.amount} onChange={e => setNewCharge({ ...newCharge, amount: e.target.value })} />
-                        <input placeholder="Tax" type="number" className="border p-2 rounded w-24 dark:bg-gray-700 dark:text-white" value={newCharge.tax} onChange={e => setNewCharge({ ...newCharge, tax: e.target.value })} />
-                        <button onClick={handleAddCharge} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add</button>
+                        <input
+                            placeholder="Code"
+                            className="border p-2 rounded flex-1 dark:bg-gray-700 dark:text-white"
+                            value={newCharge.code}
+                            onChange={(e) => setNewCharge({ ...newCharge, code: e.target.value })}
+                        />
+                        <input
+                            placeholder="Description"
+                            className="border p-2 rounded flex-1 dark:bg-gray-700 dark:text-white"
+                            value={newCharge.description}
+                            onChange={(e) => setNewCharge({ ...newCharge, description: e.target.value })}
+                        />
+                        <input
+                            placeholder="Amount"
+                            type="number"
+                            className="border p-2 rounded w-24 dark:bg-gray-700 dark:text-white"
+                            value={newCharge.amount}
+                            onChange={(e) => setNewCharge({ ...newCharge, amount: e.target.value })}
+                        />
+                        <input
+                            placeholder="Tax"
+                            type="number"
+                            className="border p-2 rounded w-24 dark:bg-gray-700 dark:text-white"
+                            value={newCharge.tax}
+                            onChange={(e) => setNewCharge({ ...newCharge, tax: e.target.value })}
+                        />
+                        <button
+                            onClick={handleAddCharge}
+                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                        >
+                            Add
+                        </button>
                     </div>
                 </div>
 
@@ -261,7 +353,7 @@ export default function FolioPage({ params }) {
                             </tr>
                         </thead>
                         <tbody>
-                            {folio.payments.map(p => (
+                            {folio.payments.map((p) => (
                                 <tr key={p.id} className="even:bg-gray-50 dark:even:bg-gray-700">
                                     <td className="border p-2">{p.method}</td>
                                     <td className="border p-2">{p.amount}</td>
@@ -269,23 +361,54 @@ export default function FolioPage({ params }) {
                                     <td className="border p-2">{new Date(p.postedAt).toLocaleString()}</td>
                                     <td className="border p-2">{p.postedBy?.name || "System"}</td>
                                     <td className="border p-2 text-center">
-                                        <button onClick={() => handleDeletePayment(p.id)} className="text-red-500 hover:text-red-700">حذف</button>
+                                        <button
+                                            onClick={() => handleDeletePayment(p.id)}
+                                            className="text-red-500 hover:text-red-700"
+                                        >
+                                            حذف
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                     <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                        <input placeholder="Method" className="border p-2 rounded flex-1 dark:bg-gray-700 dark:text-white" value={newPayment.method} onChange={e => setNewPayment({ ...newPayment, method: e.target.value })} />
-                        <input placeholder="Amount" type="number" className="border p-2 rounded w-24 dark:bg-gray-700 dark:text-white" value={newPayment.amount} onChange={e => setNewPayment({ ...newPayment, amount: e.target.value })} />
-                        <input placeholder="Reference (اختياري)" className="border p-2 rounded flex-1 dark:bg-gray-700 dark:text-white" value={newPayment.ref} onChange={e => setNewPayment({ ...newPayment, ref: e.target.value })} />
-                        <button onClick={handleAddPayment} className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Add</button>
+                        <input
+                            placeholder="Method"
+                            className="border p-2 rounded flex-1 dark:bg-gray-700 dark:text-white"
+                            value={newPayment.method}
+                            onChange={(e) => setNewPayment({ ...newPayment, method: e.target.value })}
+                        />
+                        <input
+                            placeholder="Amount"
+                            type="number"
+                            className="border p-2 rounded w-24 dark:bg-gray-700 dark:text-white"
+                            value={newPayment.amount}
+                            onChange={(e) => setNewPayment({ ...newPayment, amount: e.target.value })}
+                        />
+                        <input
+                            placeholder="Reference (اختياري)"
+                            className="border p-2 rounded flex-1 dark:bg-gray-700 dark:text-white"
+                            value={newPayment.ref}
+                            onChange={(e) => setNewPayment({ ...newPayment, ref: e.target.value })}
+                        />
+                        <button
+                            onClick={handleAddPayment}
+                            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                        >
+                            Add
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     );
 }
+
+
+
+
+
 
 
 

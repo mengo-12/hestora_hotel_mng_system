@@ -37,7 +37,9 @@ export async function GET(req) {
         const bookedRoomIds = overlappingBookings.map(b => b.roomId);
 
         // الغرف المتاحة
-        const availableRooms = rooms.filter(r => !bookedRoomIds.includes(r.id));
+        const availableRooms = rooms.filter(
+            r => r.status === "VACANT" && !bookedRoomIds.includes(r.id)
+        );
 
         return new Response(JSON.stringify(availableRooms), { status: 200 });
     } catch (err) {
