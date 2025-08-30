@@ -11,6 +11,10 @@ export default function GuestsPage() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [properties, setProperties] = useState([]);
     const [hotelGroups, setHotelGroups] = useState([]);
+    const [filteredGuests, setFilteredGuests] = useState([]); // للقائمة المفلترة
+    const [searchTerm, setSearchTerm] = useState("");
+    const [filterProperty, setFilterProperty] = useState("");
+    const [filterHotelGroup, setFilterHotelGroup] = useState("");
     const socket = useSocket();
 
     useEffect(() => {
@@ -32,6 +36,21 @@ export default function GuestsPage() {
             }
         };
     }, [socket]);
+
+    useEffect(() => {
+        const term = searchTerm.toLowerCase();
+        const filtered = guests.filter(g =>
+            (
+                g.firstName.toLowerCase().includes(term) ||
+                g.lastName.toLowerCase().includes(term) ||
+                (g.passportNumber?.toLowerCase().includes(term)) || // رقم الهوية
+                (g.phone?.toLowerCase().includes(term))             // الهاتف
+            ) &&
+            (filterProperty ? g.propertyId === filterProperty : true) &&
+            (filterHotelGroup ? g.hotelGroupId === filterHotelGroup : true)
+        );
+        setFilteredGuests(filtered);
+    }, [searchTerm, filterProperty, filterHotelGroup, guests]);
 
     const fetchGuests = async () => {
         const res = await fetch("/api/guests");
@@ -55,16 +74,52 @@ export default function GuestsPage() {
         <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Guests</h1>
-                <button
-                    onClick={() => setShowAddModal(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                    + Add Guest
-                </button>
-            </div>
 
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                    {/* 🔍 البحث */}
+                    <input
+                        type="text"
+                        placeholder="🔍 Search guests..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        className="flex-1 md:flex-none px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+                    />
+
+                    {/* فلترة حسب الفندق */}
+                    <select
+                        value={filterProperty}
+                        onChange={e => setFilterProperty(e.target.value)}
+                        className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+                    >
+                        <option value="">All Properties</option>
+                        {properties.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+
+                    {/* فلترة حسب مجموعة الفنادق */}
+                    <select
+                        value={filterHotelGroup}
+                        onChange={e => setFilterHotelGroup(e.target.value)}
+                        className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+                    >
+                        <option value="">All Hotel Groups</option>
+                        {hotelGroups.map(h => (
+                            <option key={h.id} value={h.id}>{h.name}</option>
+                        ))}
+                    </select>
+
+                    <button
+                        onClick={() => setShowAddModal(true)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                        + Add Guest
+                    </button>
+                </div>
+            </div>
+            {/* قائمة النزلاء */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {guests.map(guest => (
+                {filteredGuests.map(guest => (
                     <div
                         key={guest.id}
                         className="p-4 rounded-lg shadow cursor-pointer hover:scale-105 transition transform bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
@@ -116,7 +171,7 @@ export default function GuestsPage() {
                             <p><b>Email:</b> {selectedGuest.email || "N/A"}</p>
                             <p><b>Nationality:</b> {selectedGuest.nationality || "N/A"}</p>
                             <p><b>Passport:</b> {selectedGuest.passportNumber || "N/A"}</p>
-                            <p><b>Date of Birth:</b> {selectedGuest.dateOfBirth ? selectedGuest.dateOfBirth.slice(0,10) : "N/A"}</p>
+                            <p><b>Date of Birth:</b> {selectedGuest.dateOfBirth ? selectedGuest.dateOfBirth.slice(0, 10) : "N/A"}</p>
                             <p><b>Property:</b> {selectedGuest.property?.name || "N/A"}</p>
                             <p><b>Hotel Group:</b> {selectedGuest.hotelGroup?.name || "N/A"}</p>
                         </div>

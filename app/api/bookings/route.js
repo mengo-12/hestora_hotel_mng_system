@@ -6,7 +6,64 @@ import prisma from "@/lib/prisma";
 // --- جلب كل الحجوزات / إنشاء حجز جديد ---
 export async function GET(req) {
     try {
+        const { searchParams } = new URL(req.url);
+        const search = searchParams.get("search") || "";
+        const from = searchParams.get("from"); // تاريخ بداية الفلترة
+        const to = searchParams.get("to");     // تاريخ نهاية الفلترة
+
+        const filters = [];
+
+                // ✅ فلترة النصوص (search)
+        if (search) {
+            filters.push({
+                OR: [
+                    {
+                        guest: {
+                            firstName: { contains: search, mode: "insensitive" },
+                        },
+                    },
+                    {
+                        guest: {
+                            lastName: { contains: search, mode: "insensitive" },
+                        },
+                    },
+                    {
+                        room: {
+                            number: { contains: search, mode: "insensitive" },
+                        },
+                    },
+                    {
+                        company: {
+                            name: { contains: search, mode: "insensitive" },
+                        },
+                    },
+                    {
+                        status: { contains: search, mode: "insensitive" },
+                    },
+                ],
+            });
+        }
+
+        // ✅ فلترة بالتواريخ
+        if (from || to) {
+            const dateFilter = {};
+            if (from) {
+                dateFilter.gte = new Date(from);
+            }
+            if (to) {
+                dateFilter.lte = new Date(to);
+            }
+
+            filters.push({
+                OR: [
+                    { checkIn: dateFilter },   // الحجز يبدأ ضمن الفترة
+                    { checkOut: dateFilter },  // الحجز ينتهي ضمن الفترة
+                ],
+            });
+        }
+
         const bookings = await prisma.booking.findMany({
+            where: filters.length > 0 ? { AND: filters } : {},
             include: {
                 guest: true,
                 room: { include: { roomType: true } },
