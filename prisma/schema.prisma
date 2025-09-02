@@ -341,3 +341,11 @@ model AuditLog {
   metadata   Json?
   createdAt  DateTime @default(now())
 }
+
+model NightAudit {
+  id         String   @id @default(cuid())
+  propertyId String
+  closedDate String
+  closedById String
+  createdAt  DateTime @default(now())
+}

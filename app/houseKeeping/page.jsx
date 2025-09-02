@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from "react";
-import HousekeepingModal from "../components/HousekeepingModal";
-import { useSocket } from "../components/SocketProvider";
+import { useSocket } from "@/app/components/SocketProvider";
+import HousekeepingModal from "@/app/components/HousekeepingModal";
 
 export default function HousekeepingPage() {
     const [tasks, setTasks] = useState([]);

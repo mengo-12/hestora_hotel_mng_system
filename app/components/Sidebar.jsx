@@ -12,7 +12,9 @@ export default function Sidebar() {
         { name: 'Bookings', href: '/bookings' },
         { name: 'Guests', href: '/guests' },
         { name: 'Folios', href: '/folios' },
-        { name: 'Housekeeping', href: '/housekeeping' },
+        { name: 'Housekeeping', href: '/houseKeeping' },
+        { name: 'Night Audit', href: '/night-audit' },
+
     ];
 
     return (

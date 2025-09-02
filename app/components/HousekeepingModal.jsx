@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from "react";
-import { useSocket } from "../../components/SocketProvider";
+import { useSocket } from "./SocketProvider";
 
 export default function HousekeepingModal({ task, onClose, onSaved }) {
     const [roomId, setRoomId] = useState(task?.roomId || '');
