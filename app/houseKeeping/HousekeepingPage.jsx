@@ -63,12 +63,23 @@ export default function HousekeepingPage({ userProperties }) {
             );
         };
 
+        // تحديث حالة الغرفة فقط (أسرع من تحديث كل البيانات)
+        const handleRoomStatusChange = ({ roomId, newStatus }) => {
+            setRooms(prev =>
+                prev.map(r =>
+                    r.id === roomId ? { ...r, status: newStatus } : r
+                )
+            );
+        };
+
         socket.on("ROOM_UPDATED", handleRoomUpdate);
         socket.on("HOUSEKEEPING_UPDATED", handleHousekeepingUpdate);
+        socket.on("ROOM_STATUS_CHANGED", handleRoomStatusChange);
 
         return () => {
             socket.off("ROOM_UPDATED", handleRoomUpdate);
             socket.off("HOUSEKEEPING_UPDATED", handleHousekeepingUpdate);
+            socket.off("ROOM_STATUS_CHANGED", handleRoomStatusChange);
         };
     }, [socket, propertyId]);
 

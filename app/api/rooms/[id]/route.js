@@ -44,18 +44,35 @@ export async function PUT(req, { params }) {
             });
         }
 
-        // Broadcast عالمي
+        // بث التغييرات إلى جميع العملاء عبر السيرفر الخارجي
         try {
+            // بث تحديث شامل
             await fetch("http://localhost:3001/api/broadcast", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ event: "ROOM_UPDATED", data: updatedRoom }),
+                body: JSON.stringify({
+                    event: "ROOM_UPDATED",
+                    data: updatedRoom,
+                }),
             });
+
+            // بث مخصص لتغيير حالة الغرفة فقط
+            if (status && status !== oldRoom.status) {
+                await fetch("http://localhost:3001/api/broadcast", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        event: "ROOM_STATUS_CHANGED",
+                        data: { roomId: updatedRoom.id, newStatus: updatedRoom.status },
+                    }),
+                });
+            }
         } catch (err) {
             console.error("Socket broadcast failed:", err);
         }
 
         return new Response(JSON.stringify(updatedRoom), { status: 200 });
+
 
     } catch (err) {
         console.error("Room update failed:", err);
