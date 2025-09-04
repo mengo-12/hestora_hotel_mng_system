@@ -1,8 +1,14 @@
-// app/housekeeping/HousekeepingPage.jsx
 'use client';
 import { useEffect, useState } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
 import AddHousekeepingTaskModal from "@/app/components/AddHousekeepingTaskModal";
+
+const statusColors = {
+    VACANT: "bg-green-500",
+    OCCUPIED: "bg-red-500",
+    CLEANING: "bg-yellow-500",
+    MAINTENANCE: "bg-blue-500",
+};
 
 export default function HousekeepingPage({ userProperties }) {
     const socket = useSocket();
@@ -15,7 +21,7 @@ export default function HousekeepingPage({ userProperties }) {
     const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
     const [modalRoom, setModalRoom] = useState(null);
 
-    // --- جلب المهام والغرف ---
+    // --- جلب البيانات ---
     const fetchHousekeeping = async (propId = propertyId) => {
         if (!propId) return;
         try {
@@ -30,39 +36,77 @@ export default function HousekeepingPage({ userProperties }) {
 
     useEffect(() => { fetchHousekeeping(); }, [propertyId, date]);
 
-    // --- الاستماع للبث العالمي ---
+    // --- البث العالمي عبر السيرفر ---
     useEffect(() => {
         if (!socket) return;
 
-        // تحديث حالة الغرفة فورًا
-        const handleRoomUpdate = ({ roomId, newStatus }) => {
-            setRooms(prev => prev.map(r => r.id === roomId ? { ...r, status: newStatus } : r));
+        // تحديث الغرف عند تعديل الغرفة
+        const handleRoomUpdate = (updatedRoom) => {
+            if (updatedRoom.propertyId === propertyId) {
+                setRooms(prev =>
+                    prev.map(r => r.id === updatedRoom.id ? { ...r, ...updatedRoom } : r)
+                );
+            }
         };
 
-        // تحديث مهمة التدبير المنزلي
-        const handleHousekeepingUpdate = ({ roomId }) => {
+        // تحديث المهام عند إضافة أو تعديل مهمة
+        const handleHousekeepingUpdate = ({ task, roomId }) => {
             setRooms(prev =>
-                prev.map(r => r.id === roomId
-                    ? { ...r, housekeepingTasks: [...r.housekeepingTasks] } // تحديث المهام
-                    : r
+                prev.map(r =>
+                    r.id === roomId
+                        ? {
+                            ...r,
+                            housekeepingTasks: [task, ...r.housekeepingTasks.filter(t => t.id !== task.id)]
+                        }
+                        : r
                 )
             );
         };
 
-        socket.on("ROOM_STATUS_CHANGED", handleRoomUpdate);
+        socket.on("ROOM_UPDATED", handleRoomUpdate);
         socket.on("HOUSEKEEPING_UPDATED", handleHousekeepingUpdate);
 
         return () => {
-            socket.off("ROOM_STATUS_CHANGED", handleRoomUpdate);
+            socket.off("ROOM_UPDATED", handleRoomUpdate);
             socket.off("HOUSEKEEPING_UPDATED", handleHousekeepingUpdate);
         };
-    }, [socket]);
+    }, [socket, propertyId]);
+
+    // --- تحديث سريع لحالة الغرفة ---
+    const updateRoomStatus = async (roomId, newStatus) => {
+        try {
+            const room = rooms.find(r => r.id === roomId);
+            if (!room) throw new Error("Room not found");
+
+            const res = await fetch(`/api/rooms/${roomId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    propertyId: room.propertyId,
+                    number: room.number,
+                    roomTypeId: room.roomTypeId,
+                    status: newStatus,
+                    floor: room.floor,
+                    notes: room.notes
+                }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to update");
+
+            console.log("Room updated:", data);
+        } catch (err) {
+            console.error("Update room status failed:", err);
+            alert("Update room status failed: " + err.message);
+        }
+    };
+
 
     // --- إضافة مهمة جديدة ---
     const handleAddTask = async (room, taskData) => {
         if (!propertyId) return alert("Please select a property first.");
         try {
-            const res = await fetch("/api/housekeeping", {
+            const res = await fetch("/api/houseKeeping", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -77,7 +121,7 @@ export default function HousekeepingPage({ userProperties }) {
             const result = await res.json();
             if (result.success) {
                 setModalRoom(null);
-                // البث يتم من الخادم
+                // البث سيتم من السيرفر تلقائياً
             }
         } catch (err) {
             console.error(err);
@@ -85,30 +129,33 @@ export default function HousekeepingPage({ userProperties }) {
         }
     };
 
-    // --- تحديث حالة المهمة ---
-    const handleTaskUpdate = async (taskId, status, notes, roomStatus, roomId) => {
-        if (!propertyId) return;
+    // --- إغلاق مهمة ---
+    const closeTask = async (taskId, roomId) => {
         try {
-            const res = await fetch("/api/housekeeping", {
-                method: "POST",
+            const res = await fetch(`/api/houseKeeping/${taskId}`, {
+                method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ taskId, status, notes, roomStatus, propertyId })
+                body: JSON.stringify({ status: "Closed" })
             });
+
             const result = await res.json();
-            if (!result.success) throw new Error("Update failed");
+            if (!result.success) {
+                alert("Failed to close task: " + result.error);
+            }
+            // سيتم التحديث عبر البث من السيرفر
         } catch (err) {
-            console.error(err);
-            alert("Failed to update task");
+            console.error("Error closing task:", err);
         }
     };
 
-    // --- فلاتر الغرف ---
+    // --- الفلاتر ---
     const filteredRooms = rooms.filter(r =>
         r.number.toLowerCase().includes(searchTerm.toLowerCase()) &&
         (filterStatus ? r.status === filterStatus : true) &&
         (filterPriority ? r.housekeepingTasks.some(t => t.priority === filterPriority) : true)
     );
 
+    // --- إحصائيات ---
     const stats = {
         VACANT: rooms.filter(r => r.status === "VACANT").length,
         OCCUPIED: rooms.filter(r => r.status === "OCCUPIED").length,
@@ -118,9 +165,17 @@ export default function HousekeepingPage({ userProperties }) {
         CLOSED_TASKS: rooms.reduce((sum, r) => sum + r.housekeepingTasks.filter(t => t.status === "Closed").length, 0)
     };
 
+    // --- تقسيم حسب الطابق ---
+    const groupedByFloor = filteredRooms.reduce((acc, room) => {
+        const floor = room.floor || "Unknown";
+        if (!acc[floor]) acc[floor] = [];
+        acc[floor].push(room);
+        return acc;
+    }, {});
+
     return (
         <div className="p-6">
-            {/* العنوان والفلاتر */}
+            {/* الفلاتر */}
             <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-2">
                 <h1 className="text-2xl font-bold">Housekeeping Dashboard</h1>
                 <div className="flex gap-2 flex-wrap">
@@ -131,7 +186,7 @@ export default function HousekeepingPage({ userProperties }) {
                             ))}
                         </select>
                     ) : (
-                        <span className="text-red-500">No properties available</span>
+                        <span className="text-red-500">No properties</span>
                     )}
                     <input type="text" placeholder="Search room..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="px-3 py-2 rounded border" />
                     <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-3 py-2 rounded border">
@@ -154,63 +209,92 @@ export default function HousekeepingPage({ userProperties }) {
             {/* إحصائيات */}
             <div className="flex gap-4 mb-4 flex-wrap">
                 {Object.entries(stats).map(([key, value]) => (
-                    <div key={key} className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-center flex-1">
+                    <div key={key} className="bg-gray-200 rounded p-2 text-center flex-1">
                         <h3 className="font-bold">{key.replace("_", " ")}</h3>
                         <p>{value}</p>
                     </div>
                 ))}
             </div>
 
-            {/* قائمة الغرف */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredRooms.length === 0 && <p className="col-span-full text-center text-gray-500">No rooms found.</p>}
-                {filteredRooms.map(room => (
-                    <div key={room.id} className="border rounded p-3 shadow-sm">
-                        <div className="flex justify-between mb-2">
-                            <span className="font-bold">{room.number} - {room.roomType?.name}</span>
-                            <span className={`px-2 py-1 text-xs rounded text-white ${room.status === "VACANT" ? "bg-green-500" :
-                                room.status === "OCCUPIED" ? "bg-blue-500" :
-                                    room.status === "CLEANING" ? "bg-yellow-500" : "bg-gray-500"
-                                }`}>{room.status}</span>
-                        </div>
+            {/* الغرف حسب الطابق */}
+            <div className="h-[70vh] overflow-y-auto pr-2">
+                {Object.keys(groupedByFloor).map(floor => (
+                    <div key={floor} className="mb-6">
+                        <h2 className="text-lg font-bold mb-2 sticky top-0 bg-white z-10 p-1 shadow">
+                            Floor {floor}
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {groupedByFloor[floor].map(room => (
+                                <div
+                                    key={room.id}
+                                    className={`p-4 rounded shadow text-white ${statusColors[room.status] || "bg-gray-500"}`}
+                                >
+                                    <div className="flex justify-between mb-2">
+                                        <span className="font-bold">Room {room.number}</span>
+                                        <span className="px-2 py-1 text-xs rounded bg-black bg-opacity-20">
+                                            {room.status}
+                                        </span>
+                                    </div>
 
-                        <h4 className="font-semibold mb-1">Tasks:</h4>
-                        {room.housekeepingTasks.length === 0 && <p className="text-sm text-gray-500">No tasks</p>}
-                        <ul className="space-y-1">
-                            {room.housekeepingTasks.map(task => (
-                                <li key={task.id} className="border rounded p-2 bg-gray-50 flex flex-col gap-1">
-                                    <div className="flex justify-between">
-                                        <span>{task.type} ({task.priority || "N/A"})</span>
-                                        <span className={`text-xs px-1 rounded ${task.status === "Open" ? "bg-red-200 text-red-800" : "bg-green-200 text-green-800"}`}>{task.status}</span>
+                                    {/* المهام */}
+                                    <h4 className="font-semibold mb-1">Tasks:</h4>
+                                    {room.housekeepingTasks.length === 0 && <p className="text-sm">No tasks</p>}
+                                    <ul className="space-y-1">
+                                        {room.housekeepingTasks.map(task => (
+                                            <li
+                                                key={task.id}
+                                                className="bg-white text-black rounded p-2 text-sm flex justify-between items-center"
+                                            >
+                                                <span>{task.type} ({task.priority}) - {task.status}</span>
+                                                {task.status === "Open" && (
+                                                    <button
+                                                        onClick={() => closeTask(task.id, room.id)}
+                                                        className="ml-2 bg-red-500 text-white px-2 py-1 rounded text-xs"
+                                                    >
+                                                        Close
+                                                    </button>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+
+                                    {/* أزرار سريعة */}
+                                    <div className="flex gap-2 mt-3">
+                                        <button
+                                            onClick={() => updateRoomStatus(room.id, "CLEANING")}
+                                            className="bg-yellow-600 px-2 py-1 rounded text-sm"
+                                        >
+                                            Cleaning
+                                        </button>
+                                        <button
+                                            onClick={() => updateRoomStatus(room.id, "VACANT")}
+                                            className="bg-green-600 px-2 py-1 rounded text-sm"
+                                        >
+                                            Vacant
+                                        </button>
+                                        <button
+                                            onClick={() => updateRoomStatus(room.id, "MAINTENANCE")}
+                                            className="bg-red-600 px-2 py-1 rounded text-sm"
+                                        >
+                                            Maintenance
+                                        </button>
                                     </div>
-                                    {task.notes && <p className="text-sm text-gray-600">{task.notes}</p>}
-                                    <div className="flex gap-2 mt-1">
-                                        {task.status !== "Closed" && (
-                                            <button className="bg-green-500 text-white text-xs px-2 py-1 rounded"
-                                                onClick={() => handleTaskUpdate(task.id, "Closed", task.notes, "VACANT", room.id)}>
-                                                Close
-                                            </button>
-                                        )}
-                                        {task.status === "Closed" && (
-                                            <button className="bg-yellow-500 text-white text-xs px-2 py-1 rounded"
-                                                onClick={() => handleTaskUpdate(task.id, "Open", task.notes, "CLEANING", room.id)}>
-                                                Reopen
-                                            </button>
-                                        )}
-                                    </div>
-                                </li>
+
+                                    {/* إضافة مهمة */}
+                                    <button
+                                        onClick={() => setModalRoom(room)}
+                                        className="mt-2 px-2 py-1 bg-blue-700 rounded text-sm"
+                                    >
+                                        + Add Task
+                                    </button>
+                                </div>
                             ))}
-                        </ul>
-
-                        <button className="mt-2 px-2 py-1 bg-blue-500 text-white text-xs rounded"
-                            onClick={() => setModalRoom(room)}>
-                            Add Task
-                        </button>
+                        </div>
                     </div>
                 ))}
             </div>
 
-            {/* مودال إضافة مهمة */}
+            {/* المودال */}
             {modalRoom && (
                 <AddHousekeepingTaskModal
                     isOpen={!!modalRoom}
