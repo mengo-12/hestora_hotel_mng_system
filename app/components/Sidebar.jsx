@@ -14,6 +14,8 @@ export default function Sidebar() {
         { name: 'Folios', href: '/folios' },
         { name: 'Housekeeping', href: '/houseKeeping' },
         { name: 'Night Audit', href: '/night-audit' },
+        { name: 'Reports', href: '/reports' },
+
 
     ];
 
