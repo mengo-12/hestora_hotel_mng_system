@@ -8,6 +8,7 @@ export default function Sidebar() {
 
     const links = [
         { name: 'Dashboard', href: '/' },
+        { name: 'Front desk', href: '/front-desk' },
         { name: 'Rooms', href: '/rooms' },
         { name: 'Bookings', href: '/bookings' },
         { name: 'Guests', href: '/guests' },
