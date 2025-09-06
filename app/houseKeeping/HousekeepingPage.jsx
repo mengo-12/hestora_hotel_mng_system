@@ -34,7 +34,7 @@ export default function HousekeepingPage({ userProperties, session }) {
         try {
             const res = await fetch(`/api/houseKeeping?propertyId=${propId}&date=${date}`);
             const data = await res.json();
-            setRooms(data.rooms || []);
+            setRooms(data.rooms?.map(r => ({ ...r, bookingEnded: false })) || []);
         } catch (err) {
             console.error("Fetch housekeeping failed:", err);
             setRooms([]);
@@ -68,14 +68,23 @@ export default function HousekeepingPage({ userProperties, session }) {
             );
         };
 
+                // حدث جديد عند انتهاء الحجز
+        const handleRoomBookingEnded = ({ roomId }) => {
+            setRooms(prev =>
+                prev.map(r => r.id === roomId ? { ...r, bookingEnded: true } : r)
+            );
+        };
+
         socket.on("ROOM_UPDATED", handleRoomUpdate);
         socket.on("HOUSEKEEPING_UPDATED", handleHousekeepingUpdate);
         socket.on("ROOM_STATUS_CHANGED", handleRoomStatusChange);
+        socket.on("ROOM_BOOKING_ENDED", handleRoomBookingEnded);
 
         return () => {
             socket.off("ROOM_UPDATED", handleRoomUpdate);
             socket.off("HOUSEKEEPING_UPDATED", handleHousekeepingUpdate);
             socket.off("ROOM_STATUS_CHANGED", handleRoomStatusChange);
+            socket.off("ROOM_BOOKING_ENDED", handleRoomBookingEnded);
         };
     }, [socket, propertyId]);
 
