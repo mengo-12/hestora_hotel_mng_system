@@ -1,47 +1,28 @@
-'use client';
-import { useEffect, useState } from "react";
+import ProtectedPage from "@/app/components/ProtectedPage";
+import PropertySettingsPage from "./PropertySettingsPage"; // نسخة client-side
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 
-export default function PropertySettings() {
-    const [property, setProperty] = useState({});
-    const [loading, setLoading] = useState(true);
+export default async function Page() {
+    const session = await getServerSession(authOptions);
 
-    useEffect(() => {
-        fetch("/api/settings/property")
-            .then(res => res.json())
-            .then(data => {
-                setProperty(data);
-                setLoading(false);
-            });
-    }, []);
-
-    const handleChange = (e) => {
-        setProperty({ ...property, [e.target.name]: e.target.value });
-    };
-
-    const handleSave = async () => {
-        await fetch("/api/settings/property", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(property)
+    let userProperties = [];
+    if (session?.user?.id) {
+        userProperties = await prisma.property.findMany({
+            where: {
+                users: { some: { id: session.user.id } }
+            },
+            select: { id: true, name: true }
         });
-        alert("Property updated!");
-    };
-
-    if (loading) return <div>Loading...</div>;
+    }
 
     return (
-        <div className="space-y-4 p-4">
-            <input name="name" value={property.name || ""} onChange={handleChange} placeholder="Hotel Name" />
-            <input name="phone" value={property.phone || ""} onChange={handleChange} placeholder="Phone" />
-            <input name="email" value={property.email || ""} onChange={handleChange} placeholder="Email" />
-            <input name="address" value={property.address || ""} onChange={handleChange} placeholder="Address" />
-            <input name="currency" value={property.currency || ""} onChange={handleChange} placeholder="Currency" />
-            <input name="timezone" value={property.timezone || ""} onChange={handleChange} placeholder="Timezone" />
-            <input name="checkInTime" value={property.checkInTime || ""} onChange={handleChange} placeholder="Check-in HH:mm" />
-            <input name="checkOutTime" value={property.checkOutTime || ""} onChange={handleChange} placeholder="Check-out HH:mm" />
-            <textarea name="cancellationPolicy" value={property.cancellationPolicy || ""} onChange={handleChange} placeholder="Cancellation Policy" />
-            <textarea name="depositPolicy" value={property.depositPolicy || ""} onChange={handleChange} placeholder="Deposit Policy" />
-            <button onClick={handleSave}>Save</button>
-        </div>
+        <ProtectedPage
+            session={session}
+            allowedRoles={["ADMIN", "Manager"]}
+        >
+            <PropertySettingsPage userProperties={userProperties} session={session} />
+        </ProtectedPage>
     );
 }
