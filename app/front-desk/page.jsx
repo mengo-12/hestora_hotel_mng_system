@@ -1,3 +1,15 @@
+
+// ADMIN: كامل الصلاحيات (Check-in/out، Cancel، No-Show، فتح Folio).
+
+// FrontDesk: Check-in/out، Cancel، No-Show، فتح Folio (لا حذف).
+
+// Manager: عرض فقط، لا يمكن تعديل أي شيء.
+
+// منع ظهور أزرار أو تنفيذ أفعال غير مصرح بها حسب الدور.
+
+
+
+
 import ProtectedPage from "@/app/components/ProtectedPage";
 import FrontDeskPage from "./FrontDeskPage";
 import { getServerSession } from "next-auth/next";

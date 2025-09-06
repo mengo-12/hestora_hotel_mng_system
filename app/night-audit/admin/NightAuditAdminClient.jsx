@@ -1,4 +1,3 @@
-// app/night-audit/page.jsx
 'use client';
 
 import { useEffect, useState } from "react";
@@ -6,8 +5,15 @@ import { useSocket } from "@/app/components/SocketProvider";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-export default function NightAuditPage({ initialPropertyId, initialProperties, darkMode = false }) {
+export default function NightAuditAdminClient({ initialPropertyId, initialProperties, session, darkMode = false }) {
     const socket = useSocket();
+    const role = session?.user?.role || "Guest";
+
+    const canRunAudit = ["ADMIN", "Manager"].includes(role);
+    const canExport = ["ADMIN", "Manager"].includes(role);
+    const canView = ["ADMIN", "Manager"].includes(role);
+
+    if (!canView) return <p className="p-6 text-red-500">You do not have permission to view this page.</p>;
 
     const [properties, setProperties] = useState(initialProperties || []);
     const [selectedProperty, setSelectedProperty] = useState(initialPropertyId || "");
@@ -18,22 +24,18 @@ export default function NightAuditPage({ initialPropertyId, initialProperties, d
     const [running, setRunning] = useState(false);
     const [error, setError] = useState(null);
 
-    // fetch properties if not provided
     useEffect(() => {
         if (!properties || properties.length === 0) {
             fetch("/api/properties")
                 .then(r => r.json())
                 .then(d => setProperties(d || []))
-                .catch(e => console.error(e));
+                .catch(console.error);
         }
     }, [properties]);
 
-    // socket realtime
     useEffect(() => {
         if (!socket) return;
-        const handle = (payload) => {
-            setLogs(prev => [{ id: Date.now(), ...payload, createdAt: new Date() }, ...prev]);
-        };
+        const handle = (payload) => setLogs(prev => [{ id: Date.now(), ...payload, createdAt: new Date() }, ...prev]);
         socket.on("AUDIT_STEP_COMPLETED", handle);
         socket.on("ROOM_CHARGE_POSTED", handle);
         socket.on("audit-log", handle);
@@ -44,7 +46,6 @@ export default function NightAuditPage({ initialPropertyId, initialProperties, d
         };
     }, [socket]);
 
-    // helper: get data (GET)
     const fetchAuditData = async (propId = selectedProperty, date = auditDate) => {
         if (!propId) return;
         try {
@@ -53,37 +54,29 @@ export default function NightAuditPage({ initialPropertyId, initialProperties, d
             if (!res.ok) throw new Error(data.error || "Failed to fetch audit data");
             setBookings(data.bookings || []);
             setSummary(data.summary || null);
-        } catch (err) {
-            console.error(err);
-            setError(err.message);
-        }
+        } catch (err) { console.error(err); setError(err.message); }
     };
 
-    // run audit (POST) then update data
     const runAudit = async () => {
-        if (!selectedProperty) {
-            setError("Please select a Property");
-            return;
-        }
-        setRunning(true);
-        setError(null);
+        if (!canRunAudit) return alert("You do not have permission to run night audit.");
+        if (!selectedProperty) { setError("Please select a Property"); return; }
+        setRunning(true); setError(null);
         try {
             const res = await fetch("/api/night-audit", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ propertyId: selectedProperty, date: auditDate }),
+                body: JSON.stringify({ propertyId: selectedProperty, date: auditDate })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Night audit failed");
             setBookings(data.bookings || []);
             setSummary(data.summary || null);
-            setLogs(prev => [{ id: Date.now(), step: "NIGHT_AUDIT_RUN", message: `Night audit executed for ${auditDate}`, createdAt: new Date() }, ...prev]);
-        } catch (err) {
-            console.error(err);
-            setError(err.message);
-        } finally {
-            setRunning(false);
-        }
+            setLogs(prev => [
+                { id: Date.now(), step: "NIGHT_AUDIT_RUN", message: `Night audit executed for ${auditDate}`, createdAt: new Date() },
+                ...prev
+            ]);
+        } catch (err) { console.error(err); setError(err.message); }
+        finally { setRunning(false); }
     };
 
     // export PDF
@@ -128,6 +121,7 @@ export default function NightAuditPage({ initialPropertyId, initialProperties, d
 
     // export CSV
     const exportCSV = () => {
+        if (!canExport) return alert("You do not have permission to export reports.");
         if (!bookings || bookings.length === 0) return;
         const rows = [["Room", "Guest", "Status", "Charge", "Code", "Amount", "Time"]];
         for (const b of bookings) {
@@ -146,27 +140,25 @@ export default function NightAuditPage({ initialPropertyId, initialProperties, d
         URL.revokeObjectURL(url);
     };
 
-    const handlePrint = () => window.print();
+        const handlePrint = () => {
+        if (!canExport) return alert("You do not have permission to print reports.");
+        window.print();
+    };
 
     return (
-        <div className={`${darkMode ? "bg-gray-900 text-white min-h-screen" : "bg-white text-black"} p-6`}>
-            <h1 className="text-2xl font-bold mb-4">Night Audit</h1>
-
+        <div className={`${darkMode?"bg-gray-900 text-white min-h-screen":"bg-white text-black"} p-6`}>
+            <h1 className="text-2xl font-bold mb-4">Night Audit Admin</h1>
             <div className="flex flex-wrap gap-4 mb-4 items-center">
                 <select value={selectedProperty} onChange={e => setSelectedProperty(e.target.value)} className="border p-2 rounded text-black">
                     <option value="">-- Select Property --</option>
                     {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-
                 <input type="date" value={auditDate} onChange={e => setAuditDate(e.target.value)} className="border p-2 rounded text-black" />
-
                 <button onClick={() => fetchAuditData(selectedProperty, auditDate)} className="bg-gray-600 text-white px-4 py-2 rounded">Fetch Data</button>
-                <button onClick={runAudit} disabled={running} className={`px-4 py-2 rounded ${running ? "bg-blue-400" : "bg-blue-600 text-white"}`}>
-                    {running ? "Running..." : "Run Night Audit"}
-                </button>
-                <button onClick={exportPDF} className="bg-green-600 text-white px-3 py-2 rounded">Export PDF</button>
-                <button onClick={exportCSV} className="bg-yellow-500 px-3 py-2 rounded">Export CSV</button>
-                <button onClick={handlePrint} className="bg-gray-700 text-white px-3 py-2 rounded">Print</button>
+                <button onClick={runAudit} disabled={running || !canRunAudit} className={`px-4 py-2 rounded ${running?"bg-blue-400":"bg-blue-600 text-white"}`}>{running?"Running...":"Run Night Audit"}</button>
+                <button onClick={exportPDF} className="bg-green-600 text-white px-3 py-2 rounded" disabled={!canExport}>Export PDF</button>
+                <button onClick={exportCSV} className="bg-yellow-500 px-3 py-2 rounded" disabled={!canExport}>Export CSV</button>
+                <button onClick={handlePrint} className="bg-gray-700 text-white px-3 py-2 rounded" disabled={!canExport}>Print</button>
             </div>
 
             {error && <div className="text-red-400 mb-4">{error}</div>}

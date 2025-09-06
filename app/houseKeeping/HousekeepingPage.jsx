@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
@@ -10,8 +11,13 @@ const statusColors = {
     MAINTENANCE: "bg-blue-500",
 };
 
-export default function HousekeepingPage({ userProperties }) {
+export default function HousekeepingPage({ userProperties, session }) {
     const socket = useSocket();
+    const role = session?.user?.role || "Guest";
+
+    const canModifyRoom = ["ADMIN", "FrontDesk"].includes(role);
+    const canManageTasks = ["ADMIN", "HK"].includes(role);
+    const canView = ["ADMIN", "FrontDesk", "HK", "Manager"].includes(role);
 
     const [propertyId, setPropertyId] = useState(userProperties?.[0]?.id || "");
     const [rooms, setRooms] = useState([]);
@@ -21,7 +27,8 @@ export default function HousekeepingPage({ userProperties }) {
     const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
     const [modalRoom, setModalRoom] = useState(null);
 
-    // --- جلب البيانات ---
+    if (!canView) return <p className="p-6 text-red-500">You do not have permission to view this page.</p>;
+
     const fetchHousekeeping = async (propId = propertyId) => {
         if (!propId) return;
         try {
@@ -36,39 +43,28 @@ export default function HousekeepingPage({ userProperties }) {
 
     useEffect(() => { fetchHousekeeping(); }, [propertyId, date]);
 
-    // --- البث العالمي عبر السيرفر ---
     useEffect(() => {
         if (!socket) return;
 
-        // تحديث الغرف عند تعديل الغرفة
         const handleRoomUpdate = (updatedRoom) => {
             if (updatedRoom.propertyId === propertyId) {
-                setRooms(prev =>
-                    prev.map(r => r.id === updatedRoom.id ? { ...r, ...updatedRoom } : r)
-                );
+                setRooms(prev => prev.map(r => r.id === updatedRoom.id ? { ...r, ...updatedRoom } : r));
             }
         };
 
-        // تحديث المهام عند إضافة أو تعديل مهمة
         const handleHousekeepingUpdate = ({ task, roomId }) => {
             setRooms(prev =>
                 prev.map(r =>
                     r.id === roomId
-                        ? {
-                            ...r,
-                            housekeepingTasks: [task, ...r.housekeepingTasks.filter(t => t.id !== task.id)]
-                        }
+                        ? { ...r, housekeepingTasks: [task, ...r.housekeepingTasks.filter(t => t.id !== task.id)] }
                         : r
                 )
             );
         };
 
-        // تحديث حالة الغرفة فقط (أسرع من تحديث كل البيانات)
         const handleRoomStatusChange = ({ roomId, newStatus }) => {
             setRooms(prev =>
-                prev.map(r =>
-                    r.id === roomId ? { ...r, status: newStatus } : r
-                )
+                prev.map(r => r.id === roomId ? { ...r, status: newStatus } : r)
             );
         };
 
@@ -83,8 +79,8 @@ export default function HousekeepingPage({ userProperties }) {
         };
     }, [socket, propertyId]);
 
-    // --- تحديث سريع لحالة الغرفة ---
     const updateRoomStatus = async (roomId, newStatus) => {
+        if (!canModifyRoom) return alert("You do not have permission to change room status.");
         try {
             const room = rooms.find(r => r.id === roomId);
             if (!room) throw new Error("Room not found");
@@ -92,81 +88,50 @@ export default function HousekeepingPage({ userProperties }) {
             const res = await fetch(`/api/rooms/${roomId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    propertyId: room.propertyId,
-                    number: room.number,
-                    roomTypeId: room.roomTypeId,
-                    status: newStatus,
-                    floor: room.floor,
-                    notes: room.notes
-                }),
+                body: JSON.stringify({ ...room, status: newStatus }),
             });
 
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to update");
-
-            console.log("Room updated:", data);
         } catch (err) {
             console.error("Update room status failed:", err);
             alert("Update room status failed: " + err.message);
         }
     };
 
-
-    // --- إضافة مهمة جديدة ---
     const handleAddTask = async (room, taskData) => {
-        if (!propertyId) return alert("Please select a property first.");
+        if (!canManageTasks) return alert("You do not have permission to add tasks.");
         try {
             const res = await fetch("/api/houseKeeping", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    roomId: room.id,
-                    propertyId,
-                    type: taskData.type,
-                    priority: taskData.priority,
-                    notes: taskData.notes,
-                    assignedToId: taskData.assignedTo || null
-                })
+                body: JSON.stringify({ roomId: room.id, propertyId, ...taskData }),
             });
             const result = await res.json();
-            if (result.success) {
-                setModalRoom(null);
-                // البث سيتم من السيرفر تلقائياً
-            }
+            if (result.success) setModalRoom(null);
         } catch (err) {
             console.error(err);
             alert("Failed to add task");
         }
     };
 
-    // --- إغلاق مهمة ---
     const closeTask = async (taskId, roomId) => {
+        if (!canManageTasks) return alert("You do not have permission to close tasks.");
         try {
-            const res = await fetch(`/api/houseKeeping/${taskId}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "Closed" })
-            });
-
+            const res = await fetch(`/api/houseKeeping/${taskId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "Closed" }) });
             const result = await res.json();
-            if (!result.success) {
-                alert("Failed to close task: " + result.error);
-            }
-            // سيتم التحديث عبر البث من السيرفر
+            if (!result.success) alert("Failed to close task: " + result.error);
         } catch (err) {
             console.error("Error closing task:", err);
         }
     };
 
-    // --- الفلاتر ---
     const filteredRooms = rooms.filter(r =>
         r.number.toLowerCase().includes(searchTerm.toLowerCase()) &&
         (filterStatus ? r.status === filterStatus : true) &&
         (filterPriority ? r.housekeepingTasks.some(t => t.priority === filterPriority) : true)
     );
 
-    // --- إحصائيات ---
     const stats = {
         VACANT: rooms.filter(r => r.status === "VACANT").length,
         OCCUPIED: rooms.filter(r => r.status === "OCCUPIED").length,
@@ -176,7 +141,6 @@ export default function HousekeepingPage({ userProperties }) {
         CLOSED_TASKS: rooms.reduce((sum, r) => sum + r.housekeepingTasks.filter(t => t.status === "Closed").length, 0)
     };
 
-    // --- تقسيم حسب الطابق ---
     const groupedByFloor = filteredRooms.reduce((acc, room) => {
         const floor = room.floor || "Unknown";
         if (!acc[floor]) acc[floor] = [];
@@ -186,7 +150,8 @@ export default function HousekeepingPage({ userProperties }) {
 
     return (
         <div className="p-6">
-            {/* الفلاتر */}
+
+             {/* الفلاتر */}
             <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-2">
                 <h1 className="text-2xl font-bold">Housekeeping Dashboard</h1>
                 <div className="flex gap-2 flex-wrap">
@@ -227,77 +192,44 @@ export default function HousekeepingPage({ userProperties }) {
                 ))}
             </div>
 
-            {/* الغرف حسب الطابق */}
             <div className="h-[70vh] overflow-y-auto pr-2">
                 {Object.keys(groupedByFloor).map(floor => (
                     <div key={floor} className="mb-6">
-                        <h2 className="text-lg font-bold mb-2 sticky top-0 bg-white z-10 p-1 shadow">
-                            Floor {floor}
-                        </h2>
+                        <h2 className="text-lg font-bold mb-2 sticky top-0 bg-white z-10 p-1 shadow">Floor {floor}</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {groupedByFloor[floor].map(room => (
-                                <div
-                                    key={room.id}
-                                    className={`p-4 rounded shadow text-white ${statusColors[room.status] || "bg-gray-500"}`}
-                                >
+                                <div key={room.id} className={`p-4 rounded shadow text-white ${statusColors[room.status] || "bg-gray-500"}`}>
                                     <div className="flex justify-between mb-2">
                                         <span className="font-bold">Room {room.number}</span>
-                                        <span className="px-2 py-1 text-xs rounded bg-black bg-opacity-20">
-                                            {room.status}
-                                        </span>
+                                        <span className="px-2 py-1 text-xs rounded bg-black bg-opacity-20">{room.status}</span>
                                     </div>
 
-                                    {/* المهام */}
                                     <h4 className="font-semibold mb-1">Tasks:</h4>
                                     {room.housekeepingTasks.length === 0 && <p className="text-sm">No tasks</p>}
                                     <ul className="space-y-1">
                                         {room.housekeepingTasks.map(task => (
-                                            <li
-                                                key={task.id}
-                                                className="bg-white text-black rounded p-2 text-sm flex justify-between items-center"
-                                            >
+                                            <li key={task.id} className="bg-white text-black rounded p-2 text-sm flex justify-between items-center">
                                                 <span>{task.type} ({task.priority}) - {task.status}</span>
-                                                {task.status === "Open" && (
-                                                    <button
-                                                        onClick={() => closeTask(task.id, room.id)}
-                                                        className="ml-2 bg-red-500 text-white px-2 py-1 rounded text-xs"
-                                                    >
-                                                        Close
-                                                    </button>
+                                                {task.status === "Open" && canManageTasks && (
+                                                    <button onClick={() => closeTask(task.id, room.id)} className="ml-2 bg-red-500 text-white px-2 py-1 rounded text-xs">Close</button>
                                                 )}
                                             </li>
                                         ))}
                                     </ul>
 
-                                    {/* أزرار سريعة */}
                                     <div className="flex gap-2 mt-3">
-                                        <button
-                                            onClick={() => updateRoomStatus(room.id, "CLEANING")}
-                                            className="bg-yellow-600 px-2 py-1 rounded text-sm"
-                                        >
-                                            Cleaning
-                                        </button>
-                                        <button
-                                            onClick={() => updateRoomStatus(room.id, "VACANT")}
-                                            className="bg-green-600 px-2 py-1 rounded text-sm"
-                                        >
-                                            Vacant
-                                        </button>
-                                        <button
-                                            onClick={() => updateRoomStatus(room.id, "MAINTENANCE")}
-                                            className="bg-red-600 px-2 py-1 rounded text-sm"
-                                        >
-                                            Maintenance
-                                        </button>
+                                        {canModifyRoom && (
+                                            <>
+                                                <button onClick={() => updateRoomStatus(room.id, "CLEANING")} className="bg-yellow-600 px-2 py-1 rounded text-sm">Cleaning</button>
+                                                <button onClick={() => updateRoomStatus(room.id, "VACANT")} className="bg-green-600 px-2 py-1 rounded text-sm">Vacant</button>
+                                                <button onClick={() => updateRoomStatus(room.id, "MAINTENANCE")} className="bg-red-600 px-2 py-1 rounded text-sm">Maintenance</button>
+                                            </>
+                                        )}
                                     </div>
 
-                                    {/* إضافة مهمة */}
-                                    <button
-                                        onClick={() => setModalRoom(room)}
-                                        className="mt-2 px-2 py-1 bg-blue-700 rounded text-sm"
-                                    >
-                                        + Add Task
-                                    </button>
+                                    {canManageTasks && (
+                                        <button onClick={() => setModalRoom(room)} className="mt-2 px-2 py-1 bg-blue-700 rounded text-sm">+ Add Task</button>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -305,14 +237,8 @@ export default function HousekeepingPage({ userProperties }) {
                 ))}
             </div>
 
-            {/* المودال */}
-            {modalRoom && (
-                <AddHousekeepingTaskModal
-                    isOpen={!!modalRoom}
-                    room={modalRoom}
-                    onClose={() => setModalRoom(null)}
-                    onSave={(taskData) => handleAddTask(modalRoom, taskData)}
-                />
+            {modalRoom && canManageTasks && (
+                <AddHousekeepingTaskModal isOpen={!!modalRoom} room={modalRoom} onClose={() => setModalRoom(null)} onSave={(taskData) => handleAddTask(modalRoom, taskData)} />
             )}
         </div>
     );

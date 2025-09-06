@@ -2,49 +2,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
-export default function ReportsPage() {
+export default function ReportsPage({ userProperties, session }) {
+    const userRole = session.user.role;
     const [reportType, setReportType] = useState("Booking");
-    const [propertyId, setPropertyId] = useState("");
+    const [propertyId, setPropertyId] = useState(userRole === "FrontDesk" && userProperties.length === 1 ? userProperties[0].id : "");
     const [fromDate, setFromDate] = useState(new Date().toISOString().split("T")[0]);
     const [toDate, setToDate] = useState(new Date().toISOString().split("T")[0]);
     const [searchTerm, setSearchTerm] = useState("");
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(20);
 
-    const [properties, setProperties] = useState([]);
+    const [properties, setProperties] = useState(userProperties || []);
     const [reports, setReports] = useState([]);
     const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(false);
 
+    const [sortField, setSortField] = useState("");
+    const [sortDir, setSortDir] = useState("asc");
 
-
-    // للفرز
-    const [sortField, setSortField] = useState(""); // العمود الذي سيتم الفرز عليه
-    const [sortDir, setSortDir] = useState("asc"); // <-- هنا عرفنا sortDir
-
-    // حساب إجماليات Folio
-    const getFolioTotals = (r) => {
-        const totalCharges = (r.charges || []).reduce((s, c) => s + num(c.amount) + num(c.tax || 0), 0);
-        const totalPayments = (r.payments || []).reduce((s, p) => s + num(p.amount), 0);
-        const balance = totalCharges - totalPayments;
-        return { totalCharges, totalPayments, balance };
-    };
-
-
-    // جلب قائمة الفنادق
-    useEffect(() => {
-        const fetchProperties = async () => {
-            try {
-                const res = await fetch("/api/properties");
-                const data = await res.json();
-                setProperties(data || []);
-                if ((data || []).length && !propertyId) setPropertyId(data[0].id);
-            } catch (err) {
-                console.error("Failed to fetch properties:", err);
-            }
-        };
-        fetchProperties();
-    }, []); // أول تحميل
+    const num = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
 
     // جلب التقارير
     useEffect(() => {
@@ -62,13 +38,11 @@ export default function ReportsPage() {
                 });
 
                 const res = await fetch(`/api/reports?${params.toString()}`);
-                // في حال رجع HTML (مثلاً 404 صفحة) نتجنب JSON.parse error
                 const text = await res.text();
                 let data;
                 try {
                     data = JSON.parse(text);
                 } catch {
-                    console.error("Response is not JSON. Raw:", text);
                     data = { reports: [], totalPages: 1 };
                 }
 
@@ -81,23 +55,20 @@ export default function ReportsPage() {
                 setLoading(false);
             }
         };
-
         fetchReports();
     }, [reportType, propertyId, fromDate, toDate, searchTerm, page, limit]);
 
-    // Helpers
-    const num = (v) => {
-        const n = parseFloat(v);
-        return isNaN(n) ? 0 : n;
+    const getFolioTotals = (r) => {
+        const totalCharges = (r.charges || []).reduce((s, c) => s + num(c.amount) + num(c.tax || 0), 0);
+        const totalPayments = (r.payments || []).reduce((s, p) => s + num(p.amount), 0);
+        return { totalCharges, totalPayments, balance: totalCharges - totalPayments };
     };
 
-    // فرز على الصفحة الحالية (client-side)
     const getComparableValue = (row, field) => {
         switch (reportType) {
             case "Booking":
                 if (field === "id") return row.id || "";
-                if (field === "guestName")
-                    return `${row.guest?.firstName || ""} ${row.guest?.lastName || ""}`.trim();
+                if (field === "guestName") return `${row.guest?.firstName || ""} ${row.guest?.lastName || ""}`.trim();
                 if (field === "property") return row.property?.name || "";
                 if (field === "room") return row.room?.number || "";
                 if (field === "checkIn") return row.checkIn || "";
@@ -112,13 +83,10 @@ export default function ReportsPage() {
             case "Folio": {
                 if (field === "id") return row.id || "";
                 if (field === "bookingId") return row.bookingId || "";
-                if (field === "guestName")
-                    return `${row.guest?.firstName || ""} ${row.guest?.lastName || ""}`.trim();
+                if (field === "guestName") return `${row.guest?.firstName || ""} ${row.guest?.lastName || ""}`.trim();
                 if (field === "status") return row.status || "";
-                if (field === "totalCharges")
-                    return (row.charges || []).reduce((s, c) => s + num(c.amount), 0);
-                if (field === "totalPayments")
-                    return (row.payments || []).reduce((s, p) => s + num(p.amount), 0);
+                if (field === "totalCharges") return (row.charges || []).reduce((s, c) => s + num(c.amount), 0);
+                if (field === "totalPayments") return (row.payments || []).reduce((s, p) => s + num(p.amount), 0);
                 if (field === "balance") {
                     const ch = (row.charges || []).reduce((s, c) => s + num(c.amount), 0);
                     const pm = (row.payments || []).reduce((s, p) => s + num(p.amount), 0);
@@ -130,8 +98,7 @@ export default function ReportsPage() {
             case "Payment":
                 if (field === "id") return row.id || "";
                 if (field === "folioId") return row.folio?.id || row.folioId || "";
-                if (field === "guestName")
-                    return `${row.folio?.guest?.firstName || ""} ${row.folio?.guest?.lastName || ""}`.trim();
+                if (field === "guestName") return `${row.folio?.guest?.firstName || ""} ${row.folio?.guest?.lastName || ""}`.trim();
                 if (field === "amount") return num(row.amount);
                 if (field === "method") return row.method || "";
                 if (field === "ref") return row.ref || "";
@@ -149,8 +116,7 @@ export default function ReportsPage() {
             case "Extra":
                 if (field === "id") return row.id || "";
                 if (field === "bookingId") return row.bookingId || "";
-                if (field === "guestName")
-                    return `${row.guest?.firstName || ""} ${row.guest?.lastName || ""}`.trim();
+                if (field === "guestName") return `${row.guest?.firstName || ""} ${row.guest?.lastName || ""}`.trim();
                 if (field === "name") return row.name || "";
                 if (field === "unitPrice") return num(row.unitPrice);
                 if (field === "quantity") return row.quantity ?? 0;
@@ -158,54 +124,35 @@ export default function ReportsPage() {
                 if (field === "status") return row.status || "";
                 if (field === "createdAt") return row.createdAt || "";
                 return "";
-            default:
-                return "";
+            default: return "";
         }
     };
 
     const sortedReports = useMemo(() => {
         if (!sortField) return reports;
-        const sorted = [...reports].sort((a, b) => {
+        return [...reports].sort((a, b) => {
             const va = getComparableValue(a, sortField);
             const vb = getComparableValue(b, sortField);
-            if (typeof va === "number" && typeof vb === "number") {
-                return sortDir === "asc" ? va - vb : vb - va;
-            }
+            if (typeof va === "number" && typeof vb === "number") return sortDir === "asc" ? va - vb : vb - va;
             const sa = String(va).toLowerCase();
             const sb = String(vb).toLowerCase();
-            if (sa < sb) return sortDir === "asc" ? -1 : 1;
-            if (sa > sb) return sortDir === "asc" ? 1 : -1;
-            return 0;
+            return sortDir === "asc" ? sa.localeCompare(sb) : sb.localeCompare(sa);
         });
-        return sorted;
     }, [reports, sortField, sortDir]);
 
     const handleSort = (field) => {
-        if (sortField === field) {
-            setSortDir(sortDir === "asc" ? "desc" : "asc");
-        } else {
-            setSortField(field);
-            setSortDir("asc");
-        }
+        if (sortField === field) setSortDir(sortDir === "asc" ? "desc" : "asc");
+        else { setSortField(field); setSortDir("asc"); }
     };
 
-    // ملخص رسومي أعلى الجدول
     const chartData = useMemo(() => {
         const map = new Map();
-        if (reportType === "Booking") {
-            for (const r of reports) {
-                const k = r.status || "Unknown";
-                map.set(k, (map.get(k) || 0) + 1);
-            }
+        if (reportType === "Booking" || reportType === "Housekeeping") {
+            for (const r of reports) map.set(r.status || "Unknown", (map.get(r.status || "Unknown") || 0) + 1);
         } else if (reportType === "Payment") {
-            for (const r of reports) {
-                const k = r.method || "Unknown";
-                map.set(k, (map.get(k) || 0) + num(r.amount));
-            }
+            for (const r of reports) map.set(r.method || "Unknown", (map.get(r.method || "Unknown") || 0) + num(r.amount));
         } else if (reportType === "Folio") {
-            // إجمالي Charges/Payments/Balance
-            let totalC = 0;
-            let totalP = 0;
+            let totalC = 0, totalP = 0;
             for (const r of reports) {
                 totalC += (r.charges || []).reduce((s, c) => s + num(c.amount), 0);
                 totalP += (r.payments || []).reduce((s, p) => s + num(p.amount), 0);
@@ -215,17 +162,10 @@ export default function ReportsPage() {
                 { name: "Payments", value: totalP },
                 { name: "Balance", value: totalC - totalP },
             ];
-        } else if (reportType === "Housekeeping") {
-            for (const r of reports) {
-                const k = r.status || "Unknown";
-                map.set(k, (map.get(k) || 0) + 1);
-            }
         } else if (reportType === "Extra") {
-            // إجمالي المبلغ حسب اسم الخدمة
             for (const r of reports) {
-                const k = r.name || "Extra";
                 const total = num(r.unitPrice) * (r.quantity ?? 1) + num(r.tax);
-                map.set(k, (map.get(k) || 0) + total);
+                map.set(r.name || "Extra", (map.get(r.name || "Extra") || 0) + total);
             }
         }
         return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
@@ -252,7 +192,7 @@ export default function ReportsPage() {
             return { headers, rows };
         }
         if (reportType === "Folio") {
-            const headers = ["ID","BookingId","Guest","Status","Total Charges","Total Payments","Balance","CreatedAt"];
+            const headers = ["ID", "BookingId", "Guest", "Status", "Total Charges", "Total Payments", "Balance", "CreatedAt"];
             const rows = reports.map(r => {
                 const { totalCharges, totalPayments, balance } = getFolioTotals(r);
                 return [
@@ -338,44 +278,43 @@ export default function ReportsPage() {
             .map((row) => `<tr>${row.map((c) => `<td style="border:1px solid #ddd;padding:6px;">${c ?? ""}</td>`).join("")}</tr>`)
             .join("");
         const html = `
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Print - ${reportType}</title>
-          <style>
-            body { font-family: sans-serif; padding: 16px; }
-            table { border-collapse: collapse; width: 100%; }
-            th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
-            th { background: #f3f4f6; text-align:left; }
-          </style>
-        </head>
-        <body>
-          <h3>Reports - ${reportType}</h3>
-          <table>
-            <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
-            <tbody>${htmlRows}</tbody>
-          </table>
-          <script>window.print();</script>
-        </body>
-      </html>`;
+            <html>
+                <head>
+                    <meta charset="utf-8" />
+                    <title>Print - ${reportType}</title>
+                    <style>
+                        body {font - family: sans-serif; padding: 16px; }
+                        table {border - collapse: collapse; width: 100%; }
+                        th, td {border: 1px solid #ddd; padding: 8px; font-size: 12px; }
+                        th {background: #f3f4f6; text-align:left; }
+                    </style>
+                </head>
+                <body>
+                    <h3>Reports - ${reportType}</h3>
+                    <table>
+                        <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+                        <tbody>${htmlRows}</tbody>
+                    </table>
+                    <script>window.print();</script>
+                </body>
+            </html>`;
         const w = window.open("", "_blank");
         if (!w) return;
         w.document.open();
         w.document.write(html);
         w.document.close();
     };
-    function SortHeader({ field, children, sortField, sortDir, onSort }) {
+
+    function SortHeader({ field, children }) {
         const isActive = sortField === field;
         const arrow = isActive ? (sortDir === "asc" ? " ↑" : " ↓") : "";
         return (
-            <th
-                className="p-2 border cursor-pointer select-none text-left"
-                onClick={() => onSort(field)}
-            >
+            <th className="p-2 border cursor-pointer select-none text-left" onClick={() => handleSort(field)}>
                 {children}{arrow}
             </th>
         );
     }
+
     return (
         <div className="p-6">
             <h1 className="text-2xl font-bold mb-4">📊 لوحة التقارير</h1>
@@ -390,7 +329,12 @@ export default function ReportsPage() {
                     <option value="Extra">الخدمات الإضافية</option>
                 </select>
 
-                <select value={propertyId} onChange={e => { setPropertyId(e.target.value); setPage(1); }} className="px-3 py-2 border rounded">
+                <select
+                    value={propertyId}
+                    onChange={e => { setPropertyId(e.target.value); setPage(1); }}
+                    className="px-3 py-2 border rounded"
+                    disabled={userRole === "FrontDesk" && properties.length === 1}
+                >
                     <option value="">كل الفنادق</option>
                     {properties.map(p => (
                         <option key={p.id} value={p.id}>{p.name}</option>
@@ -404,28 +348,14 @@ export default function ReportsPage() {
                     <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); setPage(1); }} className="px-3 py-2 border rounded" />
                 </div>
 
-                <input
-                    type="text"
-                    placeholder="🔍 بحث..."
-                    value={searchTerm}
-                    onChange={e => { setSearchTerm(e.target.value); setPage(1); }}
-                    className="px-3 py-2 border rounded flex-1 min-w-[200px]"
-                />
-
-                <select value={limit} onChange={e => { setLimit(parseInt(e.target.value)); setPage(1); }} className="px-3 py-2 border rounded">
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                </select>
-
+                {/* باقي الفلاتر + أزرار التصدير */}
                 <div className="ml-auto flex gap-2">
                     <button onClick={downloadCSV} className="px-3 py-2 border rounded bg-white hover:bg-gray-50">تصدير CSV</button>
                     <button onClick={printTable} className="px-3 py-2 border rounded bg-white hover:bg-gray-50">طباعة / PDF</button>
                 </div>
             </div>
 
-            {/* ملخص رسومي */}
+            {/* ملخص الرسوم البيانية */}
             {chartData.length > 0 && (
                 <div className="w-full h-72 mb-6 border rounded-lg shadow p-2 bg-white">
                     <ResponsiveContainer>
@@ -438,7 +368,6 @@ export default function ReportsPage() {
                     </ResponsiveContainer>
                 </div>
             )}
-
             {/* جدول البيانات */}
             <div className="overflow-x-auto border rounded-lg">
                 <table className="min-w-full text-sm">
@@ -623,3 +552,4 @@ export default function ReportsPage() {
         </div>
     );
 }
+

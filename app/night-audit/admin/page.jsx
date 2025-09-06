@@ -1,3 +1,11 @@
+
+// ADMIN: كامل الصلاحيات (تشغيل الـ Night Audit، تصدير، عرض جميع الخصائص).
+
+// Manager: يمكنه تشغيل الـ Night Audit على الخصائص المسموح بها، تصدير وعرض البيانات.
+
+// غير مصرح لهم: رسالة منع الوصول.
+
+
 import ProtectedPage from "@/app/components/ProtectedPage";
 import NightAuditAdminClient from "./NightAuditAdminClient";
 import { getServerSession } from "next-auth/next";

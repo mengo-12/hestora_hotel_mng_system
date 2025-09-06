@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
+import { useSession } from "next-auth/react";
 
-export default function UsersPage() {
+export default function UsersPageClient({ userProperties }) {
+    const { data: session } = useSession();
     const [users, setUsers] = useState([]);
     const [properties, setProperties] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -11,6 +13,13 @@ export default function UsersPage() {
     const [editingUser, setEditingUser] = useState(null);
     const [form, setForm] = useState({ name: "", email: "", role: "FrontDesk", password: "", propertyId: "" });
     const socket = useSocket();
+
+    const userRole = session?.user?.role || "FrontDesk";
+
+    const canAdd = ["Admin", "Manager"].includes(userRole);
+    const canEdit = ["Admin", "Manager"].includes(userRole);
+    const canDelete = ["Admin"].includes(userRole);
+    const readOnly = ["FrontDesk", "HK"].includes(userRole);
 
     // Fetch users
     const fetchUsers = async () => {
@@ -40,12 +49,14 @@ export default function UsersPage() {
     }, [socket]);
 
     const openAddModal = () => {
+        if (!canAdd) return;
         setForm({ name: "", email: "", role: "FrontDesk", password: "", propertyId: "" });
         setEditingUser(null);
         setModalOpen(true);
     };
 
     const openEditModal = (user) => {
+        if (!canEdit) return;
         setForm({ 
             name: user.name, 
             email: user.email, 
@@ -58,6 +69,7 @@ export default function UsersPage() {
     };
 
     const handleSubmit = async () => {
+        if (readOnly) return;
         const payload = { ...form };
 
         if (!editingUser && !payload.password) {
@@ -77,24 +89,27 @@ export default function UsersPage() {
         });
 
         setModalOpen(false);
-        // إعادة جلب المستخدمين ستتم تلقائيًا عبر broadcast
     };
 
-    const handleDelete = async (id) => {
+    const handleDelete = async (user) => {
+        if (!canDelete) return;
+        if (user.role === "Admin") return alert("Cannot delete Admin user");
         if (!confirm("هل تريد حذف هذا المستخدم؟")) return;
-        await fetch(`/api/settings/users?id=${id}`, { method: "DELETE" });
+        await fetch(`/api/settings/users?id=${user.id}`, { method: "DELETE" });
     };
 
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold">Users</h2>
-                <button
-                    onClick={openAddModal}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                    Add User
-                </button>
+                {canAdd && (
+                    <button
+                        onClick={openAddModal}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                        Add User
+                    </button>
+                )}
             </div>
 
             {loading ? (
@@ -118,18 +133,22 @@ export default function UsersPage() {
                                 <td className="px-4 py-2">{user.role}</td>
                                 <td className="px-4 py-2">{user.property?.name || "—"}</td>
                                 <td className="px-4 py-2 space-x-2">
-                                    <button
-                                        onClick={() => openEditModal(user)}
-                                        className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(user.id)}
-                                        className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                                    >
-                                        Delete
-                                    </button>
+                                    {canEdit && (
+                                        <button
+                                            onClick={() => openEditModal(user)}
+                                            className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                                        >
+                                            Edit
+                                        </button>
+                                    )}
+                                    {canDelete && (
+                                        <button
+                                            onClick={() => handleDelete(user)}
+                                            className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                                        >
+                                            Delete
+                                        </button>
+                                    )}
                                 </td>
                             </tr>
                         ))}
@@ -138,7 +157,7 @@ export default function UsersPage() {
             )}
 
             {/* Modal */}
-            {modalOpen && (
+            {modalOpen && (canAdd || canEdit) && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded shadow-lg w-96">
                         <h3 className="text-lg font-bold mb-4">{editingUser ? "Edit User" : "Add User"}</h3>
@@ -149,6 +168,7 @@ export default function UsersPage() {
                                 value={form.name}
                                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                                 className="w-full px-3 py-2 border rounded"
+                                disabled={readOnly}
                             />
                             <input
                                 type="email"
@@ -156,6 +176,7 @@ export default function UsersPage() {
                                 value={form.email}
                                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                                 className="w-full px-3 py-2 border rounded"
+                                disabled={readOnly}
                             />
                             <input
                                 type="password"
@@ -163,11 +184,13 @@ export default function UsersPage() {
                                 value={form.password}
                                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                                 className="w-full px-3 py-2 border rounded"
+                                disabled={readOnly}
                             />
                             <select
                                 value={form.role}
                                 onChange={(e) => setForm({ ...form, role: e.target.value })}
                                 className="w-full px-3 py-2 border rounded"
+                                disabled={readOnly}
                             >
                                 <option value="Admin">Admin</option>
                                 <option value="FrontDesk">FrontDesk</option>
@@ -175,11 +198,11 @@ export default function UsersPage() {
                                 <option value="Manager">Manager</option>
                             </select>
 
-                            {/* Property Dropdown */}
                             <select
                                 value={form.propertyId}
                                 onChange={(e) => setForm({ ...form, propertyId: e.target.value })}
                                 className="w-full px-3 py-2 border rounded"
+                                disabled={readOnly}
                             >
                                 <option value="">Select Property</option>
                                 {properties.map((p) => (
@@ -198,6 +221,7 @@ export default function UsersPage() {
                             <button
                                 onClick={handleSubmit}
                                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                disabled={readOnly}
                             >
                                 {editingUser ? "Update" : "Add"}
                             </button>

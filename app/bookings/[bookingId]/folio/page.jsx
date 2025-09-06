@@ -1,3 +1,20 @@
+
+// Admin: كامل الصلاحيات (إضافة/تعديل/حذف Charges & Payments، إغلاق/إعادة فتح الفاتورة).
+
+// Manager: إضافة وتعديل Charges & Payments ضمن الخصائص التابعة له، يمكنه إغلاق الفاتورة لكنه لا يستطيع حذف بعض العمليات إذا أردت تحديدها لاحقًا.
+
+// FrontDesk: يمكنه فقط إضافة Charges & Payments، لا يمكنه حذف أو غلق الفاتورة.
+
+// HK أو غير مصرح له: عرض فقط.
+
+// تعريف الصلاحيات حسب الدور (Admin, Manager, FrontDesk).
+
+// التحكم في القدرة على إضافة/حذف Charges و Payments.
+
+// التحكم في القدرة على غلق أو إعادة فتح الفاتورة.
+
+// إخفاء أزرار Add/Delete للمستخدمين غير المخولين.
+
 import ProtectedPage from "@/app/components/ProtectedPage";
 import FolioPage from "./FolioPage"; // ✨ أنقل الكود الأصلي هنا
 import { getServerSession } from "next-auth/next";

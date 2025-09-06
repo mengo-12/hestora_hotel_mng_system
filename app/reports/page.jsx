@@ -1,3 +1,21 @@
+
+// Admin: يرى كل الفنادق والتقارير.
+
+// Manager: يرى فقط الفنادق المسموح بها له.
+
+// FrontDesk: يرى فقط تقارير الفندق الذي يعمل فيه.
+
+// الآن:
+
+// Admin: يرى كل الفنادق، يمكن التصدير والطباعة.
+
+// Manager: يرى فقط الفنادق المسموح بها له.
+
+// FrontDesk: يرى فقط الفندق الخاص به ولا يمكنه تغييره.
+
+// أزرار التصدير والطباعة محدودة حسب الدور.
+
+
 // app/reports/page.jsx
 import ProtectedPage from "@/app/components/ProtectedPage";
 import ReportsPage from "./ReportsPage"; // نسخة client-side

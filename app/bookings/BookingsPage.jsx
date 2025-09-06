@@ -6,7 +6,7 @@ import EditBookingModal from "@/app/components/EditBookingModal";
 import BulkBookingModal from "@/app/components/BulkBookingModal";
 import { useRouter } from "next/navigation";
 
-export default function BookingsPage() {
+export default function BookingsPage({ session, userProperties }) {
     const router = useRouter();
     const [bookings, setBookings] = useState([]);
     const [selectedBooking, setSelectedBooking] = useState(null);
@@ -20,14 +20,21 @@ export default function BookingsPage() {
     const [companies, setCompanies] = useState([]);
     const [processingId, setProcessingId] = useState(null);
 
-    // 🔍 البحث + فلترة بالتواريخ
     const [searchTerm, setSearchTerm] = useState("");
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
 
     const socket = useSocket();
+    const role = session?.user?.role || "Guest"; // دور المستخدم
 
-    // 🟢 جلب الحجوزات من API مع البحث والفلاتر
+    const canAdd = ["ADMIN", "FrontDesk"].includes(role);
+    const canEdit = ["ADMIN", "FrontDesk"].includes(role);
+    const canDelete = ["ADMIN"].includes(role);
+    const canCheckinCheckout = ["ADMIN", "FrontDesk"].includes(role);
+    const canCancelNoshow = ["ADMIN", "FrontDesk"].includes(role);
+    const canFolio = ["ADMIN", "FrontDesk", "Manager"].includes(role);
+
+    // 🔍 جلب الحجوزات
     const fetchBookings = async (search = "", from = "", to = "") => {
         try {
             const params = new URLSearchParams();
@@ -52,26 +59,19 @@ export default function BookingsPage() {
         fetchCompanies();
 
         if (!socket) return;
-        socket.on("BOOKING_CREATED", (freshBooking) => {
-            setBookings(prev => [...prev, freshBooking]);
-        });
-        socket.on("BOOKING_UPDATED", (updatedBooking) => {
-            setBookings(prev =>
-                prev.map(b => b.id === updatedBooking.id ? updatedBooking : b)
-            );
-        });
-        socket.on("BOOKING_DELETED", ({ id }) => {
-            setBookings(prev => prev.filter(b => b.id !== id));
-        });
+        socket.on("BOOKING_CREATED", (freshBooking) => setBookings(prev => [...prev, freshBooking]));
+        socket.on("BOOKING_UPDATED", (updatedBooking) => setBookings(prev =>
+            prev.map(b => b.id === updatedBooking.id ? updatedBooking : b)
+        ));
+        socket.on("BOOKING_DELETED", ({ id }) => setBookings(prev => prev.filter(b => b.id !== id)));
 
         return () => {
+            socket.off("BOOKING_CREATED");
             socket.off("BOOKING_UPDATED");
             socket.off("BOOKING_DELETED");
-            socket.off("BOOKING_CREATED");
         };
     }, [socket]);
 
-    // ⏳ عمل تأخير عند الكتابة
     useEffect(() => {
         const delay = setTimeout(() => {
             fetchBookings(searchTerm, dateFrom, dateTo);
@@ -86,7 +86,13 @@ export default function BookingsPage() {
     const fetchCompanies = async () => { try { setCompanies(await (await fetch("/api/companies")).json()); } catch { setCompanies([]); } };
 
     const handleAction = async (id, action) => {
+        // صلاحيات
+        if (action === "delete" && !canDelete) return alert("ليس لديك صلاحية لحذف الحجز");
+        if ((action === "checkin" || action === "checkout") && !canCheckinCheckout) return alert("ليس لديك صلاحية لهذا الإجراء");
+        if ((action === "cancel" || action === "noshow") && !canCancelNoshow) return alert("ليس لديك صلاحية لهذا الإجراء");
+
         if (action === "delete" && !confirm("هل أنت متأكد من حذف الحجز؟")) return;
+
         setProcessingId(id);
         try {
             const method = action === "delete" ? "DELETE" : "POST";
@@ -98,12 +104,8 @@ export default function BookingsPage() {
             }
             const data = action === "delete" ? null : await res.json();
 
-            if (action === "delete") {
-                setBookings(prev => prev.filter(b => b.id !== id));
-                alert("Booking deleted successfully");
-            } else {
-                setBookings(prev => prev.map(b => b.id === id ? data : b));
-            }
+            if (action === "delete") setBookings(prev => prev.filter(b => b.id !== id));
+            else setBookings(prev => prev.map(b => b.id === data.id ? data : b));
         } catch (err) {
             console.error(err);
             alert(err.message || "Operation failed");
@@ -122,41 +124,23 @@ export default function BookingsPage() {
 
     return (
         <div className="p-6">
-            {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-2">
                 <h1 className="text-2xl font-bold dark:text-white">Bookings</h1>
 
                 <div className="flex gap-2 flex-wrap">
-                    {/* حقل البحث */}
-                    <input
-                        type="text"
-                        placeholder="🔍 Search bookings..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                    <input type="text" placeholder="🔍 Search bookings..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
                         className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                     />
-                    {/* فلترة التواريخ */}
-                    <input
-                        type="date"
-                        value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                        className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    />
+                    <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
                     <label htmlFor="">الى</label>
-                    <input
-                        type="date"
-                        value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                        className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                    />
+                    <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
                     <label htmlFor="">من</label>
 
-                    <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">+ Add Booking</button>
-                    <button onClick={() => setShowBulkModal(true)} className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">+ Bulk Booking</button>
+                    {canAdd && <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">+ Add Booking</button>}
+                    {canAdd && <button onClick={() => setShowBulkModal(true)} className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">+ Bulk Booking</button>}
                 </div>
             </div>
 
-            {/* Booking List */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {bookings.length > 0 ? (
                     bookings.map(b => (
@@ -164,18 +148,13 @@ export default function BookingsPage() {
                             <div className="flex justify-between items-center mb-2">
                                 <h2 className="text-lg font-semibold">{b.guest?.firstName} {b.guest?.lastName}</h2>
                                 <div className="flex gap-1 flex-wrap">
-                                    <button onClick={e => { e.stopPropagation(); setEditBooking(b); }} className="bg-white text-black text-xs px-2 py-1 rounded hover:bg-gray-200">✏️ Edit</button>
-                                    <button onClick={e => { e.stopPropagation(); handleAction(b.id, "checkin"); }} disabled={processingId === b.id} className={`text-xs px-2 py-1 rounded ${processingId === b.id ? "bg-gray-400 cursor-not-allowed" : "bg-green-500 text-white hover:bg-green-600"}`}>Check-in</button>
-                                    <button onClick={e => { e.stopPropagation(); handleAction(b.id, "checkout"); }} disabled={processingId === b.id} className={`text-xs px-2 py-1 rounded ${processingId === b.id ? "bg-gray-400 cursor-not-allowed" : "bg-blue-500 text-white hover:bg-blue-600"}`}>Check-out</button>
-                                    <button onClick={e => { e.stopPropagation(); handleAction(b.id, "cancel"); }} disabled={processingId === b.id} className={`text-xs px-2 py-1 rounded ${processingId === b.id ? "bg-gray-400 cursor-not-allowed" : "bg-yellow-500 text-white hover:bg-yellow-600"}`}>Cancel</button>
-                                    <button onClick={e => { e.stopPropagation(); handleAction(b.id, "noshow"); }} disabled={processingId === b.id} className={`text-xs px-2 py-1 rounded ${processingId === b.id ? "bg-gray-400 cursor-not-allowed" : "bg-red-500 text-white hover:bg-red-600"}`}>NoShow</button>
-                                    <button onClick={e => { e.stopPropagation(); handleAction(b.id, "delete"); }} disabled={processingId === b.id} className={`text-xs px-2 py-1 rounded ${processingId === b.id ? "bg-gray-400 cursor-not-allowed" : "bg-gray-700 text-white hover:bg-gray-800"}`}>{processingId === b.id ? "Processing..." : "🗑 Delete"}</button>
-                                    <button
-                                        onClick={e => { e.stopPropagation(); router.push(`/bookings/${b.id}/folio`); }}
-                                        className="text-xs px-2 py-1 rounded bg-indigo-500 text-white hover:bg-indigo-600"
-                                    >
-                                        Folio
-                                    </button>
+                                    {canEdit && <button onClick={e => { e.stopPropagation(); setEditBooking(b); }} className="bg-white text-black text-xs px-2 py-1 rounded hover:bg-gray-200">✏️ Edit</button>}
+                                    {canCheckinCheckout && <button onClick={e => { e.stopPropagation(); handleAction(b.id, "checkin"); }} className="text-xs px-2 py-1 rounded bg-green-500 text-white hover:bg-green-600">Check-in</button>}
+                                    {canCheckinCheckout && <button onClick={e => { e.stopPropagation(); handleAction(b.id, "checkout"); }} className="text-xs px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600">Check-out</button>}
+                                    {canCancelNoshow && <button onClick={e => { e.stopPropagation(); handleAction(b.id, "cancel"); }} className="text-xs px-2 py-1 rounded bg-yellow-500 text-white hover:bg-yellow-600">Cancel</button>}
+                                    {canCancelNoshow && <button onClick={e => { e.stopPropagation(); handleAction(b.id, "noshow"); }} className="text-xs px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600">NoShow</button>}
+                                    {canDelete && <button onClick={e => { e.stopPropagation(); handleAction(b.id, "delete"); }} className="text-xs px-2 py-1 rounded bg-gray-700 text-white hover:bg-gray-800">🗑 Delete</button>}
+                                    {canFolio && <button onClick={e => { e.stopPropagation(); router.push(`/bookings/${b.id}/folio`); }} className="text-xs px-2 py-1 rounded bg-indigo-500 text-white hover:bg-indigo-600">Folio</button>}
                                 </div>
                             </div>
                             <p><b>Room:</b> {b.room?.number || "N/A"}</p>
@@ -190,13 +169,11 @@ export default function BookingsPage() {
                 )}
             </div>
 
-            {/* Modals */}
-            {showAddModal && <AddBookingModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} properties={properties} guests={guests} rooms={rooms} ratePlans={ratePlans} companies={companies} />}
-            {showBulkModal && <BulkBookingModal isOpen={showBulkModal} onClose={() => setShowBulkModal(false)} properties={properties} guests={guests} rooms={rooms} ratePlans={ratePlans} companies={companies} />}
-            {editBooking && <EditBookingModal booking={editBooking} isOpen={!!editBooking} onClose={() => setEditBooking(null)} properties={properties} guests={guests} rooms={rooms} ratePlans={ratePlans} companies={companies} />}
+            {showAddModal && canAdd && <AddBookingModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} properties={properties} guests={guests} rooms={rooms} ratePlans={ratePlans} companies={companies} />}
+            {showBulkModal && canAdd && <BulkBookingModal isOpen={showBulkModal} onClose={() => setShowBulkModal(false)} properties={properties} guests={guests} rooms={rooms} ratePlans={ratePlans} companies={companies} />}
+            {editBooking && canEdit && <EditBookingModal booking={editBooking} isOpen={!!editBooking} onClose={() => setEditBooking(null)} properties={properties} guests={guests} rooms={rooms} ratePlans={ratePlans} companies={companies} />}
 
-            {/* Booking Details */}
-            {selectedBooking && (
+            {selectedBooking && canFolio && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-96 max-h-[90vh] overflow-y-auto">
                         <h2 className="text-xl font-bold mb-4">{selectedBooking.guest?.firstName} {selectedBooking.guest?.lastName}</h2>

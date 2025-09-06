@@ -1,3 +1,13 @@
+
+// FrontDesk: يرى الغرف للفندق المخصص له فقط، يمكنه Check-In / Check-Out.
+
+// Manager: يرى كل غرف الفنادق المسموح بها له، يمكنه إضافة وتعديل الغرف، لكنه لا يمكنه حذفها.
+
+// Admin: كامل الصلاحيات (Add / Edit / Delete / Check-In/Out).
+
+// HK: يرى الغرف للفندق المخصص له فقط، لا يمكنه تعديل الغرف، لكنه يرى الحالة فقط.
+
+
 import ProtectedPage from "@/app/components/ProtectedPage";
 import RoomsPage from "./RoomsPage";
 import { getServerSession } from "next-auth/next";

@@ -1,3 +1,11 @@
+
+// Admin: كامل الصلاحيات (يمكنه تعديل كل الحقول وحفظ الإعدادات).
+
+// Manager: يمكنه تعديل معظم الحقول إلا بعض الإعدادات الحساسة (مثل العملة أو الصلاحيات المالية).
+
+// FrontDesk / HK: يمكنهم فقط رؤية المعلومات، لا يمكنهم التعديل.
+
+
 import ProtectedPage from "@/app/components/ProtectedPage";
 import PropertySettingsPage from "./PropertySettingsPage"; // نسخة client-side
 import { getServerSession } from "next-auth/next";

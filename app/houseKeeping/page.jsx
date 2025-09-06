@@ -1,30 +1,12 @@
-// // app/housekeeping/page.jsx
-// import HousekeepingPage from "./HousekeepingPage";
-// import prisma from "@/lib/prisma"; // تأكد من مسار prisma
 
-// // مثال لجلب معرف المستخدم من session
-// import { getServerSession } from "next-auth/next";
-// import { authOptions } from "@/lib/auth"; // ملف إعدادات next-auth الخاص بك
 
-// export default async function Page() {
-//     const session = await getServerSession(authOptions);
-//     const userId = session?.user?.id;
+// ADMIN: يمكنه كل شيء (تعديل الغرف، تغيير الحالة، إضافة/إغلاق المهام).
 
-//     let userProperties = [];
-//     if (userId) {
-//         userProperties = await prisma.property.findMany({
-//             where: {
-//                 users: {
-//                     some: { id: userId }
-//                 }
-//             },
-//             select: { id: true, name: true }
-//         });
-//     }
+// FrontDesk: يمكنه تعديل حالة الغرفة فقط.
 
-//     return <HousekeepingPage userProperties={userProperties || []} />;
-// }
+// HK (Housekeeping): يمكنه إضافة وإغلاق المهام، لا يمكنه تعديل الغرف أو حذف أي شيء.
 
+// Manager: يمكنه عرض كل شيء فقط، لا تعديل ولا إضافة.
 
 
 // app/housekeeping/page.jsx
