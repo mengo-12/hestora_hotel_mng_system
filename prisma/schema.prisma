@@ -39,6 +39,14 @@ model Property {
   currency     String
   hotelGroup   HotelGroup? @relation(fields: [hotelGroupId], references: [id])
   hotelGroupId String? // مؤقتًا nullable لتجنب مشاكل الترحيل
+  logo              String?   // شعار الفندق
+  email             String?
+  phone             String?
+  address           String?
+  checkInTime       String?   // صيغة HH:mm
+  checkOutTime      String?   // صيغة HH:mm
+  cancellationPolicy String?
+  depositPolicy      String?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
@@ -65,7 +73,8 @@ model RoomType {
   name       String
   capacity   Int
   basePrice  Decimal
-  amenities  String?
+  description String?
+  amenities   String?   // قائمة الخدمات داخل الغرفة
   rooms      Room[]
   ratePlans  RatePlan[]
   inventory  Inventory[]
@@ -287,6 +296,7 @@ model User {
   password         String
   name             String
   role             String             @default("FrontDesk") // Admin, FrontDesk, HK, Manager, Owner
+  active Boolean  @default(true)
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   RoomStatusLog    RoomStatusLog[]
@@ -319,6 +329,7 @@ model Extra {
   quantity    Int      @default(1)
   tax         Decimal?
   status      String   @default("Unpaid")
+  active      Boolean  @default(true)
 
   // ربط Folio (اختياري)
   folio   Folio?  @relation(fields: [folioId], references: [id])
@@ -348,4 +359,30 @@ model NightAudit {
   closedDate String
   closedById String
   createdAt  DateTime @default(now())
+}
+
+model PaymentMethod {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum Role {
+  Admin
+  FrontDesk
+  HK
+  Manager
+  Owner
 }

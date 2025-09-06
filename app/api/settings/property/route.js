@@ -1,14 +1,13 @@
-// app/api/settings/property/route.js
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/options";
+import { authOptions } from "@/lib/auth"; // ✅ استيراد من lib/auth
 
 export async function GET(req) {
     try {
         const session = await getServerSession(authOptions);
         if (!session) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
 
-        const property = await prisma.property.findFirst(); // يمكن تعديلها حسب الفندق المرتبط بالمستخدم
+        const property = await prisma.property.findFirst();
         return new Response(JSON.stringify(property), { status: 200 });
     } catch (err) {
         console.error(err);
@@ -34,7 +33,6 @@ export async function PATCH(req) {
                 phone: data.phone,
                 email: data.email,
                 address: data.address,
-                logo: data.logo,
                 currency: data.currency,
                 timezone: data.timezone,
                 checkInTime: data.checkInTime,
