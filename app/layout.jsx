@@ -34,7 +34,9 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Sidebar from "./components/Sidebar";
-import Providers from "@/app/components/Providers"; // ✅ استدعاء الملف الجديد
+import Providers from "@/app/components/Providers"; 
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth"; // ملف إعدادات next-auth الخاص بك
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -43,13 +45,15 @@ export const metadata = {
     description: "Hotel Management System",
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+    const session = await getServerSession(authOptions); // 🔑 جلب الجلسة
+
     return (
         <html lang="en" suppressHydrationWarning>
             <body className={inter.className}>
                 <Providers>
                     <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
-                        <Sidebar />
+                        <Sidebar session={session} /> {/* تمرير الجلسة */}
                         <main className="flex-1 p-6">{children}</main>
                     </div>
                 </Providers>
@@ -57,4 +61,5 @@ export default function RootLayout({ children }) {
         </html>
     );
 }
+
 
