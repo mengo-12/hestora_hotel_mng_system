@@ -1,27 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export default function ProtectedPage({ children, session, allowedRoles = [] }) {
+export default function ProtectedPage({ session, allowedRoles, children }) {
     const router = useRouter();
-    const [authorized, setAuthorized] = useState(false);
 
+    // إذا ما في جلسة → تحويل لصفحة تسجيل الدخول
     useEffect(() => {
         if (!session) {
             router.replace("/auth/signin");
-            return;
         }
+    }, [session, router]);
 
-        if (allowedRoles.length > 0 && !allowedRoles.includes(session.user.role)) {
-            router.replace("/unauthorized");
-            return;
-        }
+    if (!session) {
+        return <div className="p-6">⏳ جارٍ التحقق من الجلسة...</div>;
+    }
 
-        setAuthorized(true);
-    }, [session, router, allowedRoles]);
+    // تحقق من الدور
+    if (!allowedRoles.includes(session.user?.role)) {
+        return <div className="p-6">🚫 غير مسموح لك بالوصول إلى هذه الصفحة.</div>;
+    }
 
-    if (!authorized) return null;
-
-    return <>{children}</>; // JSX عادي
+    return <>{children}</>;
 }
