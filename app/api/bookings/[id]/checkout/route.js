@@ -48,6 +48,12 @@ export async function POST(req, { params }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ event: "ROOM_STATUS_CHANGED", data: { roomId: booking.roomId, newStatus: "VACANT" } }),
             });
+            // ✅ حدث جديد: انتهاء الحجز لإظهار الكارد باللون الأحمر
+            await fetch("http://localhost:3001/api/broadcast", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ event: "ROOM_BOOKING_ENDED", data: { roomId: booking.roomId } }),
+            });
         } catch (err) { console.error("Socket broadcast failed:", err); }
 
         return new Response(JSON.stringify(updatedBooking), { status: 200 });
