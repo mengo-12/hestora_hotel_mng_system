@@ -25,31 +25,13 @@ export default function FinancialReportPage({ session, userProperties }) {
     const [filterByRole, setFilterByRole] = useState("");
     const [filterExtraType, setFilterExtraType] = useState("");
 
-    // ===== Filtered data =====
-    const filteredTransactions = useMemo(() => {
-        return (report.transactions || []).filter(t => {
-            return (!filterType || t.type === filterType) &&
-                (!filterByEmployee || t.by === filterByEmployee) &&
-                (!filterByRole || t.role === filterByRole) &&
-                (!filterExtraType || t.extraType === filterExtraType);
-        });
-    }, [report.transactions, filterType, filterByEmployee, filterByRole, filterExtraType]);
-
-
-    // ===== Dynamic options for filters =====
-    const employeesOptions = useMemo(() => {
-        return Array.from(new Set(report.transactions.map(t => t.by).filter(Boolean)));
-    }, [report.transactions]);
-
-    const rolesOptions = useMemo(() => {
-        return Array.from(new Set(report.transactions.map(t => t.role).filter(Boolean)));
-    }, [report.transactions]);
-
-    const extraTypesOptions = useMemo(() => {
-        return Array.from(new Set(report.transactions.map(t => t.extraType).filter(Boolean)));
-    }, [report.transactions]);
-
-
+    // ===== Comparison State =====
+    const [comparison, setComparison] = useState({
+        previousPeriod: { totalCharges: 0, totalPayments: 0, profitLoss: 0 },
+        currentPeriod: { totalCharges: 0, totalPayments: 0, profitLoss: 0 },
+        difference: 0,
+        percentage: 0
+    });
 
     // ===== Columns Setup =====
     const columns = useMemo(() => [
@@ -64,7 +46,17 @@ export default function FinancialReportPage({ session, userProperties }) {
         { Header: "Extra Type", accessor: "extraType" }
     ], []);
 
-    // ===== Table Instance =====
+    // ===== Filtered data =====
+    const filteredTransactions = useMemo(() => {
+        return (report.transactions || []).filter(t => {
+            return (!filterType || t.type === filterType) &&
+                (!filterByEmployee || t.by === filterByEmployee) &&
+                (!filterByRole || t.role === filterByRole) &&
+                (!filterExtraType || t.extraType === filterExtraType);
+        });
+    }, [report.transactions, filterType, filterByEmployee, filterByRole, filterExtraType]);
+
+    // ===== Table instance =====
     const tableInstance = useTable(
         { columns, data: filteredTransactions, initialState: { pageIndex: 0, pageSize: 10 } },
         useGlobalFilter,
@@ -73,10 +65,7 @@ export default function FinancialReportPage({ session, userProperties }) {
     );
 
     const { getTableProps, getTableBodyProps, headerGroups, page, prepareRow, nextPage, previousPage, canNextPage, canPreviousPage, pageOptions, state, setGlobalFilter: setTableGlobalFilter } = tableInstance;
-
     useEffect(() => setTableGlobalFilter(globalFilter), [globalFilter]);
-
-
 
     // ===== Fetch Report =====
     const fetchReport = async () => {
@@ -111,10 +100,65 @@ export default function FinancialReportPage({ session, userProperties }) {
         return () => ["CHARGE_ADDED", "CHARGE_DELETED", "PAYMENT_ADDED", "PAYMENT_DELETED", "FOLIO_CLOSED"].forEach(event => socket.off(event, refreshReport));
     }, [socket, selectedProperty, startDate, endDate, filterType, filterByEmployee, filterByRole, filterExtraType]);
 
+    // ===== Calculate Comparison =====
+    const calculateComparison = (transactions, startDate, endDate) => {
+        if (!startDate || !endDate) return;
 
-   // ===== Export Functions =====
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+
+        const dayDiff = (end - start) / (1000 * 60 * 60 * 24); // طول الفترة بالأيام
+
+        // الفترة الحالية
+        const currentTransactions = transactions.filter(t => {
+            const date = new Date(t.postedAt);
+            return date >= start && date <= end;
+        });
+
+        // الفترة السابقة = نفس طول الفترة قبل تاريخ البداية
+        const previousStart = new Date(start);
+        previousStart.setDate(previousStart.getDate() - dayDiff - 1);
+        const previousEnd = new Date(start);
+        previousEnd.setDate(previousEnd.getDate() - 1);
+
+        const previousTransactions = transactions.filter(t => {
+            const date = new Date(t.postedAt);
+            return date >= previousStart && date <= previousEnd;
+        });
+
+        const sum = (arr) => {
+            const totalCharges = arr.filter(t => t.type === "Charge" || t.type === "Extra").reduce((a, b) => a + b.amount, 0);
+            const totalPayments = arr.filter(t => t.type === "Payment").reduce((a, b) => a + b.amount, 0);
+            const profitLoss = totalPayments - totalCharges;
+            return { totalCharges, totalPayments, profitLoss };
+        };
+
+        const current = sum(currentTransactions);
+        const previous = sum(previousTransactions);
+
+        const difference = current.profitLoss - previous.profitLoss;
+        const percentage = previous.profitLoss !== 0 ? (difference / Math.abs(previous.profitLoss)) * 100 : 0;
+
+        setComparison({ previousPeriod: previous, currentPeriod: current, difference, percentage });
+    };
+
+
+    useEffect(() => {
+        if (report.transactions.length) {
+            calculateComparison(report.transactions, startDate, endDate);
+        } else {
+            setComparison({
+                previousPeriod: { totalCharges: 0, totalPayments: 0, profitLoss: 0 },
+                currentPeriod: { totalCharges: 0, totalPayments: 0, profitLoss: 0 },
+                difference: 0,
+                percentage: 0
+            });
+        }
+    }, [report.transactions, startDate, endDate]);
+
+    // ===== Export Functions =====
     const exportExcel = () => {
-        const ws = XLSX.utils.json_to_sheet(filteredTransactions);
+        const ws = XLSX.utils.json_to_sheet(report.transactions || []);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
         XLSX.writeFile(wb, `Financial_Report_${selectedProperty}.xlsx`);
@@ -124,14 +168,13 @@ export default function FinancialReportPage({ session, userProperties }) {
         const doc = new jsPDF();
         doc.text("Financial Report", 14, 16);
         const tableColumn = columns.map(c => c.Header);
-        const tableRows = filteredTransactions.map(t => [
+        const tableRows = report.transactions.map(t => [
             new Date(t.postedAt).toLocaleString(), t.type, t.description, t.guest,
             t.amount.toFixed(2), t.by, t.role, t.bookingId, t.extraType || "-"
         ]);
         doc.autoTable({ head: [tableColumn], body: tableRows, startY: 20 });
         doc.save(`Financial_Report_${selectedProperty}.pdf`);
     };
-
 
     return (
         <div className="p-6 max-w-7xl mx-auto">
@@ -162,11 +205,7 @@ export default function FinancialReportPage({ session, userProperties }) {
             <div className="flex flex-wrap gap-4 mb-4 items-end">
                 <div>
                     <label className="block mb-1 font-semibold">نوع العملية:</label>
-                    <select
-                        className="border rounded p-2"
-                        value={filterType}
-                        onChange={e => setFilterType(e.target.value)}
-                    >
+                    <select className="border rounded p-2" value={filterType} onChange={e => setFilterType(e.target.value)}>
                         <option value="">الكل</option>
                         <option value="Charge">Charge</option>
                         <option value="Payment">Payment</option>
@@ -178,7 +217,7 @@ export default function FinancialReportPage({ session, userProperties }) {
                     <label className="block mb-1 font-semibold">الموظف:</label>
                     <select className="border rounded p-2" value={filterByEmployee} onChange={e => setFilterByEmployee(e.target.value)}>
                         <option value="">الكل</option>
-                        {employeesOptions.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                        {report.transactions.map(t => t.by).filter((v, i, a) => v && a.indexOf(v) === i).map(emp => <option key={emp} value={emp}>{emp}</option>)}
                     </select>
                 </div>
 
@@ -186,7 +225,7 @@ export default function FinancialReportPage({ session, userProperties }) {
                     <label className="block mb-1 font-semibold">الدور:</label>
                     <select className="border rounded p-2" value={filterByRole} onChange={e => setFilterByRole(e.target.value)}>
                         <option value="">الكل</option>
-                        {rolesOptions.map(role => <option key={role} value={role}>{role}</option>)}
+                        {report.transactions.map(t => t.role).filter((v, i, a) => v && a.indexOf(v) === i).map(role => <option key={role} value={role}>{role}</option>)}
                     </select>
                 </div>
 
@@ -194,21 +233,41 @@ export default function FinancialReportPage({ session, userProperties }) {
                     <label className="block mb-1 font-semibold">Extra Type:</label>
                     <select className="border rounded p-2" value={filterExtraType} onChange={e => setFilterExtraType(e.target.value)}>
                         <option value="">الكل</option>
-                        {extraTypesOptions.map(et => <option key={et} value={et}>{et}</option>)}
+                        {report.transactions.map(t => t.extraType).filter((v, i, a) => v && a.indexOf(v) === i).map(et => <option key={et} value={et}>{et}</option>)}
                     </select>
                 </div>
 
-                <button
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                    onClick={fetchReport}
-                >
-                    تحديث التقرير
-                </button>
+                <button className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600" onClick={fetchReport}>تحديث التقرير</button>
             </div>
 
             {/* Global Search */}
             <div className="mb-2">
                 <input type="text" placeholder="بحث عام..." className="border p-2 rounded w-full sm:w-64" value={globalFilter} onChange={e => setGlobalFilter(e.target.value)} />
+            </div>
+
+            {/* ===== Comparison Section (always visible) ===== */}
+            <div className="border rounded p-4 mb-4">
+                <h3 className="font-semibold text-lg mb-2">📊 مقارنة الأرباح / الخسائر</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p className="font-medium">الفترة السابقة:</p>
+                        <p>إجمالي المبالغ: {comparison.previousPeriod.totalCharges.toFixed(2)}</p>
+                        <p>المدفوعات: {comparison.previousPeriod.totalPayments.toFixed(2)}</p>
+                        <p>صافي الربح/الخسارة: {comparison.previousPeriod.profitLoss.toFixed(2)}</p>
+                    </div>
+                    <div>
+                        <p className="font-medium">الفترة الحالية:</p>
+                        <p>إجمالي المبالغ: {comparison.currentPeriod.totalCharges.toFixed(2)}</p>
+                        <p>المدفوعات: {comparison.currentPeriod.totalPayments.toFixed(2)}</p>
+                        <p>صافي الربح/الخسارة: {comparison.currentPeriod.profitLoss.toFixed(2)}</p>
+                    </div>
+                </div>
+                <div className="mt-2">
+                    <p>الفرق: {comparison.difference.toFixed(2)} ({comparison.percentage.toFixed(2)}%)</p>
+                    {comparison.difference < 0 && <p className="text-red-600">خسارة مقارنة بالفترة السابقة</p>}
+                    {comparison.difference > 0 && <p className="text-green-600">ربح إضافي مقارنة بالفترة السابقة</p>}
+                    {comparison.difference === 0 && <p>لا يوجد فرق مقارنة بالفترة السابقة</p>}
+                </div>
             </div>
 
             {/* الجدول */}
@@ -248,7 +307,3 @@ export default function FinancialReportPage({ session, userProperties }) {
         </div>
     );
 }
-
-
-
-
