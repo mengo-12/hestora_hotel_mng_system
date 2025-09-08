@@ -22,6 +22,23 @@ export default function ReportsPage({ userProperties, session }) {
 
     const num = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
 
+    // 🟢 تحديد أنواع التقارير حسب الصلاحية
+    const allowedReportTypes = useMemo(() => {
+        if (userRole === "Admin") return ["Booking", "Folio", "Payment", "Housekeeping", "Extra"];
+        if (userRole === "Manager") return ["Booking", "Folio", "Payment", "Housekeeping"];
+        if (userRole === "FrontDesk") return ["Booking", "Folio", "Payment"];
+        return [];
+    }, [userRole]);
+
+    // إذا المستخدم ما عنده صلاحيات
+    if (allowedReportTypes.length === 0) {
+        return (
+            <div className="p-6 text-center">
+                🚫 لا تملك صلاحية للوصول إلى التقارير
+            </div>
+        );
+    }
+
     // جلب التقارير
     useEffect(() => {
         const fetchReports = async () => {
@@ -321,22 +338,26 @@ export default function ReportsPage({ userProperties, session }) {
 
             {/* الفلاتر + أزرار التصدير */}
             <div className="flex flex-wrap items-center gap-2 mb-6">
-                <select value={reportType} onChange={e => { setReportType(e.target.value); setPage(1); }} className="px-3 py-2 border rounded">
-                    <option value="Booking">الحجوزات</option>
-                    <option value="Folio">الحسابات (Folios)</option>
-                    <option value="Payment">المدفوعات</option>
-                    <option value="Housekeeping">التدبير الفندقي</option>
-                    <option value="Extra">الخدمات الإضافية</option>
+                <select
+                    value={reportType}
+                    onChange={e => { setReportType(e.target.value); setPage(1); }}
+                    className="px-3 py-2 border rounded"
+                >
+                    {allowedReportTypes.includes("Booking") && <option value="Booking">الحجوزات</option>}
+                    {allowedReportTypes.includes("Folio") && <option value="Folio">الحسابات (Folios)</option>}
+                    {allowedReportTypes.includes("Payment") && <option value="Payment">المدفوعات</option>}
+                    {allowedReportTypes.includes("Housekeeping") && <option value="Housekeeping">التدبير الفندقي</option>}
+                    {allowedReportTypes.includes("Extra") && <option value="Extra">الخدمات الإضافية</option>}
                 </select>
 
                 <select
                     value={propertyId}
                     onChange={e => { setPropertyId(e.target.value); setPage(1); }}
                     className="px-3 py-2 border rounded"
-                    disabled={userRole === "FrontDesk" && properties.length === 1}
+                    disabled={userRole === "FrontDesk" || (userRole === "Manager" && userProperties.length === 1)}
                 >
                     <option value="">كل الفنادق</option>
-                    {properties.map(p => (
+                    {userProperties.map(p => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                 </select>
