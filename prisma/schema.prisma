@@ -97,6 +97,8 @@ model Room {
   housekeepingTasks HousekeepingTask[]
 
   @@unique([propertyId, number])
+
+  inventories Inventory[]  // هذا الحقل العكسي
 }
 
 model RoomStatusLog {
@@ -200,12 +202,15 @@ model Inventory {
   propertyId String
   roomType   RoomType @relation(fields: [roomTypeId], references: [id])
   roomTypeId String
+  room       Room?     @relation(fields: [roomId], references: [id])
+  roomId     String?
   date       DateTime
   allotment  Int
   sold       Int      @default(0)
   stopSell   Boolean  @default(false)
 
   @@unique([propertyId, roomTypeId, date])
+  @@unique([propertyId, roomId, date])
 }
 
 //////////////////////////////////
