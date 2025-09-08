@@ -15,9 +15,9 @@ export default function HousekeepingPage({ userProperties, session }) {
     const socket = useSocket();
     const role = session?.user?.role || "Guest";
 
-    const canModifyRoom = ["ADMIN", "FrontDesk"].includes(role);
-    const canManageTasks = ["ADMIN", "HK"].includes(role);
-    const canView = ["ADMIN", "FrontDesk", "HK", "Manager"].includes(role);
+    const canModifyRoom = ["Admin", "FrontDesk"].includes(role);
+    const canManageTasks = ["Admin", "HK"].includes(role);
+    const canView = ["Admin", "FrontDesk", "HK", "Manager"].includes(role);
 
     const [propertyId, setPropertyId] = useState(userProperties?.[0]?.id || "");
     const [rooms, setRooms] = useState([]);

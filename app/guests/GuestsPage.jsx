@@ -18,9 +18,9 @@ export default function GuestsPage({ session, userProperties }) {
     const socket = useSocket();
 
     const role = session?.user?.role || "Guest";
-    const canAddEdit = ["ADMIN", "FrontDesk"].includes(role);
-    const canDelete = role === "ADMIN";
-    const canView = ["ADMIN", "FrontDesk", "Manager"].includes(role);
+    const canAddEdit = ["Admin", "FrontDesk"].includes(role);
+    const canDelete = role === "Admin";
+    const canView = ["Admin", "FrontDesk", "Manager"].includes(role);
 
     useEffect(() => {
         if (!canView) return;

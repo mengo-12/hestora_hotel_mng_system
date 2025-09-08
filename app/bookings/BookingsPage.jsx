@@ -27,12 +27,12 @@ export default function BookingsPage({ session, userProperties }) {
     const socket = useSocket();
     const role = session?.user?.role || "Guest"; // دور المستخدم
 
-    const canAdd = ["ADMIN", "FrontDesk"].includes(role);
-    const canEdit = ["ADMIN", "FrontDesk"].includes(role);
-    const canDelete = ["ADMIN"].includes(role);
-    const canCheckinCheckout = ["ADMIN", "FrontDesk"].includes(role);
-    const canCancelNoshow = ["ADMIN", "FrontDesk"].includes(role);
-    const canFolio = ["ADMIN", "FrontDesk", "Manager"].includes(role);
+    const canAdd = ["Admin", "FrontDesk"].includes(role);
+    const canEdit = ["Admin", "FrontDesk"].includes(role);
+    const canDelete = ["Admin"].includes(role);
+    const canCheckinCheckout = ["Admin", "FrontDesk"].includes(role);
+    const canCancelNoshow = ["Admin", "FrontDesk"].includes(role);
+    const canFolio = ["Admin", "FrontDesk", "Manager"].includes(role);
 
     // 🔍 جلب الحجوزات
     const fetchBookings = async (search = "", from = "", to = "") => {

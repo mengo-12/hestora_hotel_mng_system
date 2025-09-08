@@ -9,9 +9,9 @@ export default function NightAuditAdminClient({ initialPropertyId, initialProper
     const socket = useSocket();
     const role = session?.user?.role || "Guest";
 
-    const canRunAudit = ["ADMIN", "Manager"].includes(role);
-    const canExport = ["ADMIN", "Manager"].includes(role);
-    const canView = ["ADMIN", "Manager"].includes(role);
+    const canRunAudit = ["Admin", "Manager"].includes(role);
+    const canExport = ["Admin", "Manager"].includes(role);
+    const canView = ["Admin", "Manager"].includes(role);
 
     if (!canView) return <p className="p-6 text-red-500">You do not have permission to view this page.</p>;
 

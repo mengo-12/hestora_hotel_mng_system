@@ -39,7 +39,7 @@ export default async function Page() {
     return (
         <ProtectedPage
             session={session}
-            allowedRoles={["ADMIN", "Manager", "FrontDesk"]}
+            allowedRoles={["Admin", "Manager", "FrontDesk"]}
         >
             <ReportsPage userProperties={userProperties} session={session} />
         </ProtectedPage>

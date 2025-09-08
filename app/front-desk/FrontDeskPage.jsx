@@ -19,9 +19,9 @@ export default function FrontDeskPage({ session, userProperties }) {
 
     const role = session?.user?.role || "Guest";
 
-    const canCheckinCheckout = ["ADMIN", "FrontDesk"].includes(role);
-    const canCancelNoshow = ["ADMIN", "FrontDesk"].includes(role);
-    const canFolio = ["ADMIN", "FrontDesk", "Manager"].includes(role);
+    const canCheckinCheckout = ["Admin", "FrontDesk"].includes(role);
+    const canCancelNoshow = ["Admin", "FrontDesk"].includes(role);
+    const canFolio = ["Admin", "FrontDesk", "Manager"].includes(role);
 
     const statusConfig = {
         Reserved: { bg: "bg-purple-500", text: "text-white" },

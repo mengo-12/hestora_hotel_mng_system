@@ -20,7 +20,7 @@ export default async function Page({ params }) {
     return (
         <ProtectedPage
             session={session}
-            allowedRoles={["ADMIN", "FrontDesk", "Manager"]}
+            allowedRoles={["Admin", "FrontDesk", "Manager"]}
         >
             <BookingDetailsPage 
                 bookingId={params.bookingId} 

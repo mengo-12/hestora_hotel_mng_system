@@ -9,7 +9,7 @@ export default function PropertySettings() {
 
     // صلاحيات المستخدم
     const userRole = session?.user?.role || "FrontDesk";
-    const canEditAll = ["ADMIN"].includes(userRole);
+    const canEditAll = ["Admin"].includes(userRole);
     const canEditPartial = ["Manager"].includes(userRole);
     const readOnly = ["FrontDesk", "HK"].includes(userRole);
 

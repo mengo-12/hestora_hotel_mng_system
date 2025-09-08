@@ -28,7 +28,7 @@ export default async function Page() {
     return (
         <ProtectedPage
             session={session}
-            allowedRoles={["ADMIN", "Manager"]}
+            allowedRoles={["Admin", "Manager"]}
         >
             <NightAuditAdminClient
                 initialProperties={userProperties}

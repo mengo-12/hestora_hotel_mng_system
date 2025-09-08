@@ -20,10 +20,10 @@ export default function RoomsPage({ session, userProperties }) {
 
     // صلاحيات المستخدم حسب الدور
     const userRole = session?.user?.role || "FrontDesk";
-    const canAdd = ["ADMIN", "Manager"].includes(userRole);
-    const canEdit = ["ADMIN", "Manager"].includes(userRole);
-    const canDelete = ["ADMIN"].includes(userRole);
-    const canCheckInOut = ["ADMIN", "FrontDesk"].includes(userRole);
+    const canAdd = ["Admin", "Manager"].includes(userRole);
+    const canEdit = ["Admin", "Manager"].includes(userRole);
+    const canDelete = ["Admin"].includes(userRole);
+    const canCheckInOut = ["Admin", "FrontDesk"].includes(userRole);
 
     useEffect(() => {
         fetchRooms();
@@ -56,7 +56,7 @@ export default function RoomsPage({ session, userProperties }) {
         try {
             const res = await fetch("/api/rooms");
             let data = await res.json();
-            if (userRole !== "ADMIN") {
+            if (userRole !== "Admin") {
                 // تقييد الغرف حسب الفندق المسموح به للمستخدم
                 const allowedPropertyIds = userProperties.map(p => p.id);
                 data = data.filter(r => allowedPropertyIds.includes(r.propertyId));

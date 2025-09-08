@@ -18,7 +18,7 @@ export default async function Page() {
     });
 
     return (
-        <ProtectedPage session={session} allowedRoles={["ADMIN","Manager","Accountant","FrontDesk"]}>
+        <ProtectedPage session={session} allowedRoles={["Admin","Manager","Accountant","FrontDesk"]}>
             <FinancialReportPage session={session} userProperties={userProperties} />
         </ProtectedPage>
     );
