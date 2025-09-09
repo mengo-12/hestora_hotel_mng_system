@@ -209,8 +209,10 @@ model Inventory {
   sold       Int      @default(0)
   stopSell   Boolean  @default(false)
 
-  @@unique([propertyId, roomTypeId, date])
-  @@unique([propertyId, roomId, date])
+  housekeeping String?  // ⬅ حقل اختياري
+  notes       String?  // ⬅ حقل اختياري
+  extraPrices Json?
+  @@unique([propertyId, roomTypeId, roomId, date], name: "inventory_unique") // مفتاح فريد موحد
 }
 
 //////////////////////////////////

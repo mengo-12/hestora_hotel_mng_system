@@ -1,158 +1,3 @@
-// import prisma from "@/lib/prisma";
-
-// // GET inventory data
-// export async function GET(req) {
-//     try {
-//         const { searchParams } = new URL(req.url);
-//         const propertyId = searchParams.get("propertyId");
-//         const start = searchParams.get("start");
-//         const end = searchParams.get("end");
-
-//         if (!propertyId || !start || !end) {
-//             return new Response(JSON.stringify({ error: "Missing query params" }), { status: 400 });
-//         }
-
-//         const startDate = new Date(start);
-//         const endDate = new Date(end);
-
-//         // جلب أنواع الغرف + الغرف التابعة لها
-//         const roomTypes = await prisma.roomType.findMany({
-//             where: { propertyId },
-//             include: { rooms: true }
-//         });
-
-//         // مصفوفة الأيام
-//         const dates = [];
-//         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-//             dates.push(d.toISOString().slice(0, 10));
-//         }
-
-//         // جلب الـ inventories للفندق في الفترة
-//         const inventories = await prisma.inventory.findMany({
-//             where: {
-//                 propertyId,
-//                 date: { gte: startDate, lte: endDate }
-//             }
-//         });
-
-//         // بناء البيانات مع تضمين housekeeping و notes
-//         const rows = roomTypes.map(rt => {
-//             const roomsData = rt.rooms.map(room => {
-//                 const cells = {};
-//                 dates.forEach(d => {
-//                     const inv = inventories.find(i =>
-//                         i.roomId === room.id &&
-//                         i.date.toISOString().slice(0, 10) === d
-//                     );
-
-//                     cells[d] = {
-//                         total: inv ? inv.allotment : 1, // كل غرفة افتراضياً 1
-//                         sold: inv ? inv.sold : 0,
-//                         stopSell: inv ? inv.stopSell : false,
-//                         housekeeping: inv ? inv.housekeeping || '' : '', // أضفنا هنا
-//                         notes: inv ? inv.notes || '' : ''              // ملاحظات إضافية
-//                     };
-//                 });
-
-//                 return {
-//                     id: room.id,
-//                     number: room.number,
-//                     floor: room.floor || "Unknown",
-//                     cells
-//                 };
-//             });
-
-//             return {
-//                 roomTypeId: rt.id,
-//                 name: rt.name,
-//                 rooms: roomsData
-//             };
-//         });
-
-//         return new Response(JSON.stringify({ dates, rows }), { status: 200 });
-//     } catch (err) {
-//         console.error("Inventory API error:", err);
-//         return new Response(JSON.stringify({ error: "Failed to fetch inventory" }), { status: 500 });
-//     }
-// }
-
-// // PATCH inventory update
-// export async function PATCH(req) {
-//     try {
-//         const body = await req.json();
-//         const { propertyId, roomTypeId, roomId, date, field, value } = body;
-
-//         if (!propertyId || !roomId || !date || !field) {
-//             return new Response(JSON.stringify({ error: "Missing fields" }), { status: 400 });
-//         }
-
-//         const inventoryDate = new Date(date);
-
-//         // المفتاح الفريد الصحيح (propertyId + roomId + date)
-//         const whereUnique = {
-//             propertyId_roomId_date: {
-//                 propertyId,
-//                 roomId,
-//                 date: inventoryDate
-//             }
-//         };
-
-//         // const existing = await prisma.inventory.findUnique({ where: whereUnique });
-
-//         await prisma.inventory.upsert({
-//             where: {
-//                 propertyId_roomTypeId_date: {
-//                     propertyId,
-//                     roomTypeId,
-//                     date: inventoryDate
-//                 }
-//             },
-//             update: { [field]: value },
-//             create: {
-//                 propertyId,
-//                 roomTypeId,
-//                 roomId,
-//                 date: inventoryDate,
-//                 allotment: field === "allotment" ? value : 1,
-//                 sold: field === "sold" ? value : 0,
-//                 stopSell: field === "stopSell" ? value : false
-//             }
-//         });
-
-//         // --- Broadcast ---
-//         try {
-//             await fetch("http://localhost:3001/api/broadcast", {
-//                 method: "POST",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify({
-//                     event: "INVENTORY_UPDATED",
-//                     data: {
-//                         propertyId,
-//                         roomTypeId,
-//                         roomId,
-//                         date,
-//                         field,
-//                         value
-//                     }
-//                 })
-//             });
-//         } catch (err) {
-//             console.error("Socket broadcast failed:", err);
-//         }
-
-//         return new Response(JSON.stringify({ success: true }), { status: 200 });
-//     } catch (err) {
-//         console.error("Inventory PATCH error:", err);
-//         return new Response(JSON.stringify({ error: "Failed to update inventory" }), { status: 500 });
-//     }
-// }
-
-
-
-
-
-
-
 import prisma from "@/lib/prisma";
 
 export async function GET(req) {
@@ -161,91 +6,135 @@ export async function GET(req) {
         const propertyId = searchParams.get("propertyId");
         const start = searchParams.get("start");
         const end = searchParams.get("end");
-        if (!propertyId || !start || !end)
-            return new Response(JSON.stringify({ error: "Missing query params" }), { status: 400 });
+
+        if (!propertyId || !start || !end) {
+            return new Response(JSON.stringify({ error: "Missing params" }), { status: 400 });
+        }
 
         const startDate = new Date(start);
         const endDate = new Date(end);
 
-        const roomTypes = await prisma.roomType.findMany({ where: { propertyId }, include: { rooms: true } });
-        const inventories = await prisma.inventory.findMany({
-            where: { propertyId, date: { gte: startDate, lte: endDate } }
+        // 1️⃣ جلب RoomTypes مع الغرف
+        const roomTypes = await prisma.roomType.findMany({
+            where: { propertyId },
+            include: { rooms: true }
         });
 
-        const dates = [];
-        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1))
-            dates.push(d.toISOString().slice(0, 10));
+        // 2️⃣ جلب Inventory لكل RoomType داخل الفترة
+        const inventories = await prisma.inventory.findMany({
+            where: {
+                propertyId,
+                date: { gte: startDate, lte: endDate }
+            }
+        });
 
+        // 3️⃣ إنشاء مصفوفة التواريخ
+        const dates = [];
+        for (let dt = new Date(startDate); dt <= endDate; dt.setDate(dt.getDate()+1)) {
+            dates.push(new Date(dt).toISOString().slice(0,10));
+        }
+
+        // 4️⃣ دمج البيانات لكل RoomType و Room
         const rows = roomTypes.map(rt => {
-            const roomsData = rt.rooms.map(room => {
+            const roomRows = rt.rooms.map(rm => {
                 const cells = {};
                 dates.forEach(d => {
-                    const inv = inventories.find(i => i.roomId === room.id && i.date.toISOString().slice(0, 10) === d);
+                    // السجل الخاص بالغرفة الفردية
+                    const roomInv = inventories.find(inv =>
+                        inv.roomId === rm.id && inv.date.toISOString().slice(0,10) === d
+                    );
+                    // السجل العام للنوع (roomId = null)
+                    const typeInv = inventories.find(inv =>
+                        inv.roomTypeId === rt.id && !inv.roomId && inv.date.toISOString().slice(0,10) === d
+                    );
+
+                    // دمج القيم
+                    const inv = roomInv || typeInv || {};
                     cells[d] = {
-                        total: inv ? inv.allotment : 1,
-                        sold: inv ? inv.sold : 0,
-                        stopSell: inv ? inv.stopSell : false,
-                        housekeeping: inv ? inv.housekeeping || '' : '',
-                        notes: inv ? inv.notes || '' : '',
-                        status: inv ? inv.status || 'Vacant' : 'Vacant'
+                        allotment: inv.allotment || 0,
+                        sold: inv.sold || 0,
+                        stopSell: inv.stopSell || false,
+                        housekeeping: inv.housekeeping || null,
+                        notes: inv.notes || null,
+                        extraPrices: inv.extraPrices || {},
+                        baseRate: inv.extraPrices?.baseRate || null,
+                        taxes: inv.extraPrices?.taxes || null,
+                        cta: inv.extraPrices?.cta || false,
+                        ctd: inv.extraPrices?.ctd || false
                     };
                 });
-                return { id: room.id, number: room.number, floor: room.floor || "Unknown", cells };
+                return { id: rm.id, number: rm.number, cells };
             });
-            return { roomTypeId: rt.id, name: rt.name, rooms: roomsData };
+
+            return { roomTypeId: rt.id, name: rt.name, rooms: roomRows };
         });
 
-        return new Response(JSON.stringify({ dates, rows }), { status: 200 });
-    } catch (err) {
-        console.error(err);
-        return new Response(JSON.stringify({ error: "Failed to fetch inventory" }), { status: 500 });
+        return new Response(JSON.stringify({ rows, dates }));
+
+    } catch (e) {
+        console.error(e);
+        return new Response(JSON.stringify({ error: e.message }), { status: 500 });
     }
 }
+
 
 export async function PATCH(req) {
     try {
         const body = await req.json();
         const { propertyId, roomTypeId, roomId, date, field, value } = body;
-        if (!propertyId || !roomId || !date || !field)
-            return new Response(JSON.stringify({ error: "Missing fields" }), { status: 400 });
+        if (!propertyId || !roomTypeId || !date) {
+            return new Response(JSON.stringify({ error: "Missing params" }), { status: 400 });
+        }
 
-        const inventoryDate = new Date(date);
+        const targetDate = new Date(date);
 
-        await prisma.inventory.upsert({
-            where: { propertyId_roomId_date: { propertyId, roomId, date: inventoryDate } },
-            update: { [field]: value },
-            create: {
+        // 1️⃣ البحث عن السجل الموجود أولاً
+        let inventory = await prisma.inventory.findFirst({
+            where: {
                 propertyId,
                 roomTypeId,
-                roomId,
-                date: inventoryDate,
-                allotment: field === "allotment" ? value : 1,
-                sold: field === "sold" ? value : 0,
-                stopSell: field === "stopSell" ? value : false,
-                housekeeping: field === "housekeeping" ? value : '',
-                notes: field === "notes" ? value : '',
+                roomId: roomId || null,
+                date: targetDate
             }
         });
 
-        // Broadcast
-        const event =
-            field === "housekeeping" ? "HOUSEKEEPING_UPDATED" :
-            field === "notes" ? "NOTES_UPDATED" :
-            "INVENTORY_UPDATED";
+        // 2️⃣ إذا لم يوجد، إنشاؤه
+        if (!inventory) {
+            inventory = await prisma.inventory.create({
+                data: {
+                    propertyId,
+                    roomTypeId,
+                    roomId: roomId || null,
+                    date: targetDate,
+                    allotment: 1,
+                    sold: 0,
+                    stopSell: false
+                }
+            });
+        }
 
-        await fetch("http://localhost:3001/api/broadcast", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                event,
-                data: { propertyId, roomTypeId, roomId, date, field, value }
-            })
+        // 3️⃣ تجهيز بيانات التحديث
+        const updateData = {};
+        const simpleFields = ['allotment','sold','stopSell','housekeeping','notes'];
+        const extraFields = ['baseRate','taxes','cta','ctd'];
+
+        if (simpleFields.includes(field)) {
+            updateData[field] = value;
+        } else if (extraFields.includes(field)) {
+            const extraPrices = inventory.extraPrices || {};
+            extraPrices[field] = value;
+            updateData.extraPrices = extraPrices;
+        }
+
+        // 4️⃣ تطبيق التحديث
+        const updatedInventory = await prisma.inventory.update({
+            where: { id: inventory.id },
+            data: updateData
         });
 
-        return new Response(JSON.stringify({ success: true }), { status: 200 });
-    } catch (err) {
-        console.error(err);
-        return new Response(JSON.stringify({ error: "Failed to update inventory" }), { status: 500 });
+        return new Response(JSON.stringify(updatedInventory));
+    } catch (e) {
+        console.error(e);
+        return new Response(JSON.stringify({ error: e.message }), { status: 500 });
     }
 }
-
