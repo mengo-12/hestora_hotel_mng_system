@@ -13,7 +13,7 @@ export async function GET(req) {
 
         const filters = [];
 
-                // ✅ فلترة النصوص (search)
+        // ✅ فلترة النصوص (search)
         if (search) {
             filters.push({
                 OR: [
@@ -127,6 +127,35 @@ export async function POST(req) {
             }
 
             await prisma.inventory.update({ where: { id: inventory.id }, data: { sold: { increment: 1 } } });
+
+
+            // --- تعديل: التحقق لكل يوم من الفترة ---
+            let current = new Date(checkIn);
+            const end = new Date(checkOut);
+            while (current < end) {
+                const date = new Date(current);
+
+                const inventory = await prisma.inventory.findUnique({
+                    where: {
+                        propertyId_roomTypeId_date: {
+                            propertyId,
+                            roomTypeId: ratePlan.roomTypeId,
+                            date
+                        }
+                    }
+                });
+
+                if (!inventory || inventory.allotment - inventory.sold <= 0) {
+                    return new Response(JSON.stringify({ error: `No availability on ${date.toISOString().slice(0, 10)}` }), { status: 400 });
+                }
+
+                await prisma.inventory.update({
+                    where: { id: inventory.id },
+                    data: { sold: { increment: 1 } }
+                });
+
+                current.setDate(current.getDate() + 1);
+            }
         }
 
         // --- حساب السعر الإجمالي لكل يوم ---
@@ -255,6 +284,16 @@ export async function POST(req) {
                     body: JSON.stringify({ event: "ROOM_STATUS_CHANGED", data: { roomId, newStatus: "Reserved" } })
                 });
             }
+
+            // --- تعديل: بث INVENTORY_UPDATED
+            await fetch("http://localhost:3001/api/broadcast", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    event: "INVENTORY_UPDATED",
+                    data: { propertyId, roomTypeId: booking.room?.roomTypeId || null }
+                })
+            });
         } catch (err) { console.error("Socket broadcast failed:", err); }
 
         return new Response(JSON.stringify({ freshBooking, folio, totalPrice }), { status: 201 });

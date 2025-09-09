@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 
 export async function POST(req, { params }) {
     try {
-        const booking = await prisma.booking.findUnique({ 
+        const booking = await prisma.booking.findUnique({
             where: { id: params.id },
             include: { ratePlan: true } // لإمكانية تعديل المخزون إذا كان بدون roomId
         });
@@ -14,7 +14,7 @@ export async function POST(req, { params }) {
         const updatedBooking = await prisma.booking.update({
             where: { id: params.id },
             data: { status: "InHouse" },
-            include: { guest: true, room: true, property: true, ratePlan: true, company: true,extras: true, folio: { include: { charges: true } } },
+            include: { guest: true, room: true, property: true, ratePlan: true, company: true, extras: true, folio: { include: { charges: true } } },
         });
 
         // تحديث حالة الغرفة
@@ -48,6 +48,15 @@ export async function POST(req, { params }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ event: "ROOM_STATUS_CHANGED", data: { roomId: booking.roomId, newStatus: "OCCUPIED" } }),
             });
+            await fetch("http://localhost:3001/api/broadcast", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    event: "INVENTORY_UPDATED",
+                    data: { propertyId: booking.propertyId, roomTypeId: booking.ratePlan.roomTypeId }
+                })
+            });
+
         } catch (err) { console.error("Socket broadcast failed:", err); }
 
         return new Response(JSON.stringify(updatedBooking), { status: 200 });

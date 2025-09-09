@@ -2,8 +2,8 @@ import prisma from "@/lib/prisma";
 
 export async function POST(req, { params }) {
     try {
-        const booking = await prisma.booking.findUnique({ 
-            where: { id: params.id }, 
+        const booking = await prisma.booking.findUnique({
+            where: { id: params.id },
             include: { room: true, guest: true, property: true, ratePlan: true, company: true }
         });
         if (!booking) return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404 });
@@ -51,6 +51,16 @@ export async function POST(req, { params }) {
                     body: JSON.stringify({ event: "ROOM_STATUS_CHANGED", data: { roomId: booking.roomId, newStatus: "VACANT" } }),
                 });
             }
+            // --- ✅ تعديل: بث INVENTORY_UPDATED بعد تحرير المخزون
+            await fetch("http://localhost:3001/api/broadcast", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    event: "INVENTORY_UPDATED",
+                    data: { propertyId: booking.propertyId, roomTypeId: booking.ratePlan.roomTypeId }
+                })
+            });
+
         } catch (err) { console.error("Socket broadcast failed:", err); }
 
         return new Response(JSON.stringify(updatedBooking), { status: 200 });

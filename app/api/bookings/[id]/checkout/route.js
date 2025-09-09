@@ -54,11 +54,20 @@ export async function POST(req, { params }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ event: "ROOM_BOOKING_ENDED", data: { roomId: booking.roomId } }),
             });
+            // --- ✅ تعديل: بث INVENTORY_UPDATED بعد تحرير المخزون
+            await fetch("http://localhost:3001/api/broadcast", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    event: "INVENTORY_UPDATED",
+                    data: { propertyId: booking.propertyId, roomTypeId: booking.ratePlan.roomTypeId }
+                })
+            });
         } catch (err) { console.error("Socket broadcast failed:", err); }
 
-        return new Response(JSON.stringify(updatedBooking), { status: 200 });
-    } catch (err) {
-        console.error(err);
-        return new Response(JSON.stringify({ error: "Check-out failed" }), { status: 500 });
-    }
+    return new Response(JSON.stringify(updatedBooking), { status: 200 });
+} catch (err) {
+    console.error(err);
+    return new Response(JSON.stringify({ error: "Check-out failed" }), { status: 500 });
+}
 }
