@@ -30,6 +30,7 @@ export default function Sidebar() {
         { name: 'Housekeeping', href: '/houseKeeping' },
         { name: 'Night Audit', href: '/night-audit' },
         { name: 'inventory', href: '/inventory' },
+        { name: 'Rate plane', href: '/rate-plans' },
     ];
 
     const role = session?.user?.role || "Guest";
