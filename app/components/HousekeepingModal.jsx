@@ -28,6 +28,7 @@ export default function HousekeepingModal({ task, onClose, onSaved }) {
         onClose();
     };
 
+
     return (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
             <div className="bg-white p-6 rounded w-96">

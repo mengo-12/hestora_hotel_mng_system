@@ -127,6 +127,7 @@ export default function RoomsPage({ session, userProperties }) {
         }
     };
 
+
     return (
         <div className="p-6">
             <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-3">

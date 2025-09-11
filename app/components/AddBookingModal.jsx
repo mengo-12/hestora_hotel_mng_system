@@ -2,35 +2,39 @@
 import { useState, useEffect } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
 
-export default function AddBookingModal({ isOpen, onClose, properties, guests, ratePlans, companies }) {
+export default function AddBookingModal({ isOpen, onClose, properties, guests, companies }) {
     const socket = useSocket();
 
     const [selectedProperty, setSelectedProperty] = useState("");
     const [availableRooms, setAvailableRooms] = useState([]);
     const [filteredGuests, setFilteredGuests] = useState([]);
     const [selectedRoom, setSelectedRoom] = useState("");
+    const [selectedRatePlan, setSelectedRatePlan] = useState("");
     const [selectedGuest, setSelectedGuest] = useState("");
     const [checkIn, setCheckIn] = useState("");
     const [checkOut, setCheckOut] = useState("");
     const [adults, setAdults] = useState(1);
     const [children, setChildren] = useState(0);
-    const [ratePlanId, setRatePlanId] = useState("");
     const [companyId, setCompanyId] = useState("");
     const [specialRequests, setSpecialRequests] = useState("");
 
-    // --- Extras / خدمات إضافية ---
+    // --- Extras ---
     const [extras, setExtras] = useState([]);
     const [extraName, setExtraName] = useState("");
     const [extraPrice, setExtraPrice] = useState("");
     const [extraQty, setExtraQty] = useState(1);
     const [extraTax, setExtraTax] = useState("");
 
-    // --- بيانات الغرفة المختارة ---
+    // --- بيانات الغرفة و Rate Plans ---
     const selectedRoomData = availableRooms.find(r => r.id === selectedRoom) || {};
+    const ratePlansForRoom = selectedRoomData.roomType?.ratePlans || [];
+    const selectedRatePlanData = ratePlansForRoom.find(rp => rp.id === selectedRatePlan);
 
+    // --- Filter guests by property ---
     useEffect(() => {
         if (!selectedProperty) {
             setFilteredGuests([]);
+            setSelectedGuest("");
             return;
         }
         const filtered = guests.filter(g => g.propertyId === selectedProperty);
@@ -38,6 +42,7 @@ export default function AddBookingModal({ isOpen, onClose, properties, guests, r
         setSelectedGuest("");
     }, [selectedProperty, guests]);
 
+    // --- Fetch available rooms ---
     useEffect(() => {
         const fetchAvailableRooms = async () => {
             if (!selectedProperty || !checkIn || !checkOut) return;
@@ -45,8 +50,9 @@ export default function AddBookingModal({ isOpen, onClose, properties, guests, r
             try {
                 const res = await fetch(`/api/rooms/available?propertyId=${selectedProperty}&checkIn=${checkIn}&checkOut=${checkOut}`);
                 const data = await res.json();
-                setAvailableRooms(data);
+                setAvailableRooms(Array.isArray(data) ? data : []);
                 setSelectedRoom("");
+                setSelectedRatePlan("");
             } catch (err) {
                 console.error("Failed to fetch available rooms:", err);
             }
@@ -55,6 +61,12 @@ export default function AddBookingModal({ isOpen, onClose, properties, guests, r
         fetchAvailableRooms();
     }, [selectedProperty, checkIn, checkOut]);
 
+    // --- Reset Rate Plan when room changes ---
+    useEffect(() => {
+        setSelectedRatePlan("");
+    }, [selectedRoom]);
+
+    // --- Extras handlers ---
     const addExtra = () => {
         if (!extraName || !extraPrice || extraQty < 1) {
             alert("Please fill extra name, price, and quantity.");
@@ -75,17 +87,18 @@ export default function AddBookingModal({ isOpen, onClose, properties, guests, r
     const removeExtra = (index) => setExtras(extras.filter((_, i) => i !== index));
     const handleExtraChange = (index, field, value) => {
         const updated = [...extras];
-        updated[index][field] = (field === "price" || field === "quantity" || field === "tax") ? Number(value) : value;
+        updated[index][field] = ["price", "quantity", "tax"].includes(field) ? Number(value) : value;
         setExtras(updated);
     };
 
     // --- حساب الأسعار ---
-    const roomPrice = selectedRoomData?.price || 0;
+    const roomPrice = Number(selectedRatePlanData?.basePrice || 0);
     const extrasTotal = extras.reduce((sum, ex) => sum + (ex.price * ex.quantity + ex.tax), 0);
     const grandTotal = roomPrice + extrasTotal;
 
+    // --- Submit booking ---
     const handleSubmit = async () => {
-        if (!selectedProperty || !selectedGuest || !selectedRoom || !checkIn || !checkOut) {
+        if (!selectedProperty || !selectedGuest || !selectedRoom || !checkIn || !checkOut || !selectedRatePlan) {
             alert("Please fill all required fields.");
             return;
         }
@@ -99,7 +112,7 @@ export default function AddBookingModal({ isOpen, onClose, properties, guests, r
                 checkOut,
                 adults,
                 children,
-                ratePlanId: ratePlanId || null,
+                ratePlanId: selectedRatePlan,
                 companyId: companyId || null,
                 specialRequests: specialRequests || null,
                 extras: extras.map(ex => ({
@@ -125,7 +138,7 @@ export default function AddBookingModal({ isOpen, onClose, properties, guests, r
 
             const booking = await res.json();
 
-            // --- Broadcast عالمي ---
+            // Broadcast
             if (socket) socket.emit("BOOKING_CREATED", booking);
             else await fetch("http://localhost:3001/api/broadcast", {
                 method: "POST",
@@ -177,17 +190,19 @@ export default function AddBookingModal({ isOpen, onClose, properties, guests, r
                             ))}
                         </select>
 
+                        <label>Rate Plan *</label>
+                        <select value={selectedRatePlan} onChange={e => setSelectedRatePlan(e.target.value)} className="w-full border rounded p-1">
+                            <option value="">Select Rate Plan</option>
+                            {ratePlansForRoom.map(rp => (
+                                <option key={rp.id} value={rp.id}>{rp.name} ({rp.code}) - {rp.currency} {rp.basePrice}</option>
+                            ))}
+                        </select>
+
                         <label>Adults</label>
                         <input type="number" min={1} value={adults} onChange={e => setAdults(Number(e.target.value))} className="w-full border rounded p-1" />
 
                         <label>Children</label>
                         <input type="number" min={0} value={children} onChange={e => setChildren(Number(e.target.value))} className="w-full border rounded p-1" />
-
-                        <label>Rate Plan</label>
-                        <select value={ratePlanId} onChange={e => setRatePlanId(e.target.value)} className="w-full border rounded p-1">
-                            <option value="">Select Rate Plan</option>
-                            {ratePlans.map(rp => <option key={rp.id} value={rp.id}>{rp.name}</option>)}
-                        </select>
 
                         <label>Company</label>
                         <select value={companyId} onChange={e => setCompanyId(e.target.value)} className="w-full border rounded p-1">
@@ -200,7 +215,7 @@ export default function AddBookingModal({ isOpen, onClose, properties, guests, r
                     </div>
                 </div>
 
-                {/* --- Extras Table --- */}
+                {/* Extras Table */}
                 <div className="mt-4 border-t pt-4">
                     <h3 className="font-semibold mb-2">Extras / Services</h3>
                     <div className="grid grid-cols-5 gap-2 items-end mb-2">
@@ -249,7 +264,7 @@ export default function AddBookingModal({ isOpen, onClose, properties, guests, r
                     )}
                 </div>
 
-                {/* --- إجمالي الحجز --- */}
+                {/* Totals */}
                 <div className="mt-4 text-right font-semibold">
                     <p>Room Total: ${roomPrice.toFixed(2)}</p>
                     <p>Extras Total: ${extrasTotal.toFixed(2)}</p>
@@ -264,5 +279,3 @@ export default function AddBookingModal({ isOpen, onClose, properties, guests, r
         </div>
     );
 }
-
-

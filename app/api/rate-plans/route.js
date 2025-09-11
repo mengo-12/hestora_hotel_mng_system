@@ -26,12 +26,12 @@ export async function POST(req) {
             data: { propertyId, roomTypeId, code, name, basePrice, currency, isPublic: isPublic ?? true }
         });
 
-        // --- ✅ Broadcast بعد إنشاء RatePlan ---
+        // ✅ Broadcast
         try {
             await fetch("http://localhost:3001/api/broadcast", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ event: "RATE_PLAN_CREATED", data: newPlan }),
+                body: JSON.stringify({ event: "RATEPLAN_CREATED", data: newPlan }),
             });
         } catch (err) { console.error("Socket broadcast failed:", err); }
 

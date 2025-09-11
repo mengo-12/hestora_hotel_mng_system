@@ -157,10 +157,11 @@ export default function HousekeepingPage({ userProperties, session }) {
         return acc;
     }, {});
 
+
     return (
         <div className="p-6">
 
-             {/* الفلاتر */}
+            {/* الفلاتر */}
             <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-2">
                 <h1 className="text-2xl font-bold">Housekeeping Dashboard</h1>
                 <div className="flex gap-2 flex-wrap">

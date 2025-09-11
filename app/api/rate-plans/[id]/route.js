@@ -1,5 +1,3 @@
-import prisma from "@/lib/prisma";
-
 // --- PATCH تعديل RatePlan ---
 export async function PATCH(req, { params }) {
     try {
@@ -11,12 +9,12 @@ export async function PATCH(req, { params }) {
             data
         });
 
-        // --- ✅ Broadcast بعد تعديل RatePlan ---
+        // ✅ Broadcast
         try {
             await fetch("http://localhost:3001/api/broadcast", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ event: "RATE_PLAN_UPDATED", data: updatedPlan }),
+                body: JSON.stringify({ event: "RATEPLAN_UPDATED", data: updatedPlan }),
             });
         } catch (err) { console.error("Socket broadcast failed:", err); }
 
@@ -38,7 +36,7 @@ export async function PUT(req, { params }) {
             data
         });
 
-        // Broadcast
+        // ✅ Broadcast
         try {
             await fetch("http://localhost:3001/api/broadcast", {
                 method: "POST",
@@ -60,12 +58,12 @@ export async function DELETE(req, { params }) {
         const { id } = params;
         const deletedPlan = await prisma.ratePlan.delete({ where: { id } });
 
-        // --- ✅ Broadcast بعد حذف RatePlan ---
+        // ✅ Broadcast
         try {
             await fetch("http://localhost:3001/api/broadcast", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ event: "RATE_PLAN_DELETED", data: deletedPlan }),
+                body: JSON.stringify({ event: "RATEPLAN_DELETED", data: deletedPlan }),
             });
         } catch (err) { console.error("Socket broadcast failed:", err); }
 

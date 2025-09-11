@@ -109,6 +109,7 @@ export default function EditBookingModal({ booking, isOpen, onClose, properties,
     const roomPrice = Number(form.room?.roomType?.basePrice || 0);
     const grandTotal = roomPrice + extrasTotal;
 
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-[800px] max-h-[90vh] overflow-y-auto">

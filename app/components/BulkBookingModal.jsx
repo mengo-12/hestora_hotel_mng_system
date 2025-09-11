@@ -147,6 +147,7 @@ export default function BulkBookingModal({ isOpen, onClose, properties, guests, 
 
     if (!isOpen) return null;
 
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-6 rounded-lg shadow-lg w-[95%] max-h-[95vh] overflow-y-auto">

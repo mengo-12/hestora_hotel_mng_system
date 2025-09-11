@@ -154,6 +154,8 @@ export default function RoomInventoryPage({ userProperties = [], session }) {
         };
     }, [socket, selectedProperty, dates, rows, bulkDates]);
 
+
+
     // ----- Render -----
     return (
         <div className="p-4">

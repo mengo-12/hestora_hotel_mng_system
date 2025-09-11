@@ -122,6 +122,8 @@ export default function BookingsPage({ session, userProperties }) {
         );
     };
 
+
+
     return (
         <div className="p-6">
             <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-2">

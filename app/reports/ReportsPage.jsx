@@ -75,262 +75,262 @@ export default function ReportsPage({ userProperties, session }) {
         fetchReports();
     }, [reportType, propertyId, fromDate, toDate, searchTerm, page, limit]);
 
-    const getFolioTotals = (r) => {
-        const totalCharges = (r.charges || []).reduce((s, c) => s + num(c.amount) + num(c.tax || 0), 0);
-        const totalPayments = (r.payments || []).reduce((s, p) => s + num(p.amount), 0);
-        return { totalCharges, totalPayments, balance: totalCharges - totalPayments };
-    };
+const getFolioTotals = (r) => {
+    const totalCharges = (r.charges || []).reduce((s, c) => s + num(c.amount) + num(c.tax || 0), 0);
+    const totalPayments = (r.payments || []).reduce((s, p) => s + num(p.amount), 0);
+    return { totalCharges, totalPayments, balance: totalCharges - totalPayments };
+};
 
-    const getComparableValue = (row, field) => {
-        switch (reportType) {
-            case "Booking":
-                if (field === "id") return row.id || "";
-                if (field === "guestName") return `${row.guest?.firstName || ""} ${row.guest?.lastName || ""}`.trim();
-                if (field === "property") return row.property?.name || "";
-                if (field === "room") return row.room?.number || "";
-                if (field === "checkIn") return row.checkIn || "";
-                if (field === "checkOut") return row.checkOut || "";
-                if (field === "status") return row.status || "";
-                if (field === "adults") return row.adults ?? 0;
-                if (field === "children") return row.children ?? 0;
-                if (field === "ratePlan") return row.ratePlan?.name || "";
-                if (field === "company") return row.company?.name || "";
-                if (field === "createdAt") return row.createdAt || "";
-                return "";
-            case "Folio": {
-                if (field === "id") return row.id || "";
-                if (field === "bookingId") return row.bookingId || "";
-                if (field === "guestName") return `${row.guest?.firstName || ""} ${row.guest?.lastName || ""}`.trim();
-                if (field === "status") return row.status || "";
-                if (field === "totalCharges") return (row.charges || []).reduce((s, c) => s + num(c.amount), 0);
-                if (field === "totalPayments") return (row.payments || []).reduce((s, p) => s + num(p.amount), 0);
-                if (field === "balance") {
-                    const ch = (row.charges || []).reduce((s, c) => s + num(c.amount), 0);
-                    const pm = (row.payments || []).reduce((s, p) => s + num(p.amount), 0);
-                    return ch - pm;
-                }
-                if (field === "createdAt") return row.createdAt || "";
-                return "";
+const getComparableValue = (row, field) => {
+    switch (reportType) {
+        case "Booking":
+            if (field === "id") return row.id || "";
+            if (field === "guestName") return `${row.guest?.firstName || ""} ${row.guest?.lastName || ""}`.trim();
+            if (field === "property") return row.property?.name || "";
+            if (field === "room") return row.room?.number || "";
+            if (field === "checkIn") return row.checkIn || "";
+            if (field === "checkOut") return row.checkOut || "";
+            if (field === "status") return row.status || "";
+            if (field === "adults") return row.adults ?? 0;
+            if (field === "children") return row.children ?? 0;
+            if (field === "ratePlan") return row.ratePlan?.name || "";
+            if (field === "company") return row.company?.name || "";
+            if (field === "createdAt") return row.createdAt || "";
+            return "";
+        case "Folio": {
+            if (field === "id") return row.id || "";
+            if (field === "bookingId") return row.bookingId || "";
+            if (field === "guestName") return `${row.guest?.firstName || ""} ${row.guest?.lastName || ""}`.trim();
+            if (field === "status") return row.status || "";
+            if (field === "totalCharges") return (row.charges || []).reduce((s, c) => s + num(c.amount), 0);
+            if (field === "totalPayments") return (row.payments || []).reduce((s, p) => s + num(p.amount), 0);
+            if (field === "balance") {
+                const ch = (row.charges || []).reduce((s, c) => s + num(c.amount), 0);
+                const pm = (row.payments || []).reduce((s, p) => s + num(p.amount), 0);
+                return ch - pm;
             }
-            case "Payment":
-                if (field === "id") return row.id || "";
-                if (field === "folioId") return row.folio?.id || row.folioId || "";
-                if (field === "guestName") return `${row.folio?.guest?.firstName || ""} ${row.folio?.guest?.lastName || ""}`.trim();
-                if (field === "amount") return num(row.amount);
-                if (field === "method") return row.method || "";
-                if (field === "ref") return row.ref || "";
-                if (field === "postedAt") return row.postedAt || "";
-                return "";
-            case "Housekeeping":
-                if (field === "id") return row.id || "";
-                if (field === "room") return row.room?.number || "";
-                if (field === "type") return row.type || "";
-                if (field === "priority") return row.priority || "";
-                if (field === "status") return row.status || "";
-                if (field === "assignedTo") return row.assignedTo?.name || "";
-                if (field === "createdAt") return row.createdAt || "";
-                return "";
-            case "Extra":
-                if (field === "id") return row.id || "";
-                if (field === "bookingId") return row.bookingId || "";
-                if (field === "guestName") return `${row.guest?.firstName || ""} ${row.guest?.lastName || ""}`.trim();
-                if (field === "name") return row.name || "";
-                if (field === "unitPrice") return num(row.unitPrice);
-                if (field === "quantity") return row.quantity ?? 0;
-                if (field === "tax") return num(row.tax);
-                if (field === "status") return row.status || "";
-                if (field === "createdAt") return row.createdAt || "";
-                return "";
-            default: return "";
+            if (field === "createdAt") return row.createdAt || "";
+            return "";
         }
-    };
+        case "Payment":
+            if (field === "id") return row.id || "";
+            if (field === "folioId") return row.folio?.id || row.folioId || "";
+            if (field === "guestName") return `${row.folio?.guest?.firstName || ""} ${row.folio?.guest?.lastName || ""}`.trim();
+            if (field === "amount") return num(row.amount);
+            if (field === "method") return row.method || "";
+            if (field === "ref") return row.ref || "";
+            if (field === "postedAt") return row.postedAt || "";
+            return "";
+        case "Housekeeping":
+            if (field === "id") return row.id || "";
+            if (field === "room") return row.room?.number || "";
+            if (field === "type") return row.type || "";
+            if (field === "priority") return row.priority || "";
+            if (field === "status") return row.status || "";
+            if (field === "assignedTo") return row.assignedTo?.name || "";
+            if (field === "createdAt") return row.createdAt || "";
+            return "";
+        case "Extra":
+            if (field === "id") return row.id || "";
+            if (field === "bookingId") return row.bookingId || "";
+            if (field === "guestName") return `${row.guest?.firstName || ""} ${row.guest?.lastName || ""}`.trim();
+            if (field === "name") return row.name || "";
+            if (field === "unitPrice") return num(row.unitPrice);
+            if (field === "quantity") return row.quantity ?? 0;
+            if (field === "tax") return num(row.tax);
+            if (field === "status") return row.status || "";
+            if (field === "createdAt") return row.createdAt || "";
+            return "";
+        default: return "";
+    }
+};
 
-    const sortedReports = useMemo(() => {
-        if (!sortField) return reports;
-        return [...reports].sort((a, b) => {
-            const va = getComparableValue(a, sortField);
-            const vb = getComparableValue(b, sortField);
-            if (typeof va === "number" && typeof vb === "number") return sortDir === "asc" ? va - vb : vb - va;
-            const sa = String(va).toLowerCase();
-            const sb = String(vb).toLowerCase();
-            return sortDir === "asc" ? sa.localeCompare(sb) : sb.localeCompare(sa);
-        });
-    }, [reports, sortField, sortDir]);
+const sortedReports = useMemo(() => {
+    if (!sortField) return reports;
+    return [...reports].sort((a, b) => {
+        const va = getComparableValue(a, sortField);
+        const vb = getComparableValue(b, sortField);
+        if (typeof va === "number" && typeof vb === "number") return sortDir === "asc" ? va - vb : vb - va;
+        const sa = String(va).toLowerCase();
+        const sb = String(vb).toLowerCase();
+        return sortDir === "asc" ? sa.localeCompare(sb) : sb.localeCompare(sa);
+    });
+}, [reports, sortField, sortDir]);
 
-    const handleSort = (field) => {
-        if (sortField === field) setSortDir(sortDir === "asc" ? "desc" : "asc");
-        else { setSortField(field); setSortDir("asc"); }
-    };
+const handleSort = (field) => {
+    if (sortField === field) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else { setSortField(field); setSortDir("asc"); }
+};
 
-    const chartData = useMemo(() => {
-        const map = new Map();
-        if (reportType === "Booking" || reportType === "Housekeeping") {
-            for (const r of reports) map.set(r.status || "Unknown", (map.get(r.status || "Unknown") || 0) + 1);
-        } else if (reportType === "Payment") {
-            for (const r of reports) map.set(r.method || "Unknown", (map.get(r.method || "Unknown") || 0) + num(r.amount));
-        } else if (reportType === "Folio") {
-            let totalC = 0, totalP = 0;
-            for (const r of reports) {
-                totalC += (r.charges || []).reduce((s, c) => s + num(c.amount), 0);
-                totalP += (r.payments || []).reduce((s, p) => s + num(p.amount), 0);
-            }
-            return [
-                { name: "Charges", value: totalC },
-                { name: "Payments", value: totalP },
-                { name: "Balance", value: totalC - totalP },
-            ];
-        } else if (reportType === "Extra") {
-            for (const r of reports) {
-                const total = num(r.unitPrice) * (r.quantity ?? 1) + num(r.tax);
-                map.set(r.name || "Extra", (map.get(r.name || "Extra") || 0) + total);
-            }
+const chartData = useMemo(() => {
+    const map = new Map();
+    if (reportType === "Booking" || reportType === "Housekeeping") {
+        for (const r of reports) map.set(r.status || "Unknown", (map.get(r.status || "Unknown") || 0) + 1);
+    } else if (reportType === "Payment") {
+        for (const r of reports) map.set(r.method || "Unknown", (map.get(r.method || "Unknown") || 0) + num(r.amount));
+    } else if (reportType === "Folio") {
+        let totalC = 0, totalP = 0;
+        for (const r of reports) {
+            totalC += (r.charges || []).reduce((s, c) => s + num(c.amount), 0);
+            totalP += (r.payments || []).reduce((s, p) => s + num(p.amount), 0);
         }
-        return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
-    }, [reports, reportType]);
+        return [
+            { name: "Charges", value: totalC },
+            { name: "Payments", value: totalP },
+            { name: "Balance", value: totalC - totalP },
+        ];
+    } else if (reportType === "Extra") {
+        for (const r of reports) {
+            const total = num(r.unitPrice) * (r.quantity ?? 1) + num(r.tax);
+            map.set(r.name || "Extra", (map.get(r.name || "Extra") || 0) + total);
+        }
+    }
+    return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
+}, [reports, reportType]);
 
-    // جدول للتصدير والطباعة
-    const getTableForExport = () => {
-        if (reportType === "Booking") {
-            const headers = ["ID", "Guest", "Property", "Room", "CheckIn", "CheckOut", "Status", "Adults", "Children", "RatePlan", "Company", "CreatedAt"];
-            const rows = reports.map((r) => [
-                r.id,
-                `${r.guest?.firstName || ""} ${r.guest?.lastName || ""}`.trim(),
-                r.property?.name || "",
-                r.room?.number || "-",
-                r.checkIn ? new Date(r.checkIn).toLocaleString() : "",
-                r.checkOut ? new Date(r.checkOut).toLocaleString() : "",
-                r.status || "",
-                r.adults ?? 0,
-                r.children ?? 0,
-                r.ratePlan?.name || "",
-                r.company?.name || "",
-                r.createdAt ? new Date(r.createdAt).toLocaleString() : "",
-            ]);
-            return { headers, rows };
-        }
-        if (reportType === "Folio") {
-            const headers = ["ID", "BookingId", "Guest", "Status", "Total Charges", "Total Payments", "Balance", "CreatedAt"];
-            const rows = reports.map(r => {
-                const { totalCharges, totalPayments, balance } = getFolioTotals(r);
-                return [
-                    r.id,
-                    r.bookingId || "",
-                    `${r.guest?.firstName || ""} ${r.guest?.lastName || ""}`.trim(),
-                    r.status || "",
-                    totalCharges.toFixed(2),
-                    totalPayments.toFixed(2),
-                    balance.toFixed(2),
-                    r.createdAt ? new Date(r.createdAt).toLocaleString() : "",
-                ];
-            });
-            return { headers, rows };
-        }
-        if (reportType === "Payment") {
-            const headers = ["ID", "FolioId", "Guest", "Amount", "Method", "Ref", "PostedAt"];
-            const rows = reports.map((r) => [
-                r.id,
-                r.folio?.id || r.folioId || "",
-                `${r.folio?.guest?.firstName || ""} ${r.folio?.guest?.lastName || ""}`.trim(),
-                num(r.amount).toFixed(2),
-                r.method || "",
-                r.ref || "",
-                r.postedAt ? new Date(r.postedAt).toLocaleString() : "",
-            ]);
-            return { headers, rows };
-        }
-        if (reportType === "Housekeeping") {
-            const headers = ["ID", "Room", "Type", "Priority", "Status", "AssignedTo", "CreatedAt"];
-            const rows = reports.map((r) => [
-                r.id,
-                r.room?.number || "",
-                r.type || "",
-                r.priority || "-",
-                r.status || "",
-                r.assignedTo?.name || "-",
-                r.createdAt ? new Date(r.createdAt).toLocaleString() : "",
-            ]);
-            return { headers, rows };
-        }
-        // Extra
-        const headers = ["ID", "BookingId", "Guest", "Name", "UnitPrice", "Quantity", "Tax", "Status", "CreatedAt"];
+// جدول للتصدير والطباعة
+const getTableForExport = () => {
+    if (reportType === "Booking") {
+        const headers = ["ID", "Guest", "Property", "Room", "CheckIn", "CheckOut", "Status", "Adults", "Children", "RatePlan", "Company", "CreatedAt"];
         const rows = reports.map((r) => [
             r.id,
-            r.bookingId || "",
             `${r.guest?.firstName || ""} ${r.guest?.lastName || ""}`.trim(),
-            r.name || "",
-            num(r.unitPrice).toFixed(2),
-            r.quantity ?? 1,
-            num(r.tax).toFixed(2),
+            r.property?.name || "",
+            r.room?.number || "-",
+            r.checkIn ? new Date(r.checkIn).toLocaleString() : "",
+            r.checkOut ? new Date(r.checkOut).toLocaleString() : "",
             r.status || "",
+            r.adults ?? 0,
+            r.children ?? 0,
+            r.ratePlan?.name || "",
+            r.company?.name || "",
             r.createdAt ? new Date(r.createdAt).toLocaleString() : "",
         ]);
         return { headers, rows };
-    };
-
-    const downloadCSV = () => {
-        const { headers, rows } = getTableForExport();
-        const escape = (val) => {
-            if (val == null) return "";
-            const s = String(val);
-            if (s.includes('"') || s.includes(",") || s.includes("\n")) {
-                return `"${s.replace(/"/g, '""')}"`;
-            }
-            return s;
-        };
-        const csv = [headers.map(escape).join(","), ...rows.map((row) => row.map(escape).join(","))].join("\n");
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `reports_${reportType.toLowerCase()}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    };
-
-    const printTable = () => {
-        const { headers, rows } = getTableForExport();
-        const htmlRows = rows
-            .map((row) => `<tr>${row.map((c) => `<td style="border:1px solid #ddd;padding:6px;">${c ?? ""}</td>`).join("")}</tr>`)
-            .join("");
-        const html = `
-            <html>
-                <head>
-                    <meta charset="utf-8" />
-                    <title>Print - ${reportType}</title>
-                    <style>
-                        body {font - family: sans-serif; padding: 16px; }
-                        table {border - collapse: collapse; width: 100%; }
-                        th, td {border: 1px solid #ddd; padding: 8px; font-size: 12px; }
-                        th {background: #f3f4f6; text-align:left; }
-                    </style>
-                </head>
-                <body>
-                    <h3>Reports - ${reportType}</h3>
-                    <table>
-                        <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
-                        <tbody>${htmlRows}</tbody>
-                    </table>
-                    <script>window.print();</script>
-                </body>
-            </html>`;
-        const w = window.open("", "_blank");
-        if (!w) return;
-        w.document.open();
-        w.document.write(html);
-        w.document.close();
-    };
-
-    function SortHeader({ field, children }) {
-        const isActive = sortField === field;
-        const arrow = isActive ? (sortDir === "asc" ? " ↑" : " ↓") : "";
-        return (
-            <th className="p-2 border cursor-pointer select-none text-left" onClick={() => handleSort(field)}>
-                {children}{arrow}
-            </th>
-        );
     }
+    if (reportType === "Folio") {
+        const headers = ["ID", "BookingId", "Guest", "Status", "Total Charges", "Total Payments", "Balance", "CreatedAt"];
+        const rows = reports.map(r => {
+            const { totalCharges, totalPayments, balance } = getFolioTotals(r);
+            return [
+                r.id,
+                r.bookingId || "",
+                `${r.guest?.firstName || ""} ${r.guest?.lastName || ""}`.trim(),
+                r.status || "",
+                totalCharges.toFixed(2),
+                totalPayments.toFixed(2),
+                balance.toFixed(2),
+                r.createdAt ? new Date(r.createdAt).toLocaleString() : "",
+            ];
+        });
+        return { headers, rows };
+    }
+    if (reportType === "Payment") {
+        const headers = ["ID", "FolioId", "Guest", "Amount", "Method", "Ref", "PostedAt"];
+        const rows = reports.map((r) => [
+            r.id,
+            r.folio?.id || r.folioId || "",
+            `${r.folio?.guest?.firstName || ""} ${r.folio?.guest?.lastName || ""}`.trim(),
+            num(r.amount).toFixed(2),
+            r.method || "",
+            r.ref || "",
+            r.postedAt ? new Date(r.postedAt).toLocaleString() : "",
+        ]);
+        return { headers, rows };
+    }
+    if (reportType === "Housekeeping") {
+        const headers = ["ID", "Room", "Type", "Priority", "Status", "AssignedTo", "CreatedAt"];
+        const rows = reports.map((r) => [
+            r.id,
+            r.room?.number || "",
+            r.type || "",
+            r.priority || "-",
+            r.status || "",
+            r.assignedTo?.name || "-",
+            r.createdAt ? new Date(r.createdAt).toLocaleString() : "",
+        ]);
+        return { headers, rows };
+    }
+    // Extra
+    const headers = ["ID", "BookingId", "Guest", "Name", "UnitPrice", "Quantity", "Tax", "Status", "CreatedAt"];
+    const rows = reports.map((r) => [
+        r.id,
+        r.bookingId || "",
+        `${r.guest?.firstName || ""} ${r.guest?.lastName || ""}`.trim(),
+        r.name || "",
+        num(r.unitPrice).toFixed(2),
+        r.quantity ?? 1,
+        num(r.tax).toFixed(2),
+        r.status || "",
+        r.createdAt ? new Date(r.createdAt).toLocaleString() : "",
+    ]);
+    return { headers, rows };
+};
+
+const downloadCSV = () => {
+    const { headers, rows } = getTableForExport();
+    const escape = (val) => {
+        if (val == null) return "";
+        const s = String(val);
+        if (s.includes('"') || s.includes(",") || s.includes("\n")) {
+            return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+    };
+    const csv = [headers.map(escape).join(","), ...rows.map((row) => row.map(escape).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `reports_${reportType.toLowerCase()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+};
+
+const printTable = () => {
+    const { headers, rows } = getTableForExport();
+    const htmlRows = rows
+        .map((row) => `<tr>${row.map((c) => `<td style="border:1px solid #ddd;padding:6px;">${c ?? ""}</td>`).join("")}</tr>`)
+        .join("");
+    const html = `
+        <html>
+            <head>
+                <meta charset="utf-8" />
+                <title>Print - ${reportType}</title>
+                <style>
+                    body {font - family: sans-serif; padding: 16px; }
+                    table {border - collapse: collapse; width: 100%; }
+                    th, td {border: 1px solid #ddd; padding: 8px; font-size: 12px; }
+                    th {background: #f3f4f6; text-align:left; }
+                </style>
+            </head>
+            <body>
+                <h3>Reports - ${reportType}</h3>
+                <table>
+                    <thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead>
+                    <tbody>${htmlRows}</tbody>
+                </table>
+                <script>window.print();</script>
+            </body>
+        </html>`;
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+};
+
+function SortHeader({ field, children }) {
+    const isActive = sortField === field;
+    const arrow = isActive ? (sortDir === "asc" ? " ↑" : " ↓") : "";
+    return (
+        <th className="p-2 border cursor-pointer select-none text-left" onClick={() => handleSort(field)}>
+            {children}{arrow}
+        </th>
+    );
+}
 
     return (
         <div className="p-6">

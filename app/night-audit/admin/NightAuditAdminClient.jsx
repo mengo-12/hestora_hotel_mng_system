@@ -79,74 +79,75 @@ export default function NightAuditAdminClient({ initialPropertyId, initialProper
         finally { setRunning(false); }
     };
 
-    // export PDF
-    const exportPDF = () => {
-        const doc = new jsPDF();
-        doc.setFontSize(12);
-        doc.text(`Night Audit Report - ${auditDate}`, 14, 12);
+// export PDF
+const exportPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(12);
+    doc.text(`Night Audit Report - ${auditDate}`, 14, 12);
 
-        if (summary) {
-            doc.setFontSize(10);
-            doc.text(`Rooms Sold: ${summary.roomsSold}   Occupancy: ${summary.occupancy}%   ADR: ${summary.adr}   RevPAR: ${summary.revpar}`, 14, 20);
+    if (summary) {
+        doc.setFontSize(10);
+        doc.text(`Rooms Sold: ${summary.roomsSold}   Occupancy: ${summary.occupancy}%   ADR: ${summary.adr}   RevPAR: ${summary.revpar}`, 14, 20);
+    }
+
+    let cursorY = 30;
+    for (const b of bookings) {
+        if (cursorY > 260) { doc.addPage(); cursorY = 14; }
+        const guestName = b.guest?.firstName ? `${b.guest.firstName} ${b.guest.lastName || ""}` : (b.guest?.name || "-");
+        doc.setFontSize(11);
+        doc.text(`Room: ${b.room?.number || "-"}  Guest: ${guestName}  Status: ${b.status}`, 14, cursorY);
+        cursorY += 6;
+
+        const rows = (b.folio?.charges || []).map(c => [
+            c.description,
+            c.code || "",
+            String(c.amount),
+            new Date(c.postedAt || c.createdAt || Date.now()).toLocaleString()
+        ]);
+
+        autoTable(doc, {
+            startY: cursorY,
+            head: [["Charge", "Code", "Amount", "Time"]],
+            body: rows,
+            styles: { fontSize: 9 },
+            theme: "grid",
+        });
+
+        cursorY = (doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : cursorY + 30);
+    }
+
+    doc.save(`NightAudit_${auditDate}.pdf`);
+};
+
+// export CSV
+const exportCSV = () => {
+    if (!canExport) return alert("You do not have permission to export reports.");
+    if (!bookings || bookings.length === 0) return;
+    const rows = [["Room", "Guest", "Status", "Charge", "Code", "Amount", "Time"]];
+    for (const b of bookings) {
+        const guestName = b.guest?.firstName ? `${b.guest.firstName} ${b.guest.lastName || ""}` : (b.guest?.name || "-");
+        for (const c of (b.folio?.charges || [])) {
+            rows.push([b.room?.number || "-", guestName, b.status, c.description, c.code || "", c.amount, new Date(c.postedAt || c.createdAt || Date.now()).toLocaleString()]);
         }
+    }
+    const csv = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `NightAudit_${auditDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+};
 
-        let cursorY = 30;
-        for (const b of bookings) {
-            if (cursorY > 260) { doc.addPage(); cursorY = 14; }
-            const guestName = b.guest?.firstName ? `${b.guest.firstName} ${b.guest.lastName || ""}` : (b.guest?.name || "-");
-            doc.setFontSize(11);
-            doc.text(`Room: ${b.room?.number || "-"}  Guest: ${guestName}  Status: ${b.status}`, 14, cursorY);
-            cursorY += 6;
+    const handlePrint = () => {
+    if (!canExport) return alert("You do not have permission to print reports.");
+    window.print();
+};
 
-            const rows = (b.folio?.charges || []).map(c => [
-                c.description,
-                c.code || "",
-                String(c.amount),
-                new Date(c.postedAt || c.createdAt || Date.now()).toLocaleString()
-            ]);
-
-            autoTable(doc, {
-                startY: cursorY,
-                head: [["Charge", "Code", "Amount", "Time"]],
-                body: rows,
-                styles: { fontSize: 9 },
-                theme: "grid",
-            });
-
-            cursorY = (doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : cursorY + 30);
-        }
-
-        doc.save(`NightAudit_${auditDate}.pdf`);
-    };
-
-    // export CSV
-    const exportCSV = () => {
-        if (!canExport) return alert("You do not have permission to export reports.");
-        if (!bookings || bookings.length === 0) return;
-        const rows = [["Room", "Guest", "Status", "Charge", "Code", "Amount", "Time"]];
-        for (const b of bookings) {
-            const guestName = b.guest?.firstName ? `${b.guest.firstName} ${b.guest.lastName || ""}` : (b.guest?.name || "-");
-            for (const c of (b.folio?.charges || [])) {
-                rows.push([b.room?.number || "-", guestName, b.status, c.description, c.code || "", c.amount, new Date(c.postedAt || c.createdAt || Date.now()).toLocaleString()]);
-            }
-        }
-        const csv = rows.map(r => r.join(",")).join("\n");
-        const blob = new Blob([csv], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `NightAudit_${auditDate}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-    };
-
-        const handlePrint = () => {
-        if (!canExport) return alert("You do not have permission to print reports.");
-        window.print();
-    };
 
     return (
-        <div className={`${darkMode?"bg-gray-900 text-white min-h-screen":"bg-white text-black"} p-6`}>
+        <div className={`${darkMode ? "bg-gray-900 text-white min-h-screen" : "bg-white text-black"} p-6`}>
             <h1 className="text-2xl font-bold mb-4">Night Audit Admin</h1>
             <div className="flex flex-wrap gap-4 mb-4 items-center">
                 <select value={selectedProperty} onChange={e => setSelectedProperty(e.target.value)} className="border p-2 rounded text-black">
@@ -155,7 +156,7 @@ export default function NightAuditAdminClient({ initialPropertyId, initialProper
                 </select>
                 <input type="date" value={auditDate} onChange={e => setAuditDate(e.target.value)} className="border p-2 rounded text-black" />
                 <button onClick={() => fetchAuditData(selectedProperty, auditDate)} className="bg-gray-600 text-white px-4 py-2 rounded">Fetch Data</button>
-                <button onClick={runAudit} disabled={running || !canRunAudit} className={`px-4 py-2 rounded ${running?"bg-blue-400":"bg-blue-600 text-white"}`}>{running?"Running...":"Run Night Audit"}</button>
+                <button onClick={runAudit} disabled={running || !canRunAudit} className={`px-4 py-2 rounded ${running ? "bg-blue-400" : "bg-blue-600 text-white"}`}>{running ? "Running..." : "Run Night Audit"}</button>
                 <button onClick={exportPDF} className="bg-green-600 text-white px-3 py-2 rounded" disabled={!canExport}>Export PDF</button>
                 <button onClick={exportCSV} className="bg-yellow-500 px-3 py-2 rounded" disabled={!canExport}>Export CSV</button>
                 <button onClick={handlePrint} className="bg-gray-700 text-white px-3 py-2 rounded" disabled={!canExport}>Print</button>

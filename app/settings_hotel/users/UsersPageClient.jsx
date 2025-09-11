@@ -98,6 +98,7 @@ export default function UsersPageClient({ userProperties }) {
         await fetch(`/api/settings/users?id=${user.id}`, { method: "DELETE" });
     };
 
+
     return (
         <div className="p-4">
             <div className="flex justify-between items-center mb-4">

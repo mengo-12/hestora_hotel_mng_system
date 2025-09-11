@@ -165,18 +165,24 @@ model Booking {
 // Rate Plans & Rules
 //////////////////////////////////
 model RatePlan {
-  id         String     @id @default(cuid())
-  property   Property   @relation(fields: [propertyId], references: [id])
-  propertyId String
-  roomType   RoomType   @relation(fields: [roomTypeId], references: [id])
-  roomTypeId String
-  code       String
-  name       String
-  basePrice  Decimal
-  currency   String
-  isPublic   Boolean    @default(true)
-  rateRules  RateRule[]
-  bookings   Booking[]
+  id              String        @id @default(cuid())
+  property        Property      @relation(fields: [propertyId], references: [id])
+  propertyId      String
+  roomType        RoomType      @relation(fields: [roomTypeId], references: [id])
+  roomTypeId      String
+  code            String
+  name            String
+  type            String        @default("Standard") // مثال: BAR, Non-refundable, Corporate
+  basePrice       Decimal
+  currency        String
+  isPublic        Boolean       @default(true)     // متاح للجميع أو لشركات
+  mealPlan        String?       // Room Only, BB, HB, FB, All Inclusive
+  parentRatePlan  RatePlan?     @relation("DerivedRates", fields: [parentRatePlanId], references: [id])
+  parentRatePlanId String?
+  rateRules       RateRule[]
+  occupancyRates  RatePlanOccupancy[]
+  policies        RatePlanPolicy[]
+  bookings        Booking[]
 
   @@unique([propertyId, code])
 }
@@ -191,6 +197,32 @@ model RateRule {
   maxLOS            Int?
   closedToArrival   Boolean  @default(false)
   closedToDeparture Boolean  @default(false)
+}
+
+model RatePlanOccupancy {
+  id          String    @id @default(cuid())
+  ratePlan    RatePlan  @relation(fields: [ratePlanId], references: [id])
+  ratePlanId  String
+  adults      Int       @default(1)
+  children    Int       @default(0)
+  extraPrice  Decimal?  // السعر الإضافي للشخص/الطفل
+}
+
+model RatePlanPolicy {
+  id           String     @id @default(cuid())
+  ratePlan     RatePlan   @relation(fields: [ratePlanId], references: [id])
+  ratePlanId   String
+  type         String     // مثال: Cancellation, Payment, Guarantee
+  description  String
+}
+
+model RatePlanExtra {
+  id          String     @id @default(cuid())
+  ratePlan    RatePlan   @relation(fields: [ratePlanId], references: [id])
+  ratePlanId  String
+  name        String
+  price       Decimal
+  description String?
 }
 
 //////////////////////////////////

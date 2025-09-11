@@ -100,81 +100,83 @@ export default function FinancialReportPage({ session, userProperties }) {
         return () => ["CHARGE_ADDED", "CHARGE_DELETED", "PAYMENT_ADDED", "PAYMENT_DELETED", "FOLIO_CLOSED"].forEach(event => socket.off(event, refreshReport));
     }, [socket, selectedProperty, startDate, endDate, filterType, filterByEmployee, filterByRole, filterExtraType]);
 
-    // ===== Calculate Comparison =====
-    const calculateComparison = (transactions, startDate, endDate) => {
-        if (!startDate || !endDate) return;
+// ===== Calculate Comparison =====
+const calculateComparison = (transactions, startDate, endDate) => {
+    if (!startDate || !endDate) return;
 
-        const start = new Date(startDate);
-        const end = new Date(endDate);
+    const start = new Date(startDate);
+    const end = new Date(endDate);
 
-        const dayDiff = (end - start) / (1000 * 60 * 60 * 24); // طول الفترة بالأيام
+    const dayDiff = (end - start) / (1000 * 60 * 60 * 24); // طول الفترة بالأيام
 
-        // الفترة الحالية
-        const currentTransactions = transactions.filter(t => {
-            const date = new Date(t.postedAt);
-            return date >= start && date <= end;
+    // الفترة الحالية
+    const currentTransactions = transactions.filter(t => {
+        const date = new Date(t.postedAt);
+        return date >= start && date <= end;
+    });
+
+    // الفترة السابقة = نفس طول الفترة قبل تاريخ البداية
+    const previousStart = new Date(start);
+    previousStart.setDate(previousStart.getDate() - dayDiff - 1);
+    const previousEnd = new Date(start);
+    previousEnd.setDate(previousEnd.getDate() - 1);
+
+    const previousTransactions = transactions.filter(t => {
+        const date = new Date(t.postedAt);
+        return date >= previousStart && date <= previousEnd;
+    });
+
+    const sum = (arr) => {
+        const totalCharges = arr.filter(t => t.type === "Charge" || t.type === "Extra").reduce((a, b) => a + b.amount, 0);
+        const totalPayments = arr.filter(t => t.type === "Payment").reduce((a, b) => a + b.amount, 0);
+        const profitLoss = totalPayments - totalCharges;
+        return { totalCharges, totalPayments, profitLoss };
+    };
+
+    const current = sum(currentTransactions);
+    const previous = sum(previousTransactions);
+
+    const difference = current.profitLoss - previous.profitLoss;
+    const percentage = previous.profitLoss !== 0 ? (difference / Math.abs(previous.profitLoss)) * 100 : 0;
+
+    setComparison({ previousPeriod: previous, currentPeriod: current, difference, percentage });
+};
+
+
+useEffect(() => {
+    if (report.transactions.length) {
+        calculateComparison(report.transactions, startDate, endDate);
+    } else {
+        setComparison({
+            previousPeriod: { totalCharges: 0, totalPayments: 0, profitLoss: 0 },
+            currentPeriod: { totalCharges: 0, totalPayments: 0, profitLoss: 0 },
+            difference: 0,
+            percentage: 0
         });
+    }
+}, [report.transactions, startDate, endDate]);
 
-        // الفترة السابقة = نفس طول الفترة قبل تاريخ البداية
-        const previousStart = new Date(start);
-        previousStart.setDate(previousStart.getDate() - dayDiff - 1);
-        const previousEnd = new Date(start);
-        previousEnd.setDate(previousEnd.getDate() - 1);
+// ===== Export Functions =====
+const exportExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(report.transactions || []);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
+    XLSX.writeFile(wb, `Financial_Report_${selectedProperty}.xlsx`);
+};
 
-        const previousTransactions = transactions.filter(t => {
-            const date = new Date(t.postedAt);
-            return date >= previousStart && date <= previousEnd;
-        });
-
-        const sum = (arr) => {
-            const totalCharges = arr.filter(t => t.type === "Charge" || t.type === "Extra").reduce((a, b) => a + b.amount, 0);
-            const totalPayments = arr.filter(t => t.type === "Payment").reduce((a, b) => a + b.amount, 0);
-            const profitLoss = totalPayments - totalCharges;
-            return { totalCharges, totalPayments, profitLoss };
-        };
-
-        const current = sum(currentTransactions);
-        const previous = sum(previousTransactions);
-
-        const difference = current.profitLoss - previous.profitLoss;
-        const percentage = previous.profitLoss !== 0 ? (difference / Math.abs(previous.profitLoss)) * 100 : 0;
-
-        setComparison({ previousPeriod: previous, currentPeriod: current, difference, percentage });
-    };
+const exportPDF = () => {
+    const doc = new jsPDF();
+    doc.text("Financial Report", 14, 16);
+    const tableColumn = columns.map(c => c.Header);
+    const tableRows = report.transactions.map(t => [
+        new Date(t.postedAt).toLocaleString(), t.type, t.description, t.guest,
+        t.amount.toFixed(2), t.by, t.role, t.bookingId, t.extraType || "-"
+    ]);
+    doc.autoTable({ head: [tableColumn], body: tableRows, startY: 20 });
+    doc.save(`Financial_Report_${selectedProperty}.pdf`);
+};
 
 
-    useEffect(() => {
-        if (report.transactions.length) {
-            calculateComparison(report.transactions, startDate, endDate);
-        } else {
-            setComparison({
-                previousPeriod: { totalCharges: 0, totalPayments: 0, profitLoss: 0 },
-                currentPeriod: { totalCharges: 0, totalPayments: 0, profitLoss: 0 },
-                difference: 0,
-                percentage: 0
-            });
-        }
-    }, [report.transactions, startDate, endDate]);
-
-    // ===== Export Functions =====
-    const exportExcel = () => {
-        const ws = XLSX.utils.json_to_sheet(report.transactions || []);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Financial Report");
-        XLSX.writeFile(wb, `Financial_Report_${selectedProperty}.xlsx`);
-    };
-
-    const exportPDF = () => {
-        const doc = new jsPDF();
-        doc.text("Financial Report", 14, 16);
-        const tableColumn = columns.map(c => c.Header);
-        const tableRows = report.transactions.map(t => [
-            new Date(t.postedAt).toLocaleString(), t.type, t.description, t.guest,
-            t.amount.toFixed(2), t.by, t.role, t.bookingId, t.extraType || "-"
-        ]);
-        doc.autoTable({ head: [tableColumn], body: tableRows, startY: 20 });
-        doc.save(`Financial_Report_${selectedProperty}.pdf`);
-    };
 
     return (
         <div className="p-6 max-w-7xl mx-auto">

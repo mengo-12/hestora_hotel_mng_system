@@ -135,6 +135,13 @@ export default function FrontDeskPage({ session, userProperties }) {
         setFilteredBookings(filtered);
     }, [searchTerm, filterStatus, bookings]);
 
+
+
+
+
+
+
+
     return (
         <div className="p-6">
             <Toaster position="top-right" />

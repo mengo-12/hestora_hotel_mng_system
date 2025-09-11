@@ -40,6 +40,7 @@ export default function PropertySettings() {
 
     if (loading) return <div>Loading...</div>;
 
+
     return (
         <div className="space-y-4 p-4">
             <input 

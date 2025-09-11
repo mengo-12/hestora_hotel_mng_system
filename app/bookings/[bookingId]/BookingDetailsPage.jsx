@@ -89,6 +89,7 @@ export default function FolioPage() {
     const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount), 0);
     const balance = totalCharges - totalPayments;
 
+
     return (
         <div className="p-6">
             <h1 className="text-2xl font-bold mb-4">Folio for {folio.guest?.firstName} {folio.guest?.lastName}</h1>

@@ -79,6 +79,7 @@ export default function GuestsPage({ session, userProperties }) {
 
     if (!canView) return <p className="p-6 text-red-500">You do not have permission to view this page.</p>;
 
+
     return (
         <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
             <div className="flex justify-between items-center mb-6">

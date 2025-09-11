@@ -90,6 +90,7 @@ export default function RatePlansPage({ session, userProperties }) {
         } catch (err) { console.error(err); }
     };
 
+
     return (
         <div>
             {/* اختيار الفندق */}
