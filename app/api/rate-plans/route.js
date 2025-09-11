@@ -17,13 +17,13 @@ export async function GET(req) {
 // --- POST إنشاء RatePlan جديد ---
 export async function POST(req) {
     try {
-        const { propertyId, roomTypeId, code, name, basePrice, currency, isPublic } = await req.json();
+        const { propertyId, roomTypeId, code, name, basePrice, currency, isPublic, mealPlan, parentRatePlanId } = await req.json();
         if (!propertyId || !roomTypeId || !code || !name || !basePrice || !currency) {
             return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
         }
 
         const newPlan = await prisma.ratePlan.create({
-            data: { propertyId, roomTypeId, code, name, basePrice, currency, isPublic: isPublic ?? true }
+            data: { propertyId, roomTypeId, code, name, basePrice, currency, isPublic: isPublic ?? true, mealPlan, parentRatePlanId }
         });
 
         // ✅ Broadcast

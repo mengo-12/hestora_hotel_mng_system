@@ -4,9 +4,10 @@ export async function PATCH(req, { params }) {
         const { id } = params;
         const data = await req.json();
 
+        const { name, code, basePrice, currency, isPublic, mealPlan, parentRatePlanId, roomTypeId } = await req.json();
         const updatedPlan = await prisma.ratePlan.update({
             where: { id },
-            data
+            data: { name, code, basePrice, currency, isPublic, mealPlan, parentRatePlanId, roomTypeId }
         });
 
         // ✅ Broadcast

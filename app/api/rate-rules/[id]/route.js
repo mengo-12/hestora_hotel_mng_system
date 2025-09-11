@@ -26,6 +26,7 @@ export async function PATCH(req, { params }) {
     }
 }
 
+// DELETE RateRule
 export async function DELETE(req, { params }) {
     try {
         const { id } = params;

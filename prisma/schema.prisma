@@ -32,23 +32,23 @@ model HotelGroup {
 // Properties (Hotels)
 //////////////////////////////////
 model Property {
-  id           String      @id @default(cuid())
-  code         String      @unique
-  name         String
-  timezone     String
-  currency     String
-  hotelGroup   HotelGroup? @relation(fields: [hotelGroupId], references: [id])
-  hotelGroupId String? // مؤقتًا nullable لتجنب مشاكل الترحيل
-  logo              String?   // شعار الفندق
-  email             String?
-  phone             String?
-  address           String?
-  checkInTime       String?   // صيغة HH:mm
-  checkOutTime      String?   // صيغة HH:mm
+  id                 String      @id @default(cuid())
+  code               String      @unique
+  name               String
+  timezone           String
+  currency           String
+  hotelGroup         HotelGroup? @relation(fields: [hotelGroupId], references: [id])
+  hotelGroupId       String? // مؤقتًا nullable لتجنب مشاكل الترحيل
+  logo               String? // شعار الفندق
+  email              String?
+  phone              String?
+  address            String?
+  checkInTime        String? // صيغة HH:mm
+  checkOutTime       String? // صيغة HH:mm
   cancellationPolicy String?
   depositPolicy      String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
   rooms        Room[]
   roomTypes    RoomType[]
@@ -66,18 +66,18 @@ model Property {
 // Room Types & Rooms
 //////////////////////////////////
 model RoomType {
-  id         String      @id @default(cuid())
-  property   Property    @relation(fields: [propertyId], references: [id])
-  propertyId String
-  code       String
-  name       String
-  capacity   Int
-  basePrice  Decimal
+  id          String      @id @default(cuid())
+  property    Property    @relation(fields: [propertyId], references: [id])
+  propertyId  String
+  code        String
+  name        String
+  capacity    Int
+  basePrice   Decimal
   description String?
-  amenities   String?   // قائمة الخدمات داخل الغرفة
-  rooms      Room[]
-  ratePlans  RatePlan[]
-  inventory  Inventory[]
+  amenities   String? // قائمة الخدمات داخل الغرفة
+  rooms       Room[]
+  ratePlans   RatePlan[]
+  inventory   Inventory[]
 
   @@unique([propertyId, code])
 }
@@ -96,9 +96,9 @@ model Room {
   bookings          Booking[]
   housekeepingTasks HousekeepingTask[]
 
-  @@unique([propertyId, number])
+  inventories Inventory[] // هذا الحقل العكسي
 
-  inventories Inventory[]  // هذا الحقل العكسي
+  @@unique([propertyId, number])
 }
 
 model RoomStatusLog {
@@ -165,60 +165,80 @@ model Booking {
 // Rate Plans & Rules
 //////////////////////////////////
 model RatePlan {
-  id              String        @id @default(cuid())
-  property        Property      @relation(fields: [propertyId], references: [id])
-  propertyId      String
-  roomType        RoomType      @relation(fields: [roomTypeId], references: [id])
-  roomTypeId      String
-  code            String
-  name            String
-  type            String        @default("Standard") // مثال: BAR, Non-refundable, Corporate
-  basePrice       Decimal
-  currency        String
-  isPublic        Boolean       @default(true)     // متاح للجميع أو لشركات
-  mealPlan        String?       // Room Only, BB, HB, FB, All Inclusive
-  parentRatePlan  RatePlan?     @relation("DerivedRates", fields: [parentRatePlanId], references: [id])
+  id         String   @id @default(cuid())
+  property   Property @relation(fields: [propertyId], references: [id])
+  propertyId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id])
+  roomTypeId String
+  code       String
+  name       String
+  type       String   @default("Standard")
+  basePrice  Decimal
+  currency   String
+  isPublic   Boolean  @default(true)
+  mealPlan   String? // Room Only, BB, HB, FB, All Inclusive
+
+  parentRatePlan   RatePlan?  @relation("DerivedRates", fields: [parentRatePlanId], references: [id])
   parentRatePlanId String?
-  rateRules       RateRule[]
-  occupancyRates  RatePlanOccupancy[]
-  policies        RatePlanPolicy[]
-  bookings        Booking[]
+  derivedRates     RatePlan[] @relation("DerivedRates") // العلاقة المعاكسة
+
+  rateRules      RateRule[] @relation("RatePlanRules")
+  occupancyRates RatePlanOccupancy[]
+  policies       RatePlanPolicy[]
+  extras         RatePlanExtra[]
+  bookings       Booking[]
 
   @@unique([propertyId, code])
 }
 
 model RateRule {
-  id                String   @id @default(cuid())
-  ratePlan          RatePlan @relation(fields: [ratePlanId], references: [id])
-  ratePlanId        String
-  date              DateTime
-  priceOverride     Decimal?
-  minLOS            Int?
-  maxLOS            Int?
-  closedToArrival   Boolean  @default(false)
-  closedToDeparture Boolean  @default(false)
+  id                    String   @id @default(cuid())
+  ratePlanId            String
+  ratePlan              RatePlan @relation("RatePlanRules", fields: [ratePlanId], references: [id])
+  
+  startDate             DateTime?
+  endDate               DateTime?
+  priceOverride         Float?
+  minLOS                Int?
+  maxLOS                Int?
+  minOccupancy          Int?
+  maxOccupancy          Int?
+  closedToArrival       Boolean @default(false)
+  closedToDeparture     Boolean @default(false)
+  policy                String?
+  mealPlan              String?
+  isPublic              Boolean @default(true)
+  derivedFromRatePlanId String?
+  seasonName            String?
+  blackout              Boolean @default(false)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model RatePlanOccupancy {
-  id          String    @id @default(cuid())
-  ratePlan    RatePlan  @relation(fields: [ratePlanId], references: [id])
+  id          String   @id @default(cuid())
   ratePlanId  String
-  adults      Int       @default(1)
-  children    Int       @default(0)
-  extraPrice  Decimal?  // السعر الإضافي للشخص/الطفل
+  ratePlan    RatePlan @relation(fields: [ratePlanId], references: [id])
+  
+  occupancy   Int
+  price       Float
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model RatePlanPolicy {
-  id           String     @id @default(cuid())
-  ratePlan     RatePlan   @relation(fields: [ratePlanId], references: [id])
-  ratePlanId   String
-  type         String     // مثال: Cancellation, Payment, Guarantee
-  description  String
+  id          String   @id @default(cuid())
+  ratePlan    RatePlan @relation(fields: [ratePlanId], references: [id])
+  ratePlanId  String
+  type        String // مثال: Cancellation, Payment, Guarantee
+  description String
 }
 
 model RatePlanExtra {
-  id          String     @id @default(cuid())
-  ratePlan    RatePlan   @relation(fields: [ratePlanId], references: [id])
+  id          String   @id @default(cuid())
+  ratePlan    RatePlan @relation(fields: [ratePlanId], references: [id])
   ratePlanId  String
   name        String
   price       Decimal
@@ -234,16 +254,17 @@ model Inventory {
   propertyId String
   roomType   RoomType @relation(fields: [roomTypeId], references: [id])
   roomTypeId String
-  room       Room?     @relation(fields: [roomId], references: [id])
+  room       Room?    @relation(fields: [roomId], references: [id])
   roomId     String?
   date       DateTime
   allotment  Int
   sold       Int      @default(0)
   stopSell   Boolean  @default(false)
 
-  housekeeping String?  // ⬅ حقل اختياري
-  notes       String?  // ⬅ حقل اختياري
-  extraPrices Json?
+  housekeeping String? // ⬅ حقل اختياري
+  notes        String? // ⬅ حقل اختياري
+  extraPrices  Json?
+
   @@unique([propertyId, roomTypeId, roomId, date], name: "inventory_unique") // مفتاح فريد موحد
 }
 
@@ -335,7 +356,7 @@ model User {
   password         String
   name             String
   role             String             @default("FrontDesk") // Admin, FrontDesk, HK, Manager, Owner
-  active Boolean  @default(true)
+  active           Boolean            @default(true)
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   RoomStatusLog    RoomStatusLog[]

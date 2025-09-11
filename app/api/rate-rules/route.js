@@ -6,13 +6,11 @@ export async function GET(req) {
         const { searchParams } = new URL(req.url);
         const ratePlanId = searchParams.get("ratePlanId");
 
-        if (!ratePlanId) {
-            return new Response(JSON.stringify({ error: "ratePlanId is required" }), { status: 400 });
-        }
+        if (!ratePlanId) return new Response(JSON.stringify({ error: "ratePlanId is required" }), { status: 400 });
 
         const rules = await prisma.rateRule.findMany({
             where: { ratePlanId },
-            orderBy: { date: "asc" }
+            orderBy: { startDate: "asc" } // استخدام startDate بدل date مفصل للـ validity
         });
 
         return new Response(JSON.stringify(rules), { status: 200 });
@@ -25,13 +23,44 @@ export async function GET(req) {
 // POST RateRule
 export async function POST(req) {
     try {
-        const { ratePlanId, date, priceOverride, minLOS, maxLOS, closedToArrival, closedToDeparture } = await req.json();
-        if (!ratePlanId || !date) {
+        const {
+            ratePlanId,
+            startDate,
+            endDate,
+            priceOverride,
+            minLOS,
+            maxLOS,
+            minOccupancy,
+            maxOccupancy,
+            closedToArrival,
+            closedToDeparture,
+            policy,
+            mealPlan,
+            isPublic,
+            derivedFromRatePlanId
+        } = await req.json();
+
+        if (!ratePlanId || !startDate || !endDate) {
             return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
         }
 
         const newRule = await prisma.rateRule.create({
-            data: { ratePlanId, date: new Date(date), priceOverride, minLOS, maxLOS, closedToArrival: closedToArrival ?? false, closedToDeparture: closedToDeparture ?? false }
+            data: {
+                ratePlanId,
+                startDate: new Date(startDate),
+                endDate: new Date(endDate),
+                priceOverride,
+                minLOS,
+                maxLOS,
+                minOccupancy,
+                maxOccupancy,
+                closedToArrival: closedToArrival ?? false,
+                closedToDeparture: closedToDeparture ?? false,
+                policy,
+                mealPlan,
+                isPublic: isPublic ?? true,
+                derivedFromRatePlanId
+            }
         });
 
         // ✅ Broadcast

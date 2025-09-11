@@ -7,18 +7,25 @@ export default function AddRatePlanModal({ session, userProperties, selectedProp
     const [basePrice, setBasePrice] = useState("");
     const [currency, setCurrency] = useState("SAR");
     const [roomTypeId, setRoomTypeId] = useState("");
+    const [mealPlan, setMealPlan] = useState("Room Only");
+    const [isPublic, setIsPublic] = useState(true);
+    const [parentRatePlanId, setParentRatePlanId] = useState("");
     const [loading, setLoading] = useState(false);
     const [roomTypes, setRoomTypes] = useState([]);
+    const [existingRatePlans, setExistingRatePlans] = useState([]);
 
-    // ✅ تحديث RoomTypes بناءً على الفندق المحدد
     useEffect(() => {
         if (!selectedPropertyId) return;
         const property = userProperties.find(p => p.id === selectedPropertyId);
         if (property) {
             const rTypes = property.roomTypes || [];
             setRoomTypes(rTypes);
-            if (rTypes.length > 0) setRoomTypeId(rTypes[0].id); // أول خيار افتراضي
+            if (rTypes.length > 0) setRoomTypeId(rTypes[0].id);
         }
+        // جلب RatePlans الحالية للفندق لاختيار Parent
+        fetch(`/api/rate-plans?propertyId=${selectedPropertyId}`)
+            .then(res => res.json())
+            .then(data => setExistingRatePlans(data || []));
     }, [selectedPropertyId, userProperties]);
 
     const handleSubmit = async () => {
@@ -29,21 +36,22 @@ export default function AddRatePlanModal({ session, userProperties, selectedProp
             const res = await fetch("/api/rate-plans", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, code, basePrice, currency, roomTypeId, propertyId: selectedPropertyId }),
+                body: JSON.stringify({
+                    name, code, basePrice, currency, roomTypeId,
+                    propertyId: selectedPropertyId,
+                    mealPlan, isPublic, parentRatePlanId: parentRatePlanId || null
+                }),
             });
             const newPlan = await res.json();
             if (res.ok) {
                 onCreated?.(newPlan);
-                // Broadcast
                 await fetch("http://localhost:3001/api/broadcast", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ event: "RATEPLAN_CREATED", data: newPlan }),
                 });
                 onClose();
-            } else {
-                alert(newPlan.error || "فشل إنشاء خطة الأسعار");
-            }
+            } else alert(newPlan.error || "فشل إنشاء خطة الأسعار");
         } catch (err) { console.error(err); }
         setLoading(false);
     };
@@ -63,9 +71,22 @@ export default function AddRatePlanModal({ session, userProperties, selectedProp
                     </select>
                     <select className="border p-2 rounded" value={roomTypeId} onChange={e => setRoomTypeId(e.target.value)}>
                         <option value="">اختر نوع الغرفة</option>
-                        {roomTypes.map(rt => (
-                            <option key={rt.id} value={rt.id}>{rt.name}</option>
-                        ))}
+                        {roomTypes.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
+                    </select>
+                    <select className="border p-2 rounded" value={mealPlan} onChange={e => setMealPlan(e.target.value)}>
+                        <option value="Room Only">Room Only</option>
+                        <option value="BB">BB</option>
+                        <option value="HB">HB</option>
+                        <option value="FB">FB</option>
+                        <option value="All Inclusive">All Inclusive</option>
+                    </select>
+                    <label className="flex items-center gap-2">
+                        <input type="checkbox" checked={isPublic} onChange={e => setIsPublic(e.target.checked)} />
+                        عام (Public)
+                    </label>
+                    <select className="border p-2 rounded" value={parentRatePlanId} onChange={e => setParentRatePlanId(e.target.value)}>
+                        <option value="">لا يوجد خطة أساسية</option>
+                        {existingRatePlans.map(rp => <option key={rp.id} value={rp.id}>{rp.name}</option>)}
                     </select>
                 </div>
                 <div className="flex justify-end gap-2 mt-4">

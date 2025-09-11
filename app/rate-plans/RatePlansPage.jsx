@@ -3,11 +3,13 @@ import { useEffect, useState } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
 import AddRatePlanModal from "@/app/components/AddRatePlanModal";
 import EditRatePlanModal from "@/app/components/EditRatePlanModal";
+import RateRulesModal from "@/app/components/RateRulesModal"; // ✅ استدعاء RateRulesModal
 
 export default function RatePlansPage({ session, userProperties }) {
     const [ratePlans, setRatePlans] = useState([]);
     const [showAddModal, setShowAddModal] = useState(false);
     const [editRatePlan, setEditRatePlan] = useState(null);
+    const [rateRulesPlan, setRateRulesPlan] = useState(null); // ✅ الحالة لفتح RateRulesModal
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedProperty, setSelectedProperty] = useState("");
     const socket = useSocket();
@@ -17,12 +19,10 @@ export default function RatePlansPage({ session, userProperties }) {
     const canDelete = role === "Admin";
     const canView = ["Admin", "FrontDesk", "Manager"].includes(role);
 
-    // --- إذا للمستخدم فندق واحد فقط نختارها افتراضيًا
     useEffect(() => {
         if (userProperties.length === 1) setSelectedProperty(userProperties[0].id);
     }, [userProperties]);
 
-    // --- جلب RatePlans من API
     const fetchRatePlans = async (propertyId) => {
         if (!propertyId) return;
         try {
@@ -36,8 +36,6 @@ export default function RatePlansPage({ session, userProperties }) {
         }
     };
 
-
-    
     useEffect(() => {
         if (!canView || !selectedProperty) return;
 
@@ -66,15 +64,11 @@ export default function RatePlansPage({ session, userProperties }) {
         };
     }, [socket, canView, selectedProperty]);
 
-    // --- تصفية البحث
     const filteredRatePlans = ratePlans.filter(plan =>
         plan.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         plan.code.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    
-
-    // --- حذف RatePlan
     const deleteRatePlan = async (id) => {
         if (!confirm("هل أنت متأكد من حذف خطة الأسعار؟")) return;
         try {
@@ -89,7 +83,6 @@ export default function RatePlansPage({ session, userProperties }) {
             }
         } catch (err) { console.error(err); }
     };
-
 
     return (
         <div>
@@ -132,7 +125,10 @@ export default function RatePlansPage({ session, userProperties }) {
                         </div>
                         <div className="flex gap-2">
                             {canAddEdit && (
-                                <button className="px-3 py-1 bg-green-600 text-white rounded" onClick={() => setEditRatePlan(plan)}>تعديل</button>
+                                <>
+                                    <button className="px-3 py-1 bg-green-600 text-white rounded" onClick={() => setEditRatePlan(plan)}>تعديل</button>
+                                    <button className="px-3 py-1 bg-yellow-600 text-white rounded" onClick={() => setRateRulesPlan(plan)}>Rate Rules</button>
+                                </>
                             )}
                             {canDelete && (
                                 <button className="px-3 py-1 bg-red-600 text-white rounded" onClick={() => deleteRatePlan(plan.id)}>حذف</button>
@@ -140,6 +136,9 @@ export default function RatePlansPage({ session, userProperties }) {
                         </div>
                     </div>
                     <div>نوع الغرفة: {plan.roomType?.name || "-"}</div>
+                    <div>Meal Plan: {plan.mealPlan || "-"}</div>
+                    <div>Public: {plan.isPublic ? "Yes" : "No"}</div>
+                    {plan.parentRatePlan && <div>Derived from: {plan.parentRatePlan.name}</div>}
                 </div>
             ))}
 
@@ -160,6 +159,12 @@ export default function RatePlansPage({ session, userProperties }) {
                     userProperties={userProperties}
                     onClose={() => setEditRatePlan(null)}
                     onUpdated={(updatedPlan) => setRatePlans(prev => prev.map(r => r.id === updatedPlan.id ? updatedPlan : r))}
+                />
+            )}
+            {rateRulesPlan && (
+                <RateRulesModal
+                    ratePlan={rateRulesPlan}
+                    onClose={() => setRateRulesPlan(null)}
                 />
             )}
         </div>
