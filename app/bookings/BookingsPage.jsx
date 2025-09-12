@@ -114,12 +114,23 @@ export default function BookingsPage({ session, userProperties }) {
         }
     };
 
+    // ======== حساب Grand Total مثل Opera Cloud ========
     const calculateGrandTotal = (booking) => {
         if (!booking?.folio) return 0;
-        return (booking.folio.charges || []).reduce(
-            (sum, c) => sum + Number(c.amount || 0) + Number(c.tax || 0),
-            0
-        );
+
+        // مجموع Charges مع احتساب الضريبة كنسبة مئوية
+        const chargesTotal = (booking.folio.charges || []).reduce((sum, c) => {
+            const amount = Number(c.amount || 0);
+            const taxPercent = Number(c.tax || 0);
+            const taxValue = (amount * taxPercent) / 100;
+            return sum + amount + taxValue;
+        }, 0);
+
+        // مجموع المدفوعات
+        const paymentsTotal = (booking.folio.payments || []).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+        // Grand Total
+        return chargesTotal - paymentsTotal;
     };
 
 

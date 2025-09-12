@@ -338,7 +338,15 @@ export default function FolioPage({ bookingId, userProperties, session }) {
     if (loading) return <p className="text-center mt-4">جاري التحميل...</p>;
     if (!folio) return <p className="text-center mt-4">الفاتورة غير موجودة</p>;
 
-    const totalCharges = folio.charges.reduce((sum, c) => sum + Number(c.amount || 0) + Number(c.tax || 0), 0);
+    // ✅ الحسابات
+    const subtotal = folio.charges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+    const taxTotal = folio.charges.reduce((sum, c) => {
+        const amount = Number(c.amount || 0);
+        const taxPercent = Number(c.tax || 0);
+        return sum + (amount * taxPercent) / 100;
+    }, 0);
+    const totalCharges = subtotal + taxTotal;
+
     const totalPayments = folio.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const balance = totalCharges - totalPayments;
 
@@ -346,13 +354,17 @@ export default function FolioPage({ bookingId, userProperties, session }) {
     const handleAddCharge = async () => {
         if (!canAddCharge) return alert("ليس لديك صلاحية لإضافة Charges");
         try {
+            const amount = Number(newCharge.amount);
+            const taxPercent = Number(newCharge.tax || 0);
+            const taxAmount = (amount * taxPercent) / 100;
+
             await fetch(`/api/folios/${bookingId}/charges`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...newCharge,
-                    amount: Number(newCharge.amount),
-                    tax: Number(newCharge.tax || 0),
+                    amount,
+                    tax: taxPercent, // نخزن النسبة
                     postedById: sessionUser.id,
                 }),
             });
@@ -428,7 +440,7 @@ export default function FolioPage({ bookingId, userProperties, session }) {
         <div className="p-6 max-w-5xl mx-auto">
             {/* Booking Info */}
             {folio.booking && (
-                <div className="rounded shadow p-4 mb-6 bg-gray-50">
+                <div className="rounded shadow p-4 mb-6">
                     <h2 className="text-2xl font-bold mb-3">Booking Details</h2>
                     <p><strong>Guest:</strong> {folio.booking.guest?.name}</p>
                     <p><strong>Room:</strong> {folio.booking.room?.number || "N/A"} ({folio.booking.room?.roomType?.name})</p>
@@ -442,7 +454,9 @@ export default function FolioPage({ bookingId, userProperties, session }) {
             <div className="rounded shadow p-4 mb-6">
                 <h2 className="text-2xl font-bold mb-3">Folio Summary</h2>
                 <p>Status: <span className="font-semibold">{folio.status}</span></p>
-                <p>Total Charges: <span className="text-red-600 font-bold">{totalCharges.toFixed(2)}</span></p>
+                <p>Subtotal (قبل الضريبة): <span className="text-gray-800 font-bold">{subtotal.toFixed(2)}</span></p>
+                <p>Tax Total (الضريبة): <span className="text-orange-600 font-bold">{taxTotal.toFixed(2)}</span></p>
+                <p>Total Charges (الإجمالي مع الضريبة): <span className="text-red-600 font-bold">{totalCharges.toFixed(2)}</span></p>
                 <p>Total Payments: <span className="text-green-600 font-bold">{totalPayments.toFixed(2)}</span></p>
                 <p>Balance: <span className="text-blue-600 font-bold">{balance.toFixed(2)}</span></p>
                 <div className="flex gap-3 mt-4 flex-wrap">
@@ -471,33 +485,40 @@ export default function FolioPage({ bookingId, userProperties, session }) {
                             <th className="border p-2">Code</th>
                             <th className="border p-2">Description</th>
                             <th className="border p-2">Amount</th>
-                            <th className="border p-2">Tax</th>
+                            <th className="border p-2">Tax %</th>
+                            <th className="border p-2">Tax Value</th>
                             <th className="border p-2">Posted At</th>
                             <th className="border p-2">By</th>
                             <th className="border p-2">Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {folio.charges.map((c) => (
-                            <tr key={c.id}>
-                                <td className="border p-2">{c.code}</td>
-                                <td className="border p-2">{c.description}</td>
-                                <td className="border p-2">{Number(c.amount).toFixed(2)}</td>
-                                <td className="border p-2">{Number(c.tax).toFixed(2)}</td>
-                                <td className="border p-2">{new Date(c.postedAt).toLocaleString()}</td>
-                                <td className="border p-2">{c.postedBy?.name || "System"}</td>
-                                <td className="border p-2 text-center">
-                                    {canDeleteCharge && (
-                                        <button
-                                            onClick={() => handleDeleteCharge(c.id)}
-                                            className="text-red-500 hover:text-red-700"
-                                        >
-                                            حذف
-                                        </button>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
+                        {folio.charges.map((c) => {
+                            const amount = Number(c.amount || 0);
+                            const taxPercent = Number(c.tax || 0);
+                            const taxValue = (amount * taxPercent) / 100;
+                            return (
+                                <tr key={c.id}>
+                                    <td className="border p-2">{c.code}</td>
+                                    <td className="border p-2">{c.description}</td>
+                                    <td className="border p-2">{amount.toFixed(2)}</td>
+                                    <td className="border p-2">{taxPercent}%</td>
+                                    <td className="border p-2">{taxValue.toFixed(2)}</td>
+                                    <td className="border p-2">{new Date(c.postedAt).toLocaleString()}</td>
+                                    <td className="border p-2">{c.postedBy?.name || "System"}</td>
+                                    <td className="border p-2 text-center">
+                                        {canDeleteCharge && (
+                                            <button
+                                                onClick={() => handleDeleteCharge(c.id)}
+                                                className="text-red-500 hover:text-red-700"
+                                            >
+                                                حذف
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
                 {canAddCharge && (
@@ -505,7 +526,7 @@ export default function FolioPage({ bookingId, userProperties, session }) {
                         <input placeholder="Code" className="border p-2 rounded flex-1" value={newCharge.code} onChange={(e) => setNewCharge({ ...newCharge, code: e.target.value })} />
                         <input placeholder="Description" className="border p-2 rounded flex-1" value={newCharge.description} onChange={(e) => setNewCharge({ ...newCharge, description: e.target.value })} />
                         <input placeholder="Amount" type="number" className="border p-2 rounded w-24" value={newCharge.amount} onChange={(e) => setNewCharge({ ...newCharge, amount: e.target.value })} />
-                        <input placeholder="Tax" type="number" className="border p-2 rounded w-24" value={newCharge.tax} onChange={(e) => setNewCharge({ ...newCharge, tax: e.target.value })} />
+                        <input placeholder="Tax %" type="number" className="border p-2 rounded w-24" value={newCharge.tax} onChange={(e) => setNewCharge({ ...newCharge, tax: e.target.value })} />
                         <button onClick={handleAddCharge} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add</button>
                     </div>
                 )}
@@ -556,5 +577,6 @@ export default function FolioPage({ bookingId, userProperties, session }) {
         </div>
     );
 }
+
 
 

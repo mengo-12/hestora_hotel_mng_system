@@ -368,12 +368,39 @@ export default function EditBookingModal({ booking, isOpen, onClose, properties,
 
     if (!isOpen) return null;
 
-    const extrasTotal = extras.reduce(
-        (sum, e) => sum + ((Number(e.price) || 0) * (Number(e.quantity) || 1) + (Number(e.tax) || 0)),
-        0
-    );
-    const roomPrice = Number(form.room?.roomType?.basePrice || 0);
-    const grandTotal = roomPrice + extrasTotal;
+    // --- حساب الأسعار ---
+    const calculateExtrasSubtotal = () => {
+        return extras?.reduce((sum, ex) => {
+            const price = Number(ex.price || 0);
+            const qty = Number(ex.quantity || 1);
+            return sum + price * qty;
+        }, 0) || 0;
+    };
+
+    const calculateExtrasTax = () => {
+        return extras?.reduce((sum, ex) => {
+            const price = Number(ex.price || 0);
+            const qty = Number(ex.quantity || 1);
+            const taxRate = Number(ex.tax || 0); // نسبة مئوية
+            return sum + (price * qty * taxRate) / 100;
+        }, 0) || 0;
+    };
+
+    const selectedRatePlanData = ratePlans.find(rp => rp.id === form.ratePlanId);
+    const roomPrice = Number(selectedRatePlanData?.basePrice || 0);
+
+    const extrasSubtotal = calculateExtrasSubtotal();
+    const extrasTax = calculateExtrasTax();
+
+    // المجموع الفرعي
+    const subtotal = roomPrice + extrasSubtotal;
+
+    // الضريبة (مثلاً ضريبة عامة 15% + ضرائب الخدمات)
+    const generalTax = (roomPrice * 15) / 100;
+    const totalTax = generalTax + extrasTax;
+
+    // الإجمالي
+    const grandTotal = subtotal + totalTax;
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -395,9 +422,9 @@ export default function EditBookingModal({ booking, isOpen, onClose, properties,
                         </select>
 
                         <label>Check-In *</label>
-                        <input type="datetime-local" name="checkIn" value={form.checkIn?.slice(0,16) || ""} onChange={handleChange} className="w-full border rounded p-1" />
+                        <input type="datetime-local" name="checkIn" value={form.checkIn?.slice(0, 16) || ""} onChange={handleChange} className="w-full border rounded p-1" />
                         <label>Check-Out *</label>
-                        <input type="datetime-local" name="checkOut" value={form.checkOut?.slice(0,16) || ""} onChange={handleChange} className="w-full border rounded p-1" />
+                        <input type="datetime-local" name="checkOut" value={form.checkOut?.slice(0, 16) || ""} onChange={handleChange} className="w-full border rounded p-1" />
                     </div>
 
                     <div className="space-y-2">
@@ -467,7 +494,7 @@ export default function EditBookingModal({ booking, isOpen, onClose, properties,
                                             <input type="number" value={ex.tax} onChange={e => handleExtraChange(idx, "tax", Number(e.target.value))} className="w-full border rounded p-1" />
                                         </td>
                                         <td className="border p-1">
-                                            ${( (Number(ex.price) || 0) * (Number(ex.quantity) || 1) + (Number(ex.tax) || 0) ).toFixed(2)}
+                                            ${((Number(ex.price) || 0) * (Number(ex.quantity) || 1) + (Number(ex.tax) || 0)).toFixed(2)}
                                         </td>
                                         <td className="border p-1 text-center">
                                             <button onClick={() => removeExtra(idx)} className="px-2 py-1 bg-red-500 text-white rounded">Delete</button>
@@ -480,8 +507,10 @@ export default function EditBookingModal({ booking, isOpen, onClose, properties,
                 </div>
 
                 <div className="mt-4 text-right font-semibold">
-                    <p>Room Total: ${roomPrice.toFixed(2)}</p>
-                    <p>Extras Total: ${extrasTotal.toFixed(2)}</p>
+                    <p>Room Price: ${roomPrice.toFixed(2)}</p>
+                    <p>Extras Subtotal: ${extrasSubtotal.toFixed(2)}</p>
+                    <p>Subtotal: ${subtotal.toFixed(2)}</p>
+                    <p>Taxes: ${totalTax.toFixed(2)}</p>
                     <p className="text-lg">Grand Total: ${grandTotal.toFixed(2)}</p>
                 </div>
 

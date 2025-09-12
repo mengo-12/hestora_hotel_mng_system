@@ -91,10 +91,19 @@ export default function AddBookingModal({ isOpen, onClose, properties, guests, c
         setExtras(updated);
     };
 
-    // --- حساب الأسعار ---
+
+    // --- حساب الأسعار والضرائب كنسبة مئوية ---
     const roomPrice = Number(selectedRatePlanData?.basePrice || 0);
-    const extrasTotal = extras.reduce((sum, ex) => sum + (ex.price * ex.quantity + ex.tax), 0);
-    const grandTotal = roomPrice + extrasTotal;
+    const roomTaxPercent = Number(selectedRatePlanData?.taxPercent || 0);
+    const roomTax = (roomPrice * roomTaxPercent) / 100;
+
+    const extrasSubtotal = extras.reduce((sum, ex) => sum + (ex.price * ex.quantity), 0);
+    const extrasTax = extras.reduce((sum, ex) => sum + ((ex.price * ex.quantity * (ex.tax || 0)) / 100), 0);
+
+    const subtotal = roomPrice + extrasSubtotal;
+    const totalTax = roomTax + extrasTax;
+    const grandTotal = subtotal + totalTax;
+
 
     // --- Submit booking ---
     const handleSubmit = async () => {
@@ -253,7 +262,7 @@ export default function AddBookingModal({ isOpen, onClose, properties, guests, c
                                         <td className="border p-1">
                                             <input type="number" value={ex.tax} onChange={e => handleExtraChange(idx, "tax", e.target.value)} className="w-full border rounded p-1" />
                                         </td>
-                                        <td className="border p-1">${(ex.price * ex.quantity + ex.tax).toFixed(2)}</td>
+                                        <td className="border p-1"> ${((ex.price * ex.quantity) + ((ex.price * ex.quantity * (ex.tax || 0)) / 100)).toFixed(2)}</td>
                                         <td className="border p-1 text-center">
                                             <button onClick={() => removeExtra(idx)} className="px-2 py-1 bg-red-500 text-white rounded">Delete</button>
                                         </td>
@@ -266,11 +275,12 @@ export default function AddBookingModal({ isOpen, onClose, properties, guests, c
 
                 {/* Totals */}
                 <div className="mt-4 text-right font-semibold">
-                    <p>Room Total: ${roomPrice.toFixed(2)}</p>
-                    <p>Extras Total: ${extrasTotal.toFixed(2)}</p>
+                    <p>Room Price: ${roomPrice.toFixed(2)}</p>
+                    <p>Extras Subtotal: ${extrasSubtotal.toFixed(2)}</p>
+                    <p>Subtotal: ${subtotal.toFixed(2)}</p>
+                    <p>Taxes: ${totalTax.toFixed(2)}</p>
                     <p className="text-lg">Grand Total: ${grandTotal.toFixed(2)}</p>
                 </div>
-
                 <div className="mt-6 flex justify-end gap-2">
                     <button onClick={onClose} className="px-4 py-2 bg-gray-500 text-white rounded">Cancel</button>
                     <button onClick={handleSubmit} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Create Booking</button>
