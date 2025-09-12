@@ -59,10 +59,34 @@ export async function GET(req) {
                             where: { postedAt: { gte: dayStart, lt: dayEnd } },
                             orderBy: { postedAt: "asc" },
                         },
+                        payments: true
                     },
                 },
             },
             orderBy: { roomId: "asc" },
+        });
+
+        // حساب كل Folio Summary لكل حجز
+        const bookingsWithFolioSummary = bookings.map(b => {
+            const folio = b.folio || { charges: [], payments: [] };
+
+            const subtotal = folio.charges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+            const taxTotal = folio.charges.reduce((sum, c) => sum + ((Number(c.amount || 0) * Number(c.tax || 0)) / 100), 0);
+            const totalCharges = subtotal + taxTotal;
+            const totalPayments = folio.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+            const balance = totalCharges - totalPayments;
+
+            return {
+                ...b,
+                folio: {
+                    ...folio,
+                    subtotal,
+                    taxTotal,
+                    totalCharges,
+                    totalPayments,
+                    balance
+                }
+            };
         });
 
         const roomsSold = bookings.length;
@@ -70,7 +94,7 @@ export async function GET(req) {
         const occupancy = roomsAvailable > 0 ? Math.round((roomsSold / roomsAvailable) * 100) : 0;
 
         let totalRevenue = 0, roomsRevenue = 0;
-        bookings.forEach(b => {
+        bookingsWithFolioSummary.forEach(b => {
             const charges = b.folio?.charges || [];
             totalRevenue += charges.reduce((s, c) => s + Number(c.amount || 0) + Number(c.tax || 0), 0);
             roomsRevenue += charges.filter(c => c.code === "ROOM").reduce((s, c) => s + Number(c.amount || 0) + Number(c.tax || 0), 0);
@@ -80,7 +104,7 @@ export async function GET(req) {
         const revpar = roomsAvailable > 0 ? Math.round(totalRevenue / roomsAvailable) : 0;
 
         return NextResponse.json({
-            bookings,
+            bookings: bookingsWithFolioSummary,
             summary: {
                 roomsSold,
                 roomsAvailable,
@@ -89,7 +113,7 @@ export async function GET(req) {
                 revpar,
                 totalRevenue,
                 roomsRevenue,
-                revenueBreakdown: calculateRevenueBreakdown(bookings)
+                revenueBreakdown: calculateRevenueBreakdown(bookingsWithFolioSummary)
             }
         });
     } catch (err) {
@@ -97,6 +121,8 @@ export async function GET(req) {
         return NextResponse.json({ error: "Failed to fetch night audit data", details: err.message }, { status: 500 });
     }
 }
+
+
 
 // -------- POST --------
 export async function POST(req) {
