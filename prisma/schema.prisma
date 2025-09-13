@@ -60,6 +60,7 @@ model Property {
   inventory    Inventory[]
   guests       Guest[]
   auditLogs    AuditLog[]
+  groups       GroupMaster[]
 }
 
 //////////////////////////////////
@@ -78,7 +79,7 @@ model RoomType {
   rooms       Room[]
   ratePlans   RatePlan[]
   inventory   Inventory[]
-
+  roomBlocks RoomBlock[]
   @@unique([propertyId, code])
 }
 
@@ -131,6 +132,8 @@ model Guest {
   bookings       Booking[]
   folios         Folio[]
   extras         Extra[] // الحقل العكسي
+
+  groupMasters GroupMaster[] @relation("LeaderGuest")
 }
 
 //////////////////////////////////
@@ -153,6 +156,10 @@ model Booking {
   children        Int
   specialRequests String?
   folio           Folio?
+
+   // 🔹 العلاقة مع الحجز الجماعي
+  group           GroupMaster? @relation(fields: [groupId], references: [id])
+  groupId         String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -187,6 +194,7 @@ model RatePlan {
   policies       RatePlanPolicy[]
   extras         RatePlanExtra[]
   bookings       Booking[]
+  roomBlocks  RoomBlock[]
 
   @@unique([propertyId, code])
 }
@@ -301,7 +309,10 @@ model Folio {
   payments  Payment[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
   extras    Extra[] // الحقل العكسي
+  groupMasterId String?
+  groupMaster   GroupMaster? @relation(fields: [groupMasterId], references: [id])
 }
 
 model Charge {
@@ -340,7 +351,9 @@ model Company {
   name          String
   creditLimit   Decimal?
   rateAgreement String?
+
   bookings      Booking[]
+  groupMasters GroupMaster[]
 
   @@unique([propertyId, code])
 }
@@ -445,4 +458,51 @@ enum Role {
   HK
   Manager
   Owner
+}
+
+//////////////////////////////////
+// Group Master (مجموعات الحجوزات)
+//////////////////////////////////
+model GroupMaster {
+  id          String     @id @default(cuid())
+  property    Property   @relation(fields: [propertyId], references: [id])
+  propertyId  String
+
+  name        String     // اسم المجموعة (مثلاً: STC Conference 2025)
+  leader      Guest      @relation("LeaderGuest", fields: [leaderId], references: [id])
+  leaderId    String     // النزيل المسؤول
+  company     Company?   @relation(fields: [companyId], references: [id])
+  companyId   String?
+
+  startDate   DateTime
+  endDate     DateTime
+  notes       String?
+
+  bookings    Booking[]
+  roomBlocks  RoomBlock[]
+  folios      Folio[]    // فواتير مرتبطة بالمجموعة
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+//////////////////////////////////
+// Room Block (تخصيص الغرف للمجموعة)
+//////////////////////////////////
+model RoomBlock {
+  id          String     @id @default(cuid())
+  group       GroupMaster @relation(fields: [groupId], references: [id])
+  groupId     String
+
+  roomType    RoomType   @relation(fields: [roomTypeId], references: [id])
+  roomTypeId  String
+
+  totalRooms  Int
+  pickedUp    Int        @default(0) // عدد الغرف المحجوزة فعلاً
+  ratePlan    RatePlan?  @relation(fields: [ratePlanId], references: [id])
+  ratePlanId  String?
+
+  notes       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }
