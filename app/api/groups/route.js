@@ -46,6 +46,16 @@ export async function POST(req) {
             },
         });
 
+        // 🔹 جلب البيانات مع العلاقات كاملة للبث
+        const newGroupWithRelations = await prisma.groupMaster.findUnique({
+            where: { id: newGroup.id },
+            include: {
+                property: { select: { id: true, name: true } },
+                company: { select: { id: true, name: true } },
+                leader: { select: { id: true, firstName: true, lastName: true } },
+            },
+        });
+
         // 🔹 Broadcast
         try {
             await fetch("http://localhost:3001/api/broadcast", {
@@ -53,14 +63,14 @@ export async function POST(req) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     event: "GROUP_CREATED",
-                    data: { groupId: newGroup.id, propertyId, name, leaderId },
+                    data: newGroupWithRelations,
                 }),
             });
         } catch (err) {
             console.error("❌ Socket broadcast failed:", err);
         }
 
-        return NextResponse.json(newGroup, { status: 201 });
+        return NextResponse.json(newGroupWithRelations, { status: 201 });
     } catch (error) {
         console.error("❌ Error creating group:", error);
         return NextResponse.json({ error: "Failed to create group" }, { status: 500 });
@@ -75,7 +85,7 @@ export async function PUT(req) {
 
         if (!id) return NextResponse.json({ error: "Missing group ID" }, { status: 400 });
 
-        const updatedGroup = await prisma.groupMaster.update({
+        await prisma.groupMaster.update({
             where: { id },
             data: {
                 name,
@@ -87,6 +97,16 @@ export async function PUT(req) {
             },
         });
 
+        // 🔹 جلب البيانات بعد التحديث مع العلاقات كاملة للبث
+        const updatedGroup = await prisma.groupMaster.findUnique({
+            where: { id },
+            include: {
+                property: { select: { id: true, name: true } },
+                company: { select: { id: true, name: true } },
+                leader: { select: { id: true, firstName: true, lastName: true } },
+            },
+        });
+
         // 🔹 Broadcast
         try {
             await fetch("http://localhost:3001/api/broadcast", {
@@ -94,7 +114,7 @@ export async function PUT(req) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     event: "GROUP_UPDATED",
-                    data: { groupId: id, name, leaderId, companyId },
+                    data: updatedGroup,
                 }),
             });
         } catch (err) {

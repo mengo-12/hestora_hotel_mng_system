@@ -71,7 +71,7 @@ export default function GroupsTable({ session, userProperties }) {
             ) : (
                 <table className="w-full border">
                     <thead>
-                        <tr className="bg-gray-200">
+                        <tr className="">
                             <th className="border px-2 py-1">الاسم</th>
                             <th className="border px-2 py-1">الفندق</th>
                             <th className="border px-2 py-1">المسؤول</th>
