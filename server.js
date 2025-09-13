@@ -1,6 +1,7 @@
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import cors from "cors"; // 📌 استيراد cors
 
 const app = express();
 const server = createServer(app);
@@ -12,6 +13,13 @@ const io = new Server(server, {
         methods: ["GET", "POST"],
     },
 });
+
+// 🔹 السماح بالـ CORS لكل الطلبات من أي أصل
+app.use(cors({
+    origin: "http://localhost:3002", // أو "*" للسماح لكل الأصول
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type"],
+}));
 
 io.on("connection", (socket) => {
     console.log("A user connected:", socket.id);
