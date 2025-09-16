@@ -26,6 +26,9 @@ model HotelGroup {
   guests     Guest[]    @relation("HotelGroupGuests")
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
+
+  company    Company?   @relation("CompanyGroups", fields: [companyId], references: [id])
+  companyId  String?
 }
 
 //////////////////////////////////
@@ -302,6 +305,8 @@ model Folio {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   extras    Extra[] // الحقل العكسي
+  company   Company?  @relation("CompanyFolios", fields: [companyId], references: [id])
+  companyId String?
 }
 
 model Charge {
@@ -340,9 +345,15 @@ model Company {
   name          String
   creditLimit   Decimal?
   rateAgreement String?
+
   bookings      Booking[]
+  folios        Folio[]       @relation("CompanyFolios")
+  groups        HotelGroup[]  @relation("CompanyGroups") // علاقة اختيارية إذا الشركة تدير مجموعات
 
   @@unique([propertyId, code])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 //////////////////////////////////
