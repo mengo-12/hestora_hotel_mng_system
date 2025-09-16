@@ -53,16 +53,18 @@ model Property {
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
-  rooms        Room[]
-  roomTypes    RoomType[]
-  bookings     Booking[]
-  users        User[]
-  ratePlans    RatePlan[]
-  housekeeping HousekeepingTask[]
-  companies    Company[]
-  inventory    Inventory[]
-  guests       Guest[]
-  auditLogs    AuditLog[]
+  rooms              Room[]
+  roomTypes          RoomType[]
+  bookings           Booking[]
+  users              User[]
+  ratePlans          RatePlan[]
+  housekeeping       HousekeepingTask[]
+  companies          Company[]
+  inventory          Inventory[]
+  guests             Guest[]
+  auditLogs          AuditLog[]
+  groups             GroupMaster[]
+  roomBlocks         RoomBlock[]
 }
 
 //////////////////////////////////
@@ -81,6 +83,8 @@ model RoomType {
   rooms       Room[]
   ratePlans   RatePlan[]
   inventory   Inventory[]
+
+  roomBlocks  RoomBlock[]
 
   @@unique([propertyId, code])
 }
@@ -134,6 +138,8 @@ model Guest {
   bookings       Booking[]
   folios         Folio[]
   extras         Extra[] // الحقل العكسي
+
+  leaderOfGroups GroupMaster[] @relation("GroupLeader")
 }
 
 //////////////////////////////////
@@ -157,10 +163,12 @@ model Booking {
   specialRequests String?
   folio           Folio?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  company   Company? @relation(fields: [companyId], references: [id])
-  companyId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  company         Company? @relation(fields: [companyId], references: [id])
+  companyId       String?
+  group           GroupMaster? @relation(fields: [groupId], references: [id])
+  groupId         String?
   extras    Extra[] // هذا هو الحقل العكسي
 }
 
@@ -348,8 +356,9 @@ model Company {
 
   bookings      Booking[]
   folios        Folio[]       @relation("CompanyFolios")
-  groups        HotelGroup[]  @relation("CompanyGroups") // علاقة اختيارية إذا الشركة تدير مجموعات
-
+  groups        HotelGroup[]  @relation("CompanyGroups")
+  groupMasters  GroupMaster[]  @relation("CompanyGroups")
+  
   @@unique([propertyId, code])
 
   createdAt     DateTime @default(now())
@@ -448,6 +457,49 @@ model SystemSetting {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+//////////////////////////////////
+// Groups (Conferences, Events, Tours)
+//////////////////////////////////
+model GroupMaster {
+  id          String     @id @default(cuid())
+  property    Property   @relation(fields: [propertyId], references: [id])
+  propertyId  String
+  company     Company?   @relation("CompanyGroups", fields: [companyId], references: [id])
+  companyId   String?
+  leader      Guest?     @relation("GroupLeader", fields: [leaderId], references: [id])
+  leaderId    String?
+
+  code        String     @unique
+  name        String
+  description String?
+
+  status      String     @default("Active") // Active, Closed, Cancelled
+  startDate   DateTime?
+  endDate     DateTime?
+
+  roomBlocks  RoomBlock[]
+  bookings    Booking[]  // الحجوزات المرتبطة بالمجموعة
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model RoomBlock {
+  id         String     @id @default(cuid())
+  group      GroupMaster @relation(fields: [groupId], references: [id])
+  groupId    String
+  roomType   RoomType    @relation(fields: [roomTypeId], references: [id])
+  roomTypeId String
+  property   Property    @relation(fields: [propertyId], references: [id])
+  propertyId String
+
+  blockDate  DateTime
+  roomsBlocked Int
+  roomsPicked  Int @default(0)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 enum Role {

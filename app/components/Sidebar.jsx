@@ -27,6 +27,7 @@ export default function Sidebar() {
         { name: 'Bookings', href: '/bookings' },
         { name: 'Guests', href: '/guests' },
         { name: 'Companies', href: '/companies' },
+        { name: 'Groups', href: '/groups' },
         { name: 'Housekeeping', href: '/houseKeeping' },
         { name: 'Night Audit', href: '/night-audit' },
         { name: 'inventory', href: '/inventory' },
