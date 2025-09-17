@@ -63,47 +63,6 @@ export async function POST(req) {
     }
 }
 
-// --- تعديل مجموعة ---
-// export async function PUT(req, { params }) {
-//     try {
-//         const session = await getServerSession(authOptions);
-//         if (!session) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
-
-//         const { id } = params;
-//         const { propertyId, companyId, leaderId, code, name, description, startDate, endDate } = await req.json();
-
-//         const updatedGroup = await prisma.groupMaster.update({
-//             where: { id },
-//             data: {
-//                 propertyId,
-//                 companyId: companyId || null,
-//                 leaderId: leaderId || null,
-//                 code,
-//                 name,
-//                 description,
-//                 startDate: startDate ? new Date(startDate) : null,
-//                 endDate: endDate ? new Date(endDate) : null,
-//             },
-//             include: { property: true, company: true, leader: true, roomBlocks: true },
-
-//         });
-
-//         try {
-//             await fetch("http://localhost:3001/api/broadcast", {
-//                 method: "POST",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify({ event: "GROUP_UPDATED", data: updatedGroup }), // أو GROUP_DELETED
-//             });
-//         } catch (err) {
-//             console.error("Socket broadcast failed:", err);
-//         }
-
-//         return new Response(JSON.stringify(updatedGroup), { status: 200 });
-//     } catch (err) {
-//         console.error("Failed to update group:", err);
-//         return new Response(JSON.stringify({ error: "Failed to update group" }), { status: 500 });
-//     }
-// }
 
 // --- حذف مجموعة ---
 export async function DELETE(req, { params }) {
