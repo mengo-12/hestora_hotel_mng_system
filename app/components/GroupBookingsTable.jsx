@@ -30,7 +30,7 @@ export default function GroupBookingsTable({ group, properties, roomTypes, guest
     };
 
     return (
-        <div>
+        <div className="overflow-x-auto">
             <table className="w-full table-auto border">
                 <thead>
                     <tr className="bg-gray-200">
@@ -40,6 +40,8 @@ export default function GroupBookingsTable({ group, properties, roomTypes, guest
                         <th className="border px-2 py-1">Check-Out</th>
                         <th className="border px-2 py-1">Adults</th>
                         <th className="border px-2 py-1">Children</th>
+                        <th className="border px-2 py-1">Extras</th>
+                        <th className="border px-2 py-1">Folio</th>
                         <th className="border px-2 py-1">Actions</th>
                     </tr>
                 </thead>
@@ -52,6 +54,8 @@ export default function GroupBookingsTable({ group, properties, roomTypes, guest
                             <td className="border px-2 py-1">{b.checkOut ? new Date(b.checkOut).toLocaleDateString() : "-"}</td>
                             <td className="border px-2 py-1">{b.adults || 0}</td>
                             <td className="border px-2 py-1">{b.children || 0}</td>
+                            <td className="border px-2 py-1">{b.extras?.length || 0}</td>
+                            <td className="border px-2 py-1">{b.folios?.length || 0}</td>
                             <td className="border px-2 py-1">
                                 <button
                                     onClick={() => { setSelectedBooking(b); setEditModalOpen(true); }}

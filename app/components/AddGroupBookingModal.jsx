@@ -9,76 +9,62 @@ export default function AddGroupBookingModal({ isOpen, onClose, groups, properti
     const [propertyId, setPropertyId] = useState("");
     const [roomTypeId, setRoomTypeId] = useState("");
     const [roomTypes, setRoomTypes] = useState([]);
+    const [availableRooms, setAvailableRooms] = useState([]);
+    const [selectedRoomId, setSelectedRoomId] = useState("");
     const [checkIn, setCheckIn] = useState("");
     const [checkOut, setCheckOut] = useState("");
     const [adults, setAdults] = useState(1);
     const [children, setChildren] = useState(0);
     const [specialRequests, setSpecialRequests] = useState("");
+    const [extras, setExtras] = useState([]);
 
-    // --- Fetch room types when property changes ---
+    // جلب Room Types عند اختيار Property
     useEffect(() => {
-        const fetchRoomTypes = async () => {
-            if (!propertyId) {
-                setRoomTypes([]);
-                setRoomTypeId("");
-                return;
-            }
-            try {
-                const res = await fetch(`/api/roomTypes?propertyId=${propertyId}`);
-                if (!res.ok) throw new Error("Failed to fetch room types");
-                const data = await res.json();
-                setRoomTypes(data);
-                setRoomTypeId("");
-            } catch (err) {
-                console.error(err);
-                setRoomTypes([]);
-            }
-        };
-
-        fetchRoomTypes();
+        if (!propertyId) return setRoomTypes([]);
+        fetch(`/api/roomTypes?propertyId=${propertyId}`)
+            .then(res => res.json())
+            .then(data => setRoomTypes(data))
+            .catch(err => setRoomTypes([]));
     }, [propertyId]);
 
+    // جلب الغرف المتاحة حسب RoomType والتواريخ
+    useEffect(() => {
+        if (!roomTypeId || !checkIn || !checkOut) return setAvailableRooms([]);
+        fetch(`/api/rooms/available?roomTypeId=${roomTypeId}&checkIn=${checkIn}&checkOut=${checkOut}`)
+            .then(res => res.json())
+            .then(data => setAvailableRooms(data))
+            .catch(err => setAvailableRooms([]));
+    }, [roomTypeId, checkIn, checkOut]);
+
     const handleSubmit = async () => {
-        if (!groupId || !propertyId || !roomTypeId || !checkIn || !checkOut) {
-            alert("Please fill in all required fields.");
+        if (!groupId || !propertyId || !roomTypeId || !checkIn || !checkOut || !selectedRoomId) {
+            alert("Please fill all required fields.");
             return;
         }
 
-        try {
-            const payload = {
-                groupId: groupId || null,
-                propertyId,
-                roomTypeId,
-                checkIn,
-                checkOut,
-                adults,
-                children,
-                specialRequests
-            };
+        const payload = {
+            groupId, propertyId, roomTypeId, roomId: selectedRoomId,
+            checkIn, checkOut, adults, children, specialRequests, extras
+        };
 
+        try {
             const res = await fetch("/api/groupBookings", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
-
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.error || "Failed to create group booking");
-            }
+            if (!res.ok) throw new Error("Failed to create booking");
 
             const newBooking = await res.json();
-
-            if (onBookingAdded) onBookingAdded(newBooking);
-
-            if (socket) socket.emit("GROUPBOOKING_CREATED", newBooking);
+            onBookingAdded?.(newBooking);
+            socket?.emit("GROUPBOOKING_CREATED", newBooking);
 
             // Reset form
-            setGroupId(""); setPropertyId(""); setRoomTypeId(""); setRoomTypes([]);
-            setCheckIn(""); setCheckOut(""); setAdults(1); setChildren(0); setSpecialRequests("");
+            setGroupId(""); setPropertyId(""); setRoomTypeId(""); setSelectedRoomId("");
+            setCheckIn(""); setCheckOut(""); setAdults(1); setChildren(0); setSpecialRequests(""); setExtras([]);
+            setAvailableRooms([]);
             onClose();
         } catch (err) {
-            console.error(err);
             alert(err.message);
         }
     };
@@ -87,11 +73,11 @@ export default function AddGroupBookingModal({ isOpen, onClose, groups, properti
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-[400px] max-h-[90vh] overflow-y-auto">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-[450px] max-h-[90vh] overflow-y-auto">
                 <h2 className="text-xl font-bold mb-4">Add Group Booking</h2>
 
                 <div className="mb-3">
-                    <label className="block mb-1">Group *</label>
+                    <label>Group *</label>
                     <select value={groupId} onChange={e => setGroupId(e.target.value)} className="w-full border rounded p-2">
                         <option value="">Select Group</option>
                         {groups?.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -99,44 +85,66 @@ export default function AddGroupBookingModal({ isOpen, onClose, groups, properti
                 </div>
 
                 <div className="mb-3">
-                    <label className="block mb-1">Property *</label>
+                    <label>Property *</label>
                     <select value={propertyId} onChange={e => setPropertyId(e.target.value)} className="w-full border rounded p-2">
                         <option value="">Select Property</option>
-                        {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        {properties?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                 </div>
 
                 <div className="mb-3">
-                    <label className="block mb-1">Room Type *</label>
+                    <label>Room Type *</label>
                     <select value={roomTypeId} onChange={e => setRoomTypeId(e.target.value)} className="w-full border rounded p-2">
                         <option value="">Select Room Type</option>
-                        {roomTypes.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
+                        {roomTypes?.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
                     </select>
                 </div>
 
                 <div className="mb-3">
-                    <label className="block mb-1">Check-in *</label>
-                    <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} className="w-full border rounded p-2" />
+                    <label>Available Rooms *</label>
+                    <select value={selectedRoomId} onChange={e => setSelectedRoomId(e.target.value)} className="w-full border rounded p-2">
+                        <option value="">Select Room</option>
+                        {availableRooms?.map(r => <option key={r.id} value={r.id}>{r.number}</option>)}
+                    </select>
                 </div>
 
                 <div className="mb-3">
-                    <label className="block mb-1">Check-out *</label>
+                    <label>Check-in *</label>
+                    <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} className="w-full border rounded p-2" />
+                </div>
+                <div className="mb-3">
+                    <label>Check-out *</label>
                     <input type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)} className="w-full border rounded p-2" />
                 </div>
 
-                <div className="mb-3">
-                    <label className="block mb-1">Adults</label>
-                    <input type="number" value={adults} min={1} onChange={e => setAdults(Number(e.target.value))} className="w-full border rounded p-2" />
+                <div className="mb-3 flex space-x-2">
+                    <div className="flex-1">
+                        <label>Adults</label>
+                        <input type="number" min={1} value={adults} onChange={e => setAdults(Number(e.target.value))} className="w-full border rounded p-2" />
+                    </div>
+                    <div className="flex-1">
+                        <label>Children</label>
+                        <input type="number" min={0} value={children} onChange={e => setChildren(Number(e.target.value))} className="w-full border rounded p-2" />
+                    </div>
                 </div>
 
                 <div className="mb-3">
-                    <label className="block mb-1">Children</label>
-                    <input type="number" value={children} min={0} onChange={e => setChildren(Number(e.target.value))} className="w-full border rounded p-2" />
+                    <label>Special Requests</label>
+                    <textarea value={specialRequests} onChange={e => setSpecialRequests(e.target.value)} className="w-full border rounded p-2" />
                 </div>
 
+                {/* Extras placeholder */}
                 <div className="mb-3">
-                    <label className="block mb-1">Special Requests</label>
-                    <textarea value={specialRequests} onChange={e => setSpecialRequests(e.target.value)} className="w-full border rounded p-2" placeholder="Any special requests?" />
+                    <label>Extras</label>
+                    <input type="text" placeholder="Extra name,price,qty (comma-separated)" onBlur={e => {
+                        if(!e.target.value) return;
+                        const [name, price, qty] = e.target.value.split(",");
+                        setExtras([...extras, {name, unitPrice: Number(price), quantity: Number(qty)}]);
+                        e.target.value="";
+                    }} className="w-full border rounded p-2" />
+                    {extras.length > 0 && <ul className="mt-1 text-sm">
+                        {extras.map((ex,i)=><li key={i}>{ex.name} - {ex.quantity} x {ex.unitPrice}</li>)}
+                    </ul>}
                 </div>
 
                 <div className="flex justify-end space-x-2 mt-4">
