@@ -37,6 +37,47 @@ export async function PUT(req, { params }) {
     }
 }
 
+
+
+// --- PATCH: تحديث الحقول البسيطة مثل billingInstruction ---
+export async function PATCH(req, context) {
+    try {
+        const { params } = context;
+        const { id } = params; // <-- في App Router يجب await إذا كان params async
+        const data = await req.json();
+
+        const allowedFields = ["billingInstruction"];
+        const updateData = {};
+        allowedFields.forEach(f => {
+            if (data[f] !== undefined) updateData[f] = data[f];
+        });
+
+        const updatedGroup = await prisma.groupMaster.update({
+            where: { id },
+            data: updateData,
+            include: { property: true, company: true, leader: true, roomBlocks: true }
+        });
+
+        // broadcast
+        try {
+            await fetch("http://localhost:3001/api/broadcast", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ event: "GROUP_UPDATED", data: updatedGroup }),
+            });
+        } catch {}
+
+        return new Response(JSON.stringify(updatedGroup), { status: 200 });
+    } catch (err) {
+        console.error("Failed to update group (PATCH):", err);
+        return new Response(JSON.stringify({ error: "Failed to update group" }), { status: 500 });
+    }
+}
+
+
+
+
+
 // --- DELETE: حذف مجموعة ---
 export async function DELETE(req, { params }) {
     const { id } = params;

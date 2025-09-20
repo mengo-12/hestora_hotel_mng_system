@@ -489,6 +489,7 @@ model GroupMaster {
   code        String  @unique
   name        String
   description String?
+  billingInstruction String?
 
   status    String    @default("Active") // Active, Closed, Cancelled
   startDate DateTime?

@@ -1,276 +1,143 @@
+
 // 'use client';
-// import { useState, useEffect, useMemo } from "react";
+// import { useState, useEffect } from "react";
 // import { useSocket } from "@/app/components/SocketProvider";
 // import ProtectedPage from "@/app/components/ProtectedPage";
 // import AddGroupModal from "@/app/components/AddGroupModal";
 // import EditGroupModal from "@/app/components/EditGroupModal";
-// import { useTable, useSortBy, usePagination, useGlobalFilter } from "react-table";
 
 // export default function GroupsPage({ session, userProperties }) {
 //     const socket = useSocket();
-
-//     // --- States ---
-//     const [groups, setGroups] = useState([]);
-//     const [companies, setCompanies] = useState([]);
-//     const [guests, setGuests] = useState([]);
-//     const [loading, setLoading] = useState(true);
-
-//     const [addModalOpen, setAddModalOpen] = useState(false);
-//     const [editModalOpen, setEditModalOpen] = useState(false);
-//     const [selectedGroup, setSelectedGroup] = useState(null);
-
-//     const [searchTerm, setSearchTerm] = useState("");
-//     const [debouncedSearch, setDebouncedSearch] = useState("");
-
-//     // --- Roles & Permissions ---
 //     const role = session?.user?.role || "Guest";
+
 //     const canAdd = ["Admin", "FrontDesk", "Manager"].includes(role);
 //     const canEdit = ["Admin", "FrontDesk", "Manager"].includes(role);
 //     const canDelete = ["Admin"].includes(role);
 
-//     // --- Fetch Data ---
-//     const fetchGroups = async () => {
-//         try {
-//             setLoading(true);
-//             const res = await fetch("/api/groups");
-//             const data = await res.json();
-//             setGroups(data || []);
-//         } catch (err) {
-//             console.error(err);
-//         } finally {
-//             setLoading(false);
-//         }
-//     };
+//     const [groups, setGroups] = useState([]);
+//     const [companies, setCompanies] = useState([]);
+//     const [guests, setGuests] = useState([]);
+//     const [roomBlocks, setRoomBlocks] = useState([]);
+//     const [loading, setLoading] = useState(true);
 
-//     const fetchCompanies = async () => {
-//         try {
-//             const res = await fetch("/api/companies");
-//             const data = await res.json();
-//             setCompanies(data || []);
-//         } catch (err) {
-//             console.error(err);
-//         }
-//     };
-
-//     const fetchGuests = async () => {
-//         try {
-//             const res = await fetch("/api/guests");
-//             const data = await res.json();
-//             setGuests(data || []);
-//         } catch (err) {
-//             console.error(err);
-//         }
-//     };
+//     const [searchTerm, setSearchTerm] = useState("");
+//     const [selectedGroup, setSelectedGroup] = useState(null);
+//     const [addModalOpen, setAddModalOpen] = useState(false);
+//     const [editModalOpen, setEditModalOpen] = useState(false);
 
 //     useEffect(() => {
-//         fetchGroups();
-//         fetchCompanies();
-//         fetchGuests();
-
-//         if (!socket) return;
-
-//         // 🔔 Socket broadcast
-//         socket.on("GROUP_CREATED", (group) => setGroups(prev => [group, ...prev]));
-//         socket.on("GROUP_UPDATED", (updatedGroup) =>
-//             setGroups(prev => prev.map(g => g.id === updatedGroup.id ? updatedGroup : g))
-//         );
-//         socket.on("GROUP_DELETED", ({ id }) =>
-//             setGroups(prev => prev.filter(g => g.id !== id))
-//         );
-
-//         return () => {
-//             socket.off("GROUP_CREATED");
-//             socket.off("GROUP_UPDATED");
-//             socket.off("GROUP_DELETED");
+//         const fetchAll = async () => {
+//             setLoading(true);
+//             try {
+//                 const [grpRes, cmpRes, gstRes, rbRes] = await Promise.all([
+//                     fetch("/api/groups"), 
+//                     fetch("/api/companies"), 
+//                     fetch("/api/guests"),
+//                     fetch("/api/roomBlocks")
+//                 ]);
+//                 setGroups(await grpRes.json() || []);
+//                 setCompanies(await cmpRes.json() || []);
+//                 setGuests(await gstRes.json() || []);
+//                 setRoomBlocks(await rbRes.json() || []);
+//             } catch (err) { console.error(err); }
+//             finally { setLoading(false); }
 //         };
+//         fetchAll();
+//     }, []);
+
+//     useEffect(() => {
+//         if (!socket) return;
+//         socket.on("GROUP_CREATED", g => setGroups(prev => [g, ...prev]));
+//         socket.on("GROUP_UPDATED", g => setGroups(prev => prev.map(x => x.id === g.id ? g : x)));
+//         socket.on("GROUP_DELETED", ({ id }) => setGroups(prev => prev.filter(x => x.id !== id)));
+//         return () => { socket.off("GROUP_CREATED"); socket.off("GROUP_UPDATED"); socket.off("GROUP_DELETED"); };
 //     }, [socket]);
 
-//     // --- Debounce search ---
-//     useEffect(() => {
-//         const handler = setTimeout(() => {
-//             setDebouncedSearch(searchTerm);
-//         }, 300);
-//         return () => clearTimeout(handler);
-//     }, [searchTerm]);
-
-//     // --- Table Columns ---
-//     const columns = useMemo(() => [
-//         { Header: "Code", accessor: "code" },
-//         { Header: "Name", accessor: "name" },
-//         { Header: "Property", accessor: row => userProperties.find(p => p.id === row.propertyId)?.name || "-" },
-//         { Header: "Company", accessor: row => row.company?.name || "-" },
-//         { Header: "Leader", accessor: row => row.leader ? `${row.leader.firstName} ${row.leader.lastName}` : "-" },
-//         {
-//             Header: "Actions",
-//             accessor: "actions",
-//             Cell: ({ row }) => (
-//                 <div className="flex gap-2">
-//                     {canEdit && (
-//                         <button
-//                             onClick={() => { setSelectedGroup(row.original); setEditModalOpen(true); }}
-//                             className="px-2 py-1 bg-yellow-400 rounded hover:bg-yellow-500"
-//                         >
-//                             Edit
-//                         </button>
-//                     )}
-//                     {canDelete && (
-//                         <button
-//                             onClick={() => handleDelete(row.original.id)}
-//                             className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-//                         >
-//                             Delete
-//                         </button>
-//                     )}
-//                 </div>
-//             )
-//         }
-//     ], [userProperties]);
-
-//     // --- Filtered Data ---
-//     const data = useMemo(() => {
-//         if (!debouncedSearch) return groups;
-//         return groups.filter(g =>
-//             g.code.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-//             g.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-//             (userProperties.find(p => p.id === g.propertyId)?.name || "").toLowerCase().includes(debouncedSearch.toLowerCase())
-//         );
-//     }, [groups, debouncedSearch, userProperties]);
-
-//     const {
-//         getTableProps,
-//         getTableBodyProps,
-//         headerGroups,
-//         page,
-//         prepareRow,
-//         canPreviousPage,
-//         canNextPage,
-//         pageOptions,
-//         state: { pageIndex, pageSize },
-//         previousPage,
-//         nextPage,
-//         setPageSize
-//     } = useTable({ columns, data, initialState: { pageIndex: 0, pageSize: 10 } }, useGlobalFilter, useSortBy, usePagination);
-
-//     // --- Handlers ---
-//     const handleGroupAdded = (newGroup) => {
-//         setGroups(prev => [newGroup, ...prev]);
-//         setAddModalOpen(false);
-//         if (socket) socket.emit("GROUP_CREATED", newGroup);
-//     };
-
-//     const handleGroupUpdated = (updatedGroup) => {
-//         setGroups(prev => prev.map(g => g.id === updatedGroup.id ? updatedGroup : g));
-//         setEditModalOpen(false);
-//         if (socket) socket.emit("GROUP_UPDATED", updatedGroup);
-//     };
-
-//     const handleDelete = async (groupId) => {
+//     const handleDeleteGroup = async id => {
 //         if (!confirm("Are you sure you want to delete this group?")) return;
-//         try {
-//             const res = await fetch(`/api/groups/${groupId}`, { method: "DELETE" });
-//             if (!res.ok) throw new Error("Failed to delete group");
-//             setGroups(prev => prev.filter(g => g.id !== groupId));
-//             if (socket) socket.emit("GROUP_DELETED", { id: groupId });
-//         } catch (err) {
-//             console.error(err);
-//             alert(err.message);
+//         try { 
+//             const res = await fetch(`/api/groups/${id}`, { method: "DELETE" }); 
+//             if(!res.ok) throw new Error(); 
+//             setGroups(prev => prev.filter(g => g.id!==id)); 
+//             if(selectedGroup?.id===id)setSelectedGroup(null); 
+//             if(socket) socket.emit("GROUP_DELETED",{id}); 
 //         }
+//         catch(err){ alert("Failed to delete group"); }
 //     };
+
+//     const handleGroupAdded = g => { setGroups(prev=>[g,...prev]); setAddModalOpen(false); if(socket)socket.emit("GROUP_CREATED",g); };
+//     const handleGroupUpdated = g => { setGroups(prev=>prev.map(x=>x.id===g.id?g:x)); setEditModalOpen(false); if(socket)socket.emit("GROUP_UPDATED",g); };
+
+//     const filteredGroups = groups.filter(g => {
+//         const searchLower = searchTerm.toLowerCase();
+//         return g.name.toLowerCase().includes(searchLower) || g.code.toLowerCase().includes(searchLower);
+//     });
 
 //     return (
-//         <ProtectedPage session={session} allowedRoles={["Admin", "FrontDesk", "Manager"]}>
-//             <div className="p-4 space-y-4">
-
-//                 {/* Header */}
-//                 <div className="flex justify-between items-center">
-//                     <h2 className="text-xl font-bold">Groups</h2>
-//                     <div className="flex gap-2 items-center">
-//                         <input
-//                             type="text"
-//                             placeholder="Search by code, name, or property..."
-//                             value={searchTerm}
-//                             onChange={e => setSearchTerm(e.target.value)}
-//                             className="border rounded px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+//         <ProtectedPage session={session} allowedRoles={["Admin","FrontDesk","Manager"]}>
+//             <div className="p-6">
+//                 <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-2">
+//                     <h1 className="text-2xl font-bold dark:text-white">Groups</h1>
+//                     <div className="flex gap-2 flex-wrap">
+//                         <input type="text" placeholder="🔍 Search groups..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+//                             className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
 //                         />
-//                         {canAdd && (
-//                             <button
-//                                 onClick={() => setAddModalOpen(true)}
-//                                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-//                             >
-//                                 Add Group
-//                             </button>
-//                         )}
+//                         {canAdd && <button onClick={() => setAddModalOpen(true)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">+ Add Group</button>}
 //                     </div>
 //                 </div>
 
-//                 {/* Table */}
-//                 <div className="overflow-x-auto border rounded">
-//                     <table {...getTableProps()} className="min-w-full divide-y divide-gray-200">
-//                         <thead className="">
-//                             {headerGroups.map(headerGroup => (
-//                                 <tr {...headerGroup.getHeaderGroupProps()}>
-//                                     {headerGroup.headers.map(column => (
-//                                         <th
-//                                             {...column.getHeaderProps(column.getSortByToggleProps())}
-//                                             className="px-3 py-2 text-left text-sm font-medium text-white"
-//                                         >
-//                                             {column.render("Header")}
-//                                             <span>{column.isSorted ? (column.isSortedDesc ? " 🔽" : " 🔼") : ""}</span>
-//                                         </th>
-//                                     ))}
-//                                 </tr>
-//                             ))}
-//                         </thead>
-//                         <tbody {...getTableBodyProps()} className=" divide-y divide-gray-200">
-//                             {page.map(row => {
-//                                 prepareRow(row);
-//                                 return (
-//                                     <tr {...row.getRowProps()} className="">
-//                                         {row.cells.map(cell => (
-//                                             <td {...cell.getCellProps()} className="px-3 py-2 text-sm">{cell.render("Cell")}</td>
-//                                         ))}
-//                                     </tr>
-//                                 )
-//                             })}
-//                         </tbody>
-//                     </table>
+//                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+//                     {filteredGroups.length > 0 ? (
+//                         filteredGroups.map(g => (
+//                             <div key={g.id} className="p-4 rounded-lg shadow cursor-pointer dark:bg-gray-700 bg-white text-black dark:text-white transition transform hover:scale-105" onClick={() => setSelectedGroup(g)}>
+//                                 <div className="flex justify-between items-center mb-2">
+//                                     <h2 className="text-lg font-semibold">{g.name}</h2>
+//                                     <div className="flex gap-1 flex-wrap">
+//                                         {canEdit && <button onClick={e => { e.stopPropagation(); setSelectedGroup(g); setEditModalOpen(true); }} className="bg-white text-black text-xs px-2 py-1 rounded hover:bg-gray-200">✏️ Edit</button>}
+//                                         {canDelete && <button onClick={e => { e.stopPropagation(); handleDeleteGroup(g.id); }} className="text-xs px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600">🗑 Delete</button>}
+//                                         {canAdd && <button onClick={e => { e.stopPropagation(); console.log("Clone group", g.id); }} className="text-xs px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600">Clone</button>}
+//                                     </div>
+//                                 </div>
+//                                 <p><b>Code:</b> {g.code}</p>
+//                                 <p><b>Property:</b> {userProperties.find(p => p.id === g.propertyId)?.name || "-"}</p>
+//                                 <p><b>Company:</b> {g.company?.name || "-"}</p>
+//                                 <p><b>Leader:</b> {g.leader ? `${g.leader.firstName} ${g.leader.lastName}` : "-"}</p>
+//                                 <p><b>Room Blocks:</b> {g.roomBlocks?.map(rb => rb.name).join(", ") || "-"}</p>
+//                                 <p><b>Status:</b> {g.status}</p>
+//                                 <p><b>Start:</b> {g.startDate ? new Date(g.startDate).toLocaleDateString() : "-"}</p>
+//                                 <p><b>End:</b> {g.endDate ? new Date(g.endDate).toLocaleDateString() : "-"}</p>
+//                             </div>
+//                         ))
+//                     ) : (
+//                         <p className="col-span-full text-center text-gray-500">لا توجد نتائج مطابقة 🔍</p>
+//                     )}
 //                 </div>
 
-//                 {/* Pagination */}
-//                 <div className="flex justify-between items-center mt-2">
-//                     <span className="text-sm">Page {pageIndex + 1} of {pageOptions.length}</span>
-//                     <div className="flex gap-2 items-center">
-//                         <button onClick={() => previousPage()} disabled={!canPreviousPage} className="px-2 py-1 border rounded">Previous</button>
-//                         <button onClick={() => nextPage()} disabled={!canNextPage} className="px-2 py-1 border rounded">Next</button>
-//                         <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))} className="border rounded px-2 py-1">
-//                             {[5, 10, 20, 50].map(size => <option key={size} value={size}>{size}</option>)}
-//                         </select>
-//                     </div>
-//                 </div>
-
-//                 {/* Modals */}
-//                 {addModalOpen && (
+//                 {addModalOpen && canAdd &&
 //                     <AddGroupModal
 //                         isOpen={addModalOpen}
 //                         onClose={() => setAddModalOpen(false)}
 //                         properties={userProperties}
 //                         companies={companies}
+//                         roomBlocks={roomBlocks}
 //                         guests={guests}
 //                         onGroupAdded={handleGroupAdded}
 //                     />
-//                 )}
-//                 {selectedGroup && (
+//                 }
+
+//                 {editModalOpen && selectedGroup &&
 //                     <EditGroupModal
 //                         isOpen={editModalOpen}
 //                         onClose={() => setEditModalOpen(false)}
 //                         group={selectedGroup}
 //                         properties={userProperties}
 //                         companies={companies}
+//                         roomBlocks={roomBlocks}
 //                         guests={guests}
+//                         groups={groups}
 //                         onGroupUpdated={handleGroupUpdated}
 //                     />
-//                 )}
-
+//                 }
 //             </div>
 //         </ProtectedPage>
 //     );
@@ -278,8 +145,8 @@
 
 
 
-
 // الكود الاعلى نسخة اصلية
+
 
 
 
@@ -290,9 +157,11 @@ import { useSocket } from "@/app/components/SocketProvider";
 import ProtectedPage from "@/app/components/ProtectedPage";
 import AddGroupModal from "@/app/components/AddGroupModal";
 import EditGroupModal from "@/app/components/EditGroupModal";
+import { useRouter } from "next/navigation";
 
 export default function GroupsPage({ session, userProperties }) {
     const socket = useSocket();
+    const router = useRouter();
     const role = session?.user?.role || "Guest";
 
     const canAdd = ["Admin", "FrontDesk", "Manager"].includes(role);
@@ -306,61 +175,124 @@ export default function GroupsPage({ session, userProperties }) {
     const [loading, setLoading] = useState(true);
 
     const [searchTerm, setSearchTerm] = useState("");
+    const [filterCompany, setFilterCompany] = useState("");
+    const [filterLeader, setFilterLeader] = useState("");
+    const [filterStatus, setFilterStatus] = useState("");
+    const [filterStartDate, setFilterStartDate] = useState("");
+    const [filterEndDate, setFilterEndDate] = useState("");
+
     const [selectedGroup, setSelectedGroup] = useState(null);
     const [addModalOpen, setAddModalOpen] = useState(false);
     const [editModalOpen, setEditModalOpen] = useState(false);
+
+    const [expandedGroups, setExpandedGroups] = useState({});
+    const [groupTotals, setGroupTotals] = useState({});
+    const [billingInstructions, setBillingInstructions] = useState({});
 
     useEffect(() => {
         const fetchAll = async () => {
             setLoading(true);
             try {
                 const [grpRes, cmpRes, gstRes, rbRes] = await Promise.all([
-                    fetch("/api/groups"), 
-                    fetch("/api/companies"), 
+                    fetch("/api/groups"),
+                    fetch("/api/companies"),
                     fetch("/api/guests"),
                     fetch("/api/roomBlocks")
                 ]);
-                setGroups(await grpRes.json() || []);
+                const groupsData = await grpRes.json() || [];
+                setGroups(groupsData);
                 setCompanies(await cmpRes.json() || []);
                 setGuests(await gstRes.json() || []);
                 setRoomBlocks(await rbRes.json() || []);
-            } catch (err) { console.error(err); }
-            finally { setLoading(false); }
+
+                // جلب totals لكل مجموعة
+                const totalsMap = {};
+                groupsData.forEach(g => {
+                    if (g.groupTotals) totalsMap[g.id] = g.groupTotals;
+                });
+                setGroupTotals(totalsMap);
+
+                // تهيئة Billing Instructions
+                const billingMap = {};
+                groupsData.forEach(g => { billingMap[g.id] = g.billingInstruction || ""; });
+                setBillingInstructions(billingMap);
+
+            } catch (err) {
+                console.error(err);
+            } finally { setLoading(false); }
         };
         fetchAll();
     }, []);
 
+    // Socket Updates
     useEffect(() => {
         if (!socket) return;
-        socket.on("GROUP_CREATED", g => setGroups(prev => [g, ...prev]));
-        socket.on("GROUP_UPDATED", g => setGroups(prev => prev.map(x => x.id === g.id ? g : x)));
-        socket.on("GROUP_DELETED", ({ id }) => setGroups(prev => prev.filter(x => x.id !== id)));
+        socket.on("GROUP_CREATED", g => { setGroups(prev => [g, ...prev]); setGroupTotals(prev => ({ ...prev, [g.id]: g.groupTotals || {} })); });
+        socket.on("GROUP_UPDATED", g => { setGroups(prev => prev.map(x => x.id === g.id ? g : x)); setGroupTotals(prev => ({ ...prev, [g.id]: g.groupTotals || {} })); setBillingInstructions(prev => ({ ...prev, [g.id]: g.billingInstruction || "" })); });
+        socket.on("GROUP_DELETED", ({ id }) => { setGroups(prev => prev.filter(x => x.id !== id)); setGroupTotals(prev => { const copy = { ...prev }; delete copy[id]; return copy; }); setBillingInstructions(prev => { const copy = { ...prev }; delete copy[id]; return copy; }); });
         return () => { socket.off("GROUP_CREATED"); socket.off("GROUP_UPDATED"); socket.off("GROUP_DELETED"); };
     }, [socket]);
 
     const handleDeleteGroup = async id => {
         if (!confirm("Are you sure you want to delete this group?")) return;
-        try { 
-            const res = await fetch(`/api/groups/${id}`, { method: "DELETE" }); 
-            if(!res.ok) throw new Error(); 
-            setGroups(prev => prev.filter(g => g.id!==id)); 
-            if(selectedGroup?.id===id)setSelectedGroup(null); 
-            if(socket) socket.emit("GROUP_DELETED",{id}); 
-        }
-        catch(err){ alert("Failed to delete group"); }
+        try {
+            const res = await fetch(`/api/groups/${id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error();
+            setGroups(prev => prev.filter(g => g.id !== id));
+            setGroupTotals(prev => { const copy = { ...prev }; delete copy[id]; return copy; });
+            setBillingInstructions(prev => { const copy = { ...prev }; delete copy[id]; return copy; });
+            setExpandedGroups(prev => { const copy = { ...prev }; delete copy[id]; return copy; });
+            if (selectedGroup?.id === id) setSelectedGroup(null);
+        } catch { alert("Failed to delete group"); }
     };
 
-    const handleGroupAdded = g => { setGroups(prev=>[g,...prev]); setAddModalOpen(false); if(socket)socket.emit("GROUP_CREATED",g); };
-    const handleGroupUpdated = g => { setGroups(prev=>prev.map(x=>x.id===g.id?g:x)); setEditModalOpen(false); if(socket)socket.emit("GROUP_UPDATED",g); };
+    const handleGroupAdded = g => { setGroups(prev => [g, ...prev]); setAddModalOpen(false); setGroupTotals(prev => ({ ...prev, [g.id]: g.groupTotals || {} })); setBillingInstructions(prev => ({ ...prev, [g.id]: g.billingInstruction || "" })); };
+    const handleGroupUpdated = g => { setGroups(prev => prev.map(x => x.id === g.id ? g : x)); setEditModalOpen(false); setGroupTotals(prev => ({ ...prev, [g.id]: g.groupTotals || {} })); setBillingInstructions(prev => ({ ...prev, [g.id]: g.billingInstruction || "" })); };
 
     const filteredGroups = groups.filter(g => {
         const searchLower = searchTerm.toLowerCase();
-        return g.name.toLowerCase().includes(searchLower) || g.code.toLowerCase().includes(searchLower);
+        if (searchTerm && !g.name.toLowerCase().includes(searchLower) && !g.code.toLowerCase().includes(searchLower)) return false;
+        if (filterCompany && g.company?.id !== filterCompany) return false;
+        if (filterLeader && g.leader?.id !== filterLeader) return false;
+        if (filterStatus && g.status !== filterStatus) return false;
+        if (filterStartDate && new Date(g.startDate) < new Date(filterStartDate)) return false;
+        if (filterEndDate && new Date(g.endDate) > new Date(filterEndDate)) return false;
+        return true;
     });
 
+    const toggleExpand = async (group) => {
+        if (expandedGroups[group.id]) {
+            setExpandedGroups(prev => ({ ...prev, [group.id]: null }));
+        } else {
+            try {
+                const res = await fetch(`/api/folios/group/${group.id}`);
+                if (!res.ok) throw new Error("Failed to fetch group folios");
+                const data = await res.json();
+                setExpandedGroups(prev => ({ ...prev, [group.id]: data.folios || [] }));
+                if (data?.groupTotals) setGroupTotals(prev => ({ ...prev, [group.id]: data.groupTotals }));
+            } catch (err) { console.error(err); }
+        }
+    };
+
+    const handleBillingChange = async (groupId, value) => {
+        setBillingInstructions(prev => ({ ...prev, [groupId]: value }));
+        try {
+            const res = await fetch(`/api/groups/${groupId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ billingInstruction: value }),
+            });
+            
+            if (!res.ok) throw new Error("Failed to update billing instruction");
+            const updated = await res.json();
+            setGroups(prev => prev.map(g => g.id === groupId ? updated : g));
+        } catch (err) { console.error(err); alert("Failed to update billing instruction"); }
+    };
+
     return (
-        <ProtectedPage session={session} allowedRoles={["Admin","FrontDesk","Manager"]}>
+        <ProtectedPage session={session} allowedRoles={["Admin", "FrontDesk", "Manager"]}>
             <div className="p-6">
+                {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-2">
                     <h1 className="text-2xl font-bold dark:text-white">Groups</h1>
                     <div className="flex gap-2 flex-wrap">
@@ -371,33 +303,109 @@ export default function GroupsPage({ session, userProperties }) {
                     </div>
                 </div>
 
+                {/* Filters */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                    <select value={filterCompany} onChange={e => setFilterCompany(e.target.value)} className="border rounded p-1">
+                        <option value="">All Companies</option>
+                        {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                    <select value={filterLeader} onChange={e => setFilterLeader(e.target.value)} className="border rounded p-1">
+                        <option value="">All Leaders</option>
+                        {guests.map(g => <option key={g.id} value={g.id}>{g.firstName} {g.lastName}</option>)}
+                    </select>
+                    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="border rounded p-1">
+                        <option value="">All Status</option>
+                        <option value="Open">Open</option>
+                        <option value="Closed">Closed</option>
+                        <option value="Canceled">Canceled</option>
+                    </select>
+                    <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} className="border rounded p-1" />
+                    <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} className="border rounded p-1" />
+                    <button onClick={() => { setFilterCompany(""); setFilterLeader(""); setFilterStatus(""); setFilterStartDate(""); setFilterEndDate(""); }} className="px-2 py-1 bg-gray-300 rounded">Clear Filters</button>
+                </div>
+
+                {/* Groups Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredGroups.length > 0 ? (
-                        filteredGroups.map(g => (
-                            <div key={g.id} className="p-4 rounded-lg shadow cursor-pointer dark:bg-gray-700 bg-white text-black dark:text-white transition transform hover:scale-105" onClick={() => setSelectedGroup(g)}>
-                                <div className="flex justify-between items-center mb-2">
-                                    <h2 className="text-lg font-semibold">{g.name}</h2>
-                                    <div className="flex gap-1 flex-wrap">
-                                        {canEdit && <button onClick={e => { e.stopPropagation(); setSelectedGroup(g); setEditModalOpen(true); }} className="bg-white text-black text-xs px-2 py-1 rounded hover:bg-gray-200">✏️ Edit</button>}
-                                        {canDelete && <button onClick={e => { e.stopPropagation(); handleDeleteGroup(g.id); }} className="text-xs px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600">🗑 Delete</button>}
-                                        {canAdd && <button onClick={e => { e.stopPropagation(); console.log("Clone group", g.id); }} className="text-xs px-2 py-1 rounded bg-blue-500 text-white hover:bg-blue-600">Clone</button>}
+                        filteredGroups.map(g => {
+                            const totals = groupTotals[g.id] || { subtotal: 0, taxTotal: 0, totalCharges: 0, totalPayments: 0, balance: 0 };
+                            return (
+                                <div key={g.id} className="p-4 rounded-lg shadow dark:bg-gray-700 bg-white text-black dark:text-white transition transform hover:scale-105">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h2 className="text-lg font-semibold">{g.name}</h2>
+                                        <div className="flex gap-1 flex-wrap">
+                                            {canEdit && <button onClick={() => { setSelectedGroup(g); setEditModalOpen(true); }} className="bg-white text-black text-xs px-2 py-1 rounded hover:bg-gray-200">✏️ Edit</button>}
+                                            {canDelete && <button onClick={() => handleDeleteGroup(g.id)} className="text-xs px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600">🗑 Delete</button>}
+                                            <button onClick={() => toggleExpand(g)} className="text-xs px-2 py-1 rounded bg-gray-400 text-white hover:bg-gray-500">
+                                                {expandedGroups[g.id] ? "Collapse" : "Show Folios"}
+                                            </button>
+                                        </div>
                                     </div>
+
+                                    <p><b>Code:</b> {g.code}</p>
+                                    <p><b>Property:</b> {userProperties.find(p => p.id === g.propertyId)?.name || "-"}</p>
+                                    <p><b>Company:</b> {g.company?.name || "-"}</p>
+                                    <p><b>Leader:</b> {g.leader ? `${g.leader.firstName} ${g.leader.lastName}` : "-"}</p>
+                                    <p><b>Status:</b> {g.status}</p>
+                                    <p><b>Start:</b> {g.startDate ? new Date(g.startDate).toLocaleDateString() : "-"}</p>
+                                    <p><b>End:</b> {g.endDate ? new Date(g.endDate).toLocaleDateString() : "-"}</p>
+
+                                    {/* Billing Instructions */}
+                                    <div className="mt-2">
+                                        <label className="font-semibold">Billing Instructions: </label>
+                                        <select
+                                            value={billingInstructions[g.id] || ""}
+                                            onChange={(e) => handleBillingChange(g.id, e.target.value)}
+                                            className="ml-2 border rounded p-1"
+                                        >
+                                            <option value="">-- Select --</option>
+                                            <option value="Guest">Guest</option>
+                                            <option value="Group">Group</option>
+                                            <option value="Company">Company</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Master Folio Summary */}
+                                    <div className="mt-2 text-sm bg-gray-100 dark:bg-gray-800 p-2 rounded">
+                                        <p><b>Subtotal:</b> ${totals.subtotal.toFixed(2)}</p>
+                                        <p><b>Tax:</b> ${totals.taxTotal.toFixed(2)}</p>
+                                        <p><b>Total Charges:</b> ${totals.totalCharges.toFixed(2)}</p>
+                                        <p><b>Payments:</b> ${totals.totalPayments.toFixed(2)}</p>
+                                        <p className="font-bold text-green-600"><b>Balance:</b> ${totals.balance.toFixed(2)}</p>
+                                    </div>
+
+                                    {/* Quick Actions */}
+                                    <div className="mt-2 flex gap-2">
+                                        <button
+                                            onClick={() => router.push(`/groupBookings?groupId=${g.id}`)}
+                                            className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                        >
+                                            📋 Rooming List
+                                        </button>
+                                    </div>
+
+                                    {/* Expanded Folios */}
+                                    {expandedGroups[g.id]?.folios && (
+                                        <div className="mt-2 border-t pt-2 space-y-2">
+                                            {expandedGroups[g.id].folios.map(folio => (
+                                                <div key={folio.id} className="p-2 border rounded bg-gray-100 dark:bg-gray-800">
+                                                    <p><b>Folio ID:</b> {folio.id}</p>
+                                                    <p><b>Status:</b> {folio.status}</p>
+                                                    <p><b>Booking Guest:</b> {folio.booking?.guest ? `${folio.booking.guest.firstName} ${folio.booking.guest.lastName}` : "-"}</p>
+                                                    <p><b>Room:</b> {folio.booking?.room ? folio.booking.room.number : "-"}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
-                                <p><b>Code:</b> {g.code}</p>
-                                <p><b>Property:</b> {userProperties.find(p => p.id === g.propertyId)?.name || "-"}</p>
-                                <p><b>Company:</b> {g.company?.name || "-"}</p>
-                                <p><b>Leader:</b> {g.leader ? `${g.leader.firstName} ${g.leader.lastName}` : "-"}</p>
-                                <p><b>Room Blocks:</b> {g.roomBlocks?.map(rb => rb.name).join(", ") || "-"}</p>
-                                <p><b>Status:</b> {g.status}</p>
-                                <p><b>Start:</b> {g.startDate ? new Date(g.startDate).toLocaleDateString() : "-"}</p>
-                                <p><b>End:</b> {g.endDate ? new Date(g.endDate).toLocaleDateString() : "-"}</p>
-                            </div>
-                        ))
+                            );
+                        })
                     ) : (
                         <p className="col-span-full text-center text-gray-500">لا توجد نتائج مطابقة 🔍</p>
                     )}
                 </div>
 
+                {/* Modals */}
                 {addModalOpen && canAdd &&
                     <AddGroupModal
                         isOpen={addModalOpen}
@@ -427,7 +435,3 @@ export default function GroupsPage({ session, userProperties }) {
         </ProtectedPage>
     );
 }
-
-
-
-

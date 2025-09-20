@@ -316,20 +316,28 @@ export default function FolioPage({ bookingId, groupId, session }) {
         setLoading(true);
         try {
             let url = `/api/folios/${bookingId}`;
-            if (groupId) {
-                url = `/api/folios/group/${groupId}`;
-            }
+            if (groupId) url = `/api/folios/group/${groupId}`;
+
             const res = await fetch(url);
             if (!res.ok) throw new Error("Failed to fetch folios");
+
             const data = await res.json();
-            // إذا كان group folio، حوّل إلى array لتوحيد التعامل
-            setFolios(Array.isArray(data) ? data : [data]);
+
+            if (groupId) {
+                // API المجموعة: { folios, groupTotals }
+                setFolios(Array.isArray(data.folios) ? data.folios : []);
+            } else {
+                // API الحجز الفردي: يعيد الفاتورة مباشرة
+                setFolios(data ? [data] : []);
+            }
         } catch (err) {
             console.error(err);
+            setFolios([]);
         } finally {
             setLoading(false);
         }
     }, [bookingId, groupId]);
+
 
     useEffect(() => { fetchFolios(); }, [fetchFolios]);
 
@@ -350,8 +358,25 @@ export default function FolioPage({ bookingId, groupId, session }) {
     if (!folios.length) return <p className="text-center mt-4">لا توجد فواتير</p>;
 
     // دمج كل charges و payments لجميع الفواتير ضمن المجموعة
-    const allCharges = folios.flatMap(f => f.charges.map(c => ({ ...c, folioId: f.id, guestName: f.booking?.guest?.firstName + " " + f.booking?.guest?.lastName })));
-    const allPayments = folios.flatMap(f => f.payments.map(p => ({ ...p, folioId: f.id, guestName: p.booking?.guest?.firstName + " " + p.booking?.guest?.lastName })));
+    const allCharges = folios.flatMap(f =>
+        (f.charges ?? []).map(c => ({
+            ...c,
+            folioId: f.id,
+            guestName: f.booking?.guest
+                ? `${f.booking.guest.firstName} ${f.booking.guest.lastName}`
+                : "-"
+        }))
+    );
+
+    const allPayments = folios.flatMap(f =>
+        (f.payments ?? []).map(p => ({
+            ...p,
+            folioId: f.id,
+            guestName: p.booking?.guest
+                ? `${p.booking.guest.firstName} ${p.booking.guest.lastName}`
+                : "-"
+        }))
+    );
 
     const subtotal = allCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
     const taxTotal = allCharges.reduce((sum, c) => sum + (Number(c.amount || 0) * Number(c.tax || 0)) / 100, 0);

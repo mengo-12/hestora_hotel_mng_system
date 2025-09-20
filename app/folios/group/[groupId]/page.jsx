@@ -1,18 +1,417 @@
+// 'use client';
+// import { useEffect, useState } from "react";
+// import FolioPage from "../../[bookingId]/FolioPage";
+// import { getSession } from "next-auth/react";
+
+
+// export default function Page({ params }) {
+//     const groupId = params.groupId;
+
+//     const [session, setSession] = useState(null);
+//     const [bookings, setBookings] = useState([]);
+//     const [loading, setLoading] = useState(true);
+//     const [error, setError] = useState(null);
+
+//     // جلب الجلسة
+//     useEffect(() => {
+//         getSession().then(sess => setSession(sess)).catch(err => {
+//             console.error("getSession error:", err);
+//             setSession(null);
+//         });
+//     }, []);
+
+//     // جلب حجوزات المجموعة من endpoint مخصص (defensive fetch + dedupe)
+//     useEffect(() => {
+//         if (!groupId) return;
+//         setLoading(true);
+//         (async () => {
+//             try {
+//                 const res = await fetch(`/api/groupBookings?groupId=${groupId}`);
+//                 if (!res.ok) {
+//                     const txt = await res.text().catch(()=>null);
+//                     throw new Error(`Failed to fetch group bookings (${res.status}) ${txt || ''}`);
+//                 }
+//                 const data = await res.json();
+//                 // Defensive: تأكد أن البيانات مصفوفة
+//                 const arr = Array.isArray(data) ? data : [];
+//                 // تأكد أن كل عنصر فعلاً يعود لنفس الـ groupId (حماية ضد API غير متوقع)
+//                 const filtered = arr.filter(b => b.groupId === groupId || String(b.groupId) === String(groupId));
+//                 // Dedupe by booking.id (in case API أعاد duplicates)
+//                 const map = new Map();
+//                 for (const b of filtered) {
+//                     map.set(b.id, b);
+//                 }
+//                 const unique = Array.from(map.values());
+//                 setBookings(unique);
+//             } catch (err) {
+//                 console.error("Fetch group bookings error:", err);
+//                 setError(err.message || "Failed to fetch bookings");
+//                 setBookings([]);
+//             } finally {
+//                 setLoading(false);
+//             }
+//         })();
+//     }, [groupId]);
+
+//     if (!session) return <p>Loading session...</p>;
+//     if (loading) return <p className="p-4">جاري تحميل بيانات المجموعة...</p>;
+//     if (error) return <p className="p-4 text-red-500">{error}</p>;
+
+//     // حسابات — نستخدم unique roomIds لنعكس الواقع (إذا هناك أكثر من حجز بنفس الغرفة فلن نحتسبها مرتين)
+//     const uniqueRoomIds = new Set(bookings.filter(b => b.roomId).map(b => b.roomId));
+//     const totalRooms = uniqueRoomIds.size || bookings.length; // fallback إذا لا غرف محددة
+//     // حالات check-in: حسب schema لديك القيم الممكنة ["Booked","InHouse","CheckedOut","NoShow","Reserved"]
+//     const pickedRooms = bookings.filter(b => ["InHouse", "CheckedIn"].includes(b.status)).length;
+//     const remainingRooms = Math.max(0, totalRooms - pickedRooms);
+
+//     return (
+//         <div className="p-6 space-y-6">
+//             {/* Rooming List */}
+//             <div className="rounded shadow p-4">
+//                 <div className="flex justify-between items-center mb-3">
+//                     <h2 className="text-xl font-bold">Rooming List</h2>
+//                     <div className="text-sm text-gray-600">
+//                         <span className="font-semibold mr-4">Total rooms: {totalRooms}</span>
+//                         <span className="text-green-600 mr-4">Picked: {pickedRooms}</span>
+//                         <span className="text-red-600">Remaining: {remainingRooms}</span>
+//                     </div>
+//                 </div>
+
+//                 <table className="w-full border text-sm">
+//                     <thead>
+//                         <tr>
+//                             <th className="border p-2">Guest</th>
+//                             <th className="border p-2">Room</th>
+//                             <th className="border p-2">Status</th>
+//                             <th className="border p-2">Check-in</th>
+//                             <th className="border p-2">Check-out</th>
+//                             <th className="border p-2">Debug (groupId)</th>
+//                         </tr>
+//                     </thead>
+//                     <tbody>
+//                         {bookings.map(b => (
+//                             <tr key={b.id}>
+//                                 <td className="border p-2">{b.guest?.firstName} {b.guest?.lastName}</td>
+//                                 <td className="border p-2">{b.room?.number || "-"}</td>
+//                                 <td className="border p-2">{b.status}</td>
+//                                 <td className="border p-2">{b.checkIn ? new Date(b.checkIn).toLocaleDateString() : "-"}</td>
+//                                 <td className="border p-2">{b.checkOut ? new Date(b.checkOut).toLocaleDateString() : "-"}</td>
+//                                 <td className="border p-2 text-xs text-gray-500">{String(b.groupId)}</td>
+//                             </tr>
+//                         ))}
+//                     </tbody>
+//                 </table>
+//             </div>
+
+//             Folio
+//             <FolioPage groupId={groupId} session={session} />
+//         </div>
+//     );
+// }
+
+
+
+// الكود الاعلى اصلي
+
+
+
 'use client';
 import { useEffect, useState } from "react";
-import FolioPage from "../../[bookingId]/FolioPage";
 import { getSession } from "next-auth/react";
 
-export default function Page({ params }) {
+export default function GroupFolioPage({ params }) {
     const groupId = params.groupId;
-    const [session, setSession] = useState(null);
 
-    // جلب الجلسة بشكل صحيح
+    const [session, setSession] = useState(null);
+    const [bookings, setBookings] = useState([]);
+    const [folios, setFolios] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    const [newCharge, setNewCharge] = useState({ code: "", description: "", amount: "", tax: "", guestId: "" });
+    const [newPayment, setNewPayment] = useState({ method: "", amount: "", ref: "", guestId: "" });
+
+    // الصلاحيات
+    const role = session?.user?.role || "FrontDesk";
+    const canAddCharge = ["Admin", "Manager", "FrontDesk"].includes(role);
+    const canDeleteCharge = ["Admin", "Manager"].includes(role);
+    const canAddPayment = ["Admin", "Manager", "FrontDesk"].includes(role);
+    const canDeletePayment = ["Admin", "Manager"].includes(role);
+    const canCloseFolio = ["Admin", "Manager"].includes(role);
+
+    // جلب الجلسة
     useEffect(() => {
-        getSession().then(sess => setSession(sess));
+        getSession().then(sess => setSession(sess)).catch(err => {
+            console.error("getSession error:", err);
+            setSession(null);
+        });
     }, []);
 
-    if (!session) return <p>Loading session...</p>;
+    // جلب الحجوزات والفواتير
+    const fetchGroupData = async () => {
+        if (!groupId) return;
+        setLoading(true);
+        try {
+            const resBookings = await fetch(`/api/groupBookings?groupId=${groupId}`);
+            const dataBookings = await resBookings.json();
+            setBookings(Array.isArray(dataBookings) ? dataBookings : []);
 
-    return <FolioPage groupId={groupId} session={session} />;
+            const resFolios = await fetch(`/api/folios/group/${groupId}`);
+            const dataFolios = await resFolios.json();
+            setFolios(Array.isArray(dataFolios.folios) ? dataFolios.folios : []);
+        } catch (err) {
+            console.error(err);
+            setError(err.message || "Failed to fetch group data");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchGroupData(); }, [groupId]);
+
+    if (!session) return <p>Loading session...</p>;
+    if (loading) return <p className="p-4">جاري تحميل بيانات المجموعة...</p>;
+    if (error) return <p className="p-4 text-red-500">{error}</p>;
+
+    // دمج Charges و Payments لكل الفواتير
+    const allCharges = folios.flatMap(f => (f.charges ?? []).map(c => ({
+        ...c,
+        folioId: f.id,
+        guestName: f.booking?.guest ? `${f.booking.guest.firstName} ${f.booking.guest.lastName}` : "-"
+    })));
+    const allPayments = folios.flatMap(f => (f.payments ?? []).map(p => ({
+        ...p,
+        folioId: f.id,
+        guestName: p.booking?.guest ? `${p.booking.guest.firstName} ${p.booking.guest.lastName}` : "-"
+    })));
+
+    const subtotal = allCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+    const taxTotal = allCharges.reduce((sum, c) => sum + (Number(c.amount || 0) * Number(c.tax || 0)) / 100, 0);
+    const totalCharges = subtotal + taxTotal;
+    const totalPayments = allPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const balance = totalCharges - totalPayments;
+
+    // CRUD functions
+    const handleAddCharge = async () => {
+        if (!canAddCharge) return alert("ليس لديك صلاحية لإضافة Charges");
+        try {
+            await fetch(`/api/folios/group/${groupId}/charges`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    ...newCharge,
+                    amount: Number(newCharge.amount),
+                    tax: Number(newCharge.tax || 0),
+                    postedById: session.user.id
+                })
+            });
+            setNewCharge({ code: "", description: "", amount: "", tax: "", guestId: "" });
+            fetchGroupData();
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        }
+    };
+
+    const handleDeleteCharge = async (chargeId) => {
+        if (!canDeleteCharge) return alert("ليس لديك صلاحية لحذف Charges");
+        try {
+            await fetch(`/api/folios/group/${groupId}/charges`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chargeId }),
+            });
+            fetchGroupData();
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        }
+    };
+
+    const handleAddPayment = async () => {
+        if (!canAddPayment) return alert("ليس لديك صلاحية لإضافة Payments");
+        try {
+            await fetch(`/api/folios/group/${groupId}/payments`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    ...newPayment,
+                    amount: Number(newPayment.amount),
+                    postedById: session.user.id
+                }),
+            });
+            setNewPayment({ method: "", amount: "", ref: "", guestId: "" });
+            fetchGroupData();
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        }
+    };
+
+    const handleDeletePayment = async (paymentId) => {
+        if (!canDeletePayment) return alert("ليس لديك صلاحية لحذف Payments");
+        try {
+            await fetch(`/api/folios/group/${groupId}/payments`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ paymentId }),
+            });
+            fetchGroupData();
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+        }
+    };
+
+    const toggleFolioStatus = async () => {
+        if (!canCloseFolio) return alert("ليس لديك صلاحية لإغلاق أو إعادة فتح الفاتورة");
+        try {
+            await fetch(`/api/folios/group/${groupId}/close`, { method: "POST" });
+            fetchGroupData();
+        } catch (err) { console.error(err); }
+    };
+
+    return (
+        <div className="p-6 space-y-6">
+            <h1 className="text-2xl font-bold mb-4">فاتورة الحجز الجماعي</h1>
+
+            {/* Rooming List */}
+            <div className="rounded shadow p-4">
+                <h2 className="text-xl font-bold mb-3">Rooming List</h2>
+                <table className="w-full border text-sm">
+                    <thead>
+                        <tr>
+                            <th className="border p-2">Guest</th>
+                            <th className="border p-2">Room</th>
+                            <th className="border p-2">Status</th>
+                            <th className="border p-2">Check-in</th>
+                            <th className="border p-2">Check-out</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {bookings.map(b => (
+                            <tr key={b.id}>
+                                <td className="border p-2">{b.guest?.firstName} {b.guest?.lastName}</td>
+                                <td className="border p-2">{b.room?.number || "-"}</td>
+                                <td className="border p-2">{b.status}</td>
+                                <td className="border p-2">{b.checkIn ? new Date(b.checkIn).toLocaleDateString() : "-"}</td>
+                                <td className="border p-2">{b.checkOut ? new Date(b.checkOut).toLocaleDateString() : "-"}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Folio Summary */}
+            <div className="rounded shadow p-4 mb-6">
+                <h2 className="text-2xl font-bold mb-3">Folio Summary</h2>
+                <p>Subtotal: <span className="font-bold">{subtotal.toFixed(2)}</span></p>
+                <p>Tax Total: <span className="text-orange-600 font-bold">{taxTotal.toFixed(2)}</span></p>
+                <p>Total Charges: <span className="text-red-600 font-bold">{totalCharges.toFixed(2)}</span></p>
+                <p>Total Payments: <span className="text-green-600 font-bold">{totalPayments.toFixed(2)}</span></p>
+                <p>Balance: <span className="text-blue-600 font-bold">{balance.toFixed(2)}</span></p>
+                {canCloseFolio && (
+                    <button onClick={toggleFolioStatus} className="bg-yellow-500 text-white px-4 py-2 rounded mt-3 hover:bg-yellow-600">
+                        Toggle Folio Status
+                    </button>
+                )}
+            </div>
+
+            {/* Charges Table */}
+            <div className="rounded shadow p-4 mb-6">
+                <h3 className="text-xl font-semibold mb-3">Charges</h3>
+                <table className="w-full border text-sm">
+                    <thead>
+                        <tr>
+                            <th className="border p-2">Guest</th>
+                            <th className="border p-2">Code</th>
+                            <th className="border p-2">Description</th>
+                            <th className="border p-2">Amount</th>
+                            <th className="border p-2">Tax %</th>
+                            <th className="border p-2">Tax Value</th>
+                            <th className="border p-2">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {allCharges.map(c => {
+                            const taxValue = (Number(c.amount || 0) * Number(c.tax || 0)) / 100;
+                            return (
+                                <tr key={`${c.id}-${c.folioId}`}>
+                                    <td className="border p-2">{c.guestName}</td>
+                                    <td className="border p-2">{c.code}</td>
+                                    <td className="border p-2">{c.description}</td>
+                                    <td className="border p-2">{Number(c.amount).toFixed(2)}</td>
+                                    <td className="border p-2">{c.tax}%</td>
+                                    <td className="border p-2">{taxValue.toFixed(2)}</td>
+                                    <td className="border p-2 text-center">
+                                        {canDeleteCharge && (
+                                            <button onClick={() => handleDeleteCharge(c.id)} className="text-red-500 hover:text-red-700">حذف</button>
+                                        )}
+                                    </td>
+                                </tr>
+                            )
+                        })}
+                    </tbody>
+                </table>
+
+                {canAddCharge && (
+                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                        <select value={newCharge.guestId} onChange={(e) => setNewCharge({...newCharge, guestId: e.target.value})} className="border p-2 rounded">
+                            <option value="">اختر الضيف</option>
+                            {bookings.map(b => <option key={b.id} value={b.guest?.id}>{b.guest?.firstName} {b.guest?.lastName}</option>)}
+                        </select>
+                        <input placeholder="Code" className="border p-2 rounded flex-1" value={newCharge.code} onChange={(e) => setNewCharge({...newCharge, code: e.target.value})} />
+                        <input placeholder="Description" className="border p-2 rounded flex-1" value={newCharge.description} onChange={(e) => setNewCharge({...newCharge, description: e.target.value})} />
+                        <input placeholder="Amount" type="number" className="border p-2 rounded w-24" value={newCharge.amount} onChange={(e) => setNewCharge({...newCharge, amount: e.target.value})} />
+                        <input placeholder="Tax %" type="number" className="border p-2 rounded w-24" value={newCharge.tax} onChange={(e) => setNewCharge({...newCharge, tax: e.target.value})} />
+                        <button onClick={handleAddCharge} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add</button>
+                    </div>
+                )}
+            </div>
+
+            {/* Payments Table */}
+            <div className="rounded shadow p-4">
+                <h3 className="text-xl font-semibold mb-3">Payments</h3>
+                <table className="w-full border text-sm">
+                    <thead>
+                        <tr>
+                            <th className="border p-2">Guest</th>
+                            <th className="border p-2">Method</th>
+                            <th className="border p-2">Amount</th>
+                            <th className="border p-2">Reference</th>
+                            <th className="border p-2">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {allPayments.map(p => (
+                            <tr key={`${p.id}-${p.folioId}`}>
+                                <td className="border p-2">{p.guestName}</td>
+                                <td className="border p-2">{p.method}</td>
+                                <td className="border p-2">{Number(p.amount).toFixed(2)}</td>
+                                <td className="border p-2">{p.ref || "-"}</td>
+                                <td className="border p-2 text-center">
+                                    {canDeletePayment && (
+                                        <button onClick={() => handleDeletePayment(p.id)} className="text-red-500 hover:text-red-700">حذف</button>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+
+                {canAddPayment && (
+                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                        <select value={newPayment.guestId} onChange={(e) => setNewPayment({...newPayment, guestId: e.target.value})} className="border p-2 rounded">
+                            <option value="">اختر الضيف</option>
+                            {bookings.map(b => <option key={b.id} value={b.guest?.id}>{b.guest?.firstName} {b.guest?.lastName}</option>)}
+                        </select>
+                        <input placeholder="Method" className="border p-2 rounded flex-1" value={newPayment.method} onChange={(e) => setNewPayment({...newPayment, method: e.target.value})} />
+                        <input placeholder="Amount" type="number" className="border p-2 rounded w-24" value={newPayment.amount} onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})} />
+                        <input placeholder="Reference" className="border p-2 rounded flex-1" value={newPayment.ref} onChange={(e) => setNewPayment({...newPayment, ref: e.target.value})} />
+                        <button onClick={handleAddPayment} className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Add</button>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
 }
