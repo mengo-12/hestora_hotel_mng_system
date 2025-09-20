@@ -1,15 +1,16 @@
-// "use client";
+// 'use client';
 // import { useEffect, useState, useCallback } from "react";
 // import { useSocket } from "@/app/components/SocketProvider";
 
-// export default function FolioPage({ bookingId, userProperties, session }) {
-//     const sessionUser = session?.user || null;
+// export default function FolioPage({ bookingId, session }) {
 
-//     const [folio, setFolio] = useState(null);
+//     const sessionUser = session?.user || null;
+//     const socket = useSocket();
+
+//     const [folios, setFolios] = useState([]);
 //     const [loading, setLoading] = useState(true);
 //     const [newCharge, setNewCharge] = useState({ code: "", description: "", amount: "", tax: "" });
 //     const [newPayment, setNewPayment] = useState({ method: "", amount: "", ref: "" });
-//     const socket = useSocket();
 
 //     const role = sessionUser?.role || "FrontDesk";
 //     const canAddCharge = ["Admin", "Manager", "FrontDesk"].includes(role);
@@ -18,12 +19,14 @@
 //     const canDeletePayment = ["Admin", "Manager"].includes(role);
 //     const canCloseFolio = ["Admin", "Manager"].includes(role);
 
-//     const fetchFolio = useCallback(async () => {
+//     // Fetch folios
+//     const fetchFolios = useCallback(async () => {
+//         if (!bookingId) return;
 //         try {
 //             const res = await fetch(`/api/folios/${bookingId}`);
 //             if (!res.ok) throw new Error("Failed to fetch folio");
 //             const data = await res.json();
-//             setFolio(data);
+//             setFolios(data);
 //         } catch (err) {
 //             console.error(err);
 //         } finally {
@@ -32,66 +35,51 @@
 //     }, [bookingId]);
 
 //     useEffect(() => {
-//         if (bookingId) fetchFolio();
-//     }, [bookingId, fetchFolio]);
+//         fetchFolios();
+//     }, [fetchFolios]);
 
-//     // ======= Socket listeners =======
+//     // Socket listeners
 //     useEffect(() => {
 //         if (!socket || !bookingId) return;
-
-//         const onFolioUpdated = () => fetchFolio();
-//         socket.on("BOOKING_UPDATED", onFolioUpdated);
-//         socket.on("CHARGE_ADDED", onFolioUpdated);
-//         socket.on("CHARGE_DELETED", onFolioUpdated);
-//         socket.on("PAYMENT_ADDED", onFolioUpdated);
-//         socket.on("PAYMENT_DELETED", onFolioUpdated);
-//         socket.on("FOLIO_CLOSED", onFolioUpdated);
-
+//         const onFolioUpdated = () => fetchFolios();
+//         ["BOOKING_UPDATED","CHARGE_ADDED","CHARGE_DELETED","PAYMENT_ADDED","PAYMENT_DELETED","FOLIO_CLOSED"].forEach(event => {
+//             socket.on(event, onFolioUpdated);
+//         });
 //         return () => {
-//             socket.off("BOOKING_UPDATED", onFolioUpdated);
-//             socket.off("CHARGE_ADDED", onFolioUpdated);
-//             socket.off("CHARGE_DELETED", onFolioUpdated);
-//             socket.off("PAYMENT_ADDED", onFolioUpdated);
-//             socket.off("PAYMENT_DELETED", onFolioUpdated);
-//             socket.off("FOLIO_CLOSED", onFolioUpdated);
+//             ["BOOKING_UPDATED","CHARGE_ADDED","CHARGE_DELETED","PAYMENT_ADDED","PAYMENT_DELETED","FOLIO_CLOSED"].forEach(event => {
+//                 socket.off(event, onFolioUpdated);
+//             });
 //         };
 //     }, [socket, bookingId]);
 
 //     if (loading) return <p className="text-center mt-4">جاري التحميل...</p>;
-//     if (!folio) return <p className="text-center mt-4">الفاتورة غير موجودة</p>;
+//     if (!folios || folios.length === 0) return <p className="text-center mt-4">الفاتورة غير موجودة</p>;
 
-//     // ✅ الحسابات
-//     const subtotal = folio.charges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
-//     const taxTotal = folio.charges.reduce((sum, c) => {
-//         const amount = Number(c.amount || 0);
-//         const taxPercent = Number(c.tax || 0);
-//         return sum + (amount * taxPercent) / 100;
-//     }, 0);
+//     // دمج كل الـ charges و payments لجميع الفواتير ضمن الـ group
+//     const allCharges = folios.flatMap(f => f.charges.map(c => ({...c, folioId: f.id, guestName: f.guest?.name})));
+//     const allPayments = folios.flatMap(f => f.payments.map(p => ({...p, folioId: f.id, guestName: f.guest?.name})));
+
+//     // الحسابات
+//     const subtotal = allCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+//     const taxTotal = allCharges.reduce((sum, c) => sum + (Number(c.amount || 0) * Number(c.tax || 0)) / 100, 0);
 //     const totalCharges = subtotal + taxTotal;
-
-//     const totalPayments = folio.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+//     const totalPayments = allPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 //     const balance = totalCharges - totalPayments;
 
-//     // ======= Mutations =======
+//     // CRUD Functions
 //     const handleAddCharge = async () => {
 //         if (!canAddCharge) return alert("ليس لديك صلاحية لإضافة Charges");
 //         try {
 //             const amount = Number(newCharge.amount);
 //             const taxPercent = Number(newCharge.tax || 0);
-//             const taxAmount = (amount * taxPercent) / 100;
 
 //             await fetch(`/api/folios/${bookingId}/charges`, {
 //                 method: "POST",
 //                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify({
-//                     ...newCharge,
-//                     amount,
-//                     tax: taxPercent, // نخزن النسبة
-//                     postedById: sessionUser.id,
-//                 }),
+//                 body: JSON.stringify({ ...newCharge, amount, tax: taxPercent, postedById: sessionUser.id }),
 //             });
 //             setNewCharge({ code: "", description: "", amount: "", tax: "" });
-//             fetchFolio();
+//             fetchFolios();
 //         } catch (err) {
 //             console.error(err);
 //             alert(err.message);
@@ -106,7 +94,7 @@
 //                 headers: { "Content-Type": "application/json" },
 //                 body: JSON.stringify({ chargeId }),
 //             });
-//             fetchFolio();
+//             fetchFolios();
 //         } catch (err) {
 //             console.error(err);
 //             alert(err.message);
@@ -119,14 +107,10 @@
 //             await fetch(`/api/folios/${bookingId}/payments`, {
 //                 method: "POST",
 //                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify({
-//                     ...newPayment,
-//                     amount: Number(newPayment.amount),
-//                     postedById: sessionUser.id,
-//                 }),
+//                 body: JSON.stringify({ ...newPayment, amount: Number(newPayment.amount), postedById: sessionUser.id }),
 //             });
 //             setNewPayment({ method: "", amount: "", ref: "" });
-//             fetchFolio();
+//             fetchFolios();
 //         } catch (err) {
 //             console.error(err);
 //             alert(err.message);
@@ -141,7 +125,7 @@
 //                 headers: { "Content-Type": "application/json" },
 //                 body: JSON.stringify({ paymentId }),
 //             });
-//             fetchFolio();
+//             fetchFolios();
 //         } catch (err) {
 //             console.error(err);
 //             alert(err.message);
@@ -152,134 +136,40 @@
 //         if (!canCloseFolio) return alert("ليس لديك صلاحية لإغلاق أو إعادة فتح الفاتورة");
 //         try {
 //             await fetch(`/api/folios/${bookingId}/close`, { method: "POST" });
-//             fetchFolio();
+//             fetchFolios();
 //         } catch (err) {
 //             console.error(err);
 //         }
 //     };
 
 //     const printFolio = () => {
-//         if (!folio) return alert("Folio not loaded.");
-
-//         const charges = folio.charges || [];
-//         const payments = folio.payments || [];
-
-//         const subtotal = charges.reduce((s, c) => s + Number(c.amount || 0), 0);
-
-//         // ✅ إذا taxAmount غير موجودة، نحسبها (amount * tax%)
-//         const taxTotal = charges.reduce((s, c) => {
-//             const amount = Number(c.amount || 0);
-//             const taxPercent = Number(c.tax || 0);
-//             const taxAmount = c.taxAmount !== undefined ? Number(c.taxAmount) : (amount * taxPercent / 100);
-//             return s + taxAmount;
-//         }, 0);
-
-//         const totalCharges = subtotal + taxTotal;
-//         const totalPayments = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
-//         const balance = totalCharges - totalPayments;
-
 //         const printWindow = window.open("", "_blank");
 //         if (!printWindow) return alert("Unable to open print window.");
 
-//         printWindow.document.write(`
-//         <html>
-//         <head>
-//             <title>Folio ${folio.id}</title>
-//             <style>
-//                 body { font-family: Arial, sans-serif; padding: 20px; }
-//                 h1 { text-align: center; }
-//                 table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-//                 th, td { border: 1px solid #333; padding: 6px; text-align: left; }
-//                 th { background-color: #f0f0f0; }
-//                 tfoot td { font-weight: bold; }
-//             </style>
-//         </head>
-//         <body>
-//             <h1>Folio ID: ${folio.id}</h1>
-//             <p><strong>Status:</strong> ${folio.status}</p>
-//             <p><strong>Guest:</strong> ${folio.booking?.guest?.name || "-"}</p>
-//             <p><strong>Room:</strong> ${folio.booking?.room?.number || "-"} (${folio.booking?.room?.roomType?.name || "-"})</p>
-//             <table>
-//                 <thead>
-//                     <tr>
-//                         <th>Code</th>
-//                         <th>Description</th>
-//                         <th>Amount</th>
-//                         <th>Tax %</th>
-//                         <th>Tax Amount</th>
-//                         <th>Total</th>
-//                     </tr>
-//                 </thead>
-//                 <tbody>
-// ${charges.map(c => {
-//             const amount = Number(c.amount || 0);
-//             const taxPercent = Number(c.tax || 0);
-//             const taxAmount = c.taxAmount !== undefined ? Number(c.taxAmount) : (amount * taxPercent / 100);
-//             const total = amount + taxAmount;
-//             return `
-//         <tr>
-//             <td>${c.code}</td>
-//             <td>${c.description}</td>
-//             <td>${amount.toFixed(2)}</td>
-//             <td>${taxPercent.toFixed(2)}%</td>
-//             <td>${taxAmount.toFixed(2)}</td>
-//             <td>${total.toFixed(2)}</td>
-//         </tr>
-//     `;
-//         }).join("")}
-//                 </tbody>
-//                 <tfoot>
-//                     <tr>
-//                         <td colspan="2">Subtotal</td>
-//                         <td colspan="4">${subtotal.toFixed(2)}</td>
-//                     </tr>
-//                     <tr>
-//                         <td colspan="2">Tax Total</td>
-//                         <td colspan="4">${taxTotal.toFixed(2)}</td>
-//                     </tr>
-//                     <tr>
-//                         <td colspan="2">Total Charges</td>
-//                         <td colspan="4">${totalCharges.toFixed(2)}</td>
-//                     </tr>
-//                     <tr>
-//                         <td colspan="2">Total Payments</td>
-//                         <td colspan="4">${totalPayments.toFixed(2)}</td>
-//                     </tr>
-//                     <tr>
-//                         <td colspan="2">Balance</td>
-//                         <td colspan="4">${balance.toFixed(2)}</td>
-//                     </tr>
-//                 </tfoot>
-//             </table>
-//         </body>
-//         </html>
-//     `);
-
+//         printWindow.document.write(`<html><head><title>Folio</title></head><body>`);
+//         folios.forEach(f => {
+//             printWindow.document.write(`<h2>Folio ID: ${f.id} (${f.guest?.name || "N/A"})</h2>`);
+//             printWindow.document.write(`<p>Status: ${f.status}</p>`);
+//             printWindow.document.write(`<p>Room: ${f.booking?.room?.number || "-"}</p>`);
+//             printWindow.document.write(`<table border="1" cellpadding="4" cellspacing="0"><thead><tr><th>Code</th><th>Description</th><th>Amount</th><th>Tax %</th><th>Tax Value</th><th>Total</th></tr></thead><tbody>`);
+//             f.charges.forEach(c => {
+//                 const taxValue = (Number(c.amount || 0) * Number(c.tax || 0)) / 100;
+//                 const total = Number(c.amount || 0) + taxValue;
+//                 printWindow.document.write(`<tr><td>${c.code}</td><td>${c.description}</td><td>${Number(c.amount).toFixed(2)}</td><td>${c.tax}%</td><td>${taxValue.toFixed(2)}</td><td>${total.toFixed(2)}</td></tr>`);
+//             });
+//             printWindow.document.write(`</tbody></table><hr/>`);
+//         });
+//         printWindow.document.write(`</body></html>`);
 //         printWindow.document.close();
 //         printWindow.focus();
 //         printWindow.print();
 //     };
 
-
-
 //     return (
 //         <div className="p-6 max-w-5xl mx-auto">
-//             {/* Booking Info */}
-//             {folio.booking && (
-//                 <div className="rounded shadow p-4 mb-6">
-//                     <h2 className="text-2xl font-bold mb-3">Booking Details</h2>
-//                     <p><strong>Guest:</strong> {folio.booking.guest?.name}</p>
-//                     <p><strong>Room:</strong> {folio.booking.room?.number || "N/A"} ({folio.booking.room?.roomType?.name})</p>
-//                     <p><strong>Rate Plan:</strong> {folio.booking.ratePlan?.name || "N/A"}</p>
-//                     <p><strong>Check-In:</strong> {new Date(folio.booking.checkIn).toLocaleDateString()}</p>
-//                     <p><strong>Check-Out:</strong> {new Date(folio.booking.checkOut).toLocaleDateString()}</p>
-//                 </div>
-//             )}
-
 //             {/* Folio Summary */}
 //             <div className="rounded shadow p-4 mb-6">
 //                 <h2 className="text-2xl font-bold mb-3">Folio Summary</h2>
-//                 <p>Status: <span className="font-semibold">{folio.status}</span></p>
 //                 <p>Subtotal (قبل الضريبة): <span className="text-gray-800 font-bold">{subtotal.toFixed(2)}</span></p>
 //                 <p>Tax Total (الضريبة): <span className="text-orange-600 font-bold">{taxTotal.toFixed(2)}</span></p>
 //                 <p>Total Charges (الإجمالي مع الضريبة): <span className="text-red-600 font-bold">{totalCharges.toFixed(2)}</span></p>
@@ -291,13 +181,13 @@
 //                         className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
 //                         disabled={!canCloseFolio}
 //                     >
-//                         {folio.status === "Open" ? "Close Folio" : "Reopen Folio"}
+//                         {folios.some(f => f.status === "Open") ? "Close Folio" : "Reopen Folio"}
 //                     </button>
 //                     <button onClick={printFolio} className="bg-blue-500 text-white px-4 py-2 rounded">Print</button>
 //                 </div>
 //             </div>
 
-//             {/* Charges */}
+//             {/* Charges Table */}
 //             <div className="rounded shadow p-4 mb-6">
 //                 <h3 className="text-xl font-semibold mb-3">Charges</h3>
 //                 <table className="w-full border text-sm">
@@ -314,25 +204,20 @@
 //                         </tr>
 //                     </thead>
 //                     <tbody>
-//                         {folio.charges.map((c) => {
-//                             const amount = Number(c.amount || 0);
-//                             const taxPercent = Number(c.tax || 0);
-//                             const taxValue = (amount * taxPercent) / 100;
+//                         {allCharges.map(c => {
+//                             const taxValue = (Number(c.amount || 0) * Number(c.tax || 0)) / 100;
 //                             return (
-//                                 <tr key={c.id}>
+//                                 <tr key={`${c.id}-${c.folioId}`}>
 //                                     <td className="border p-2">{c.code}</td>
 //                                     <td className="border p-2">{c.description}</td>
-//                                     <td className="border p-2">{amount.toFixed(2)}</td>
-//                                     <td className="border p-2">{taxPercent}%</td>
+//                                     <td className="border p-2">{Number(c.amount).toFixed(2)}</td>
+//                                     <td className="border p-2">{c.tax}%</td>
 //                                     <td className="border p-2">{taxValue.toFixed(2)}</td>
 //                                     <td className="border p-2">{new Date(c.postedAt).toLocaleString()}</td>
-//                                     <td className="border p-2">{c.postedBy?.name || "System"}</td>
+//                                     <td className="border p-2">{c.postedBy?.name || "System"} {c.guestName ? `(${c.guestName})` : ""}</td>
 //                                     <td className="border p-2 text-center">
 //                                         {canDeleteCharge && (
-//                                             <button
-//                                                 onClick={() => handleDeleteCharge(c.id)}
-//                                                 className="text-red-500 hover:text-red-700"
-//                                             >
+//                                             <button onClick={() => handleDeleteCharge(c.id)} className="text-red-500 hover:text-red-700">
 //                                                 حذف
 //                                             </button>
 //                                         )}
@@ -342,6 +227,7 @@
 //                         })}
 //                     </tbody>
 //                 </table>
+
 //                 {canAddCharge && (
 //                     <div className="mt-4 flex flex-col sm:flex-row gap-2">
 //                         <input placeholder="Code" className="border p-2 rounded flex-1" value={newCharge.code} onChange={(e) => setNewCharge({ ...newCharge, code: e.target.value })} />
@@ -353,7 +239,7 @@
 //                 )}
 //             </div>
 
-//             {/* Payments */}
+//             {/* Payments Table */}
 //             <div className="rounded shadow p-4">
 //                 <h3 className="text-xl font-semibold mb-3">Payments</h3>
 //                 <table className="w-full border text-sm">
@@ -368,13 +254,13 @@
 //                         </tr>
 //                     </thead>
 //                     <tbody>
-//                         {folio.payments.map((p) => (
-//                             <tr key={p.id}>
+//                         {allPayments.map(p => (
+//                             <tr key={`${p.id}-${p.folioId}`}>
 //                                 <td className="border p-2">{p.method}</td>
 //                                 <td className="border p-2">{Number(p.amount).toFixed(2)}</td>
 //                                 <td className="border p-2">{p.ref || "-"}</td>
 //                                 <td className="border p-2">{new Date(p.postedAt).toLocaleString()}</td>
-//                                 <td className="border p-2">{p.postedBy?.name || "System"}</td>
+//                                 <td className="border p-2">{p.postedBy?.name || "System"} {p.guestName ? `(${p.guestName})` : ""}</td>
 //                                 <td className="border p-2 text-center">
 //                                     {canDeletePayment && (
 //                                         <button onClick={() => handleDeletePayment(p.id)} className="text-red-500 hover:text-red-700">
@@ -386,6 +272,7 @@
 //                         ))}
 //                     </tbody>
 //                 </table>
+
 //                 {canAddPayment && (
 //                     <div className="mt-4 flex flex-col sm:flex-row gap-2">
 //                         <input placeholder="Method" className="border p-2 rounded flex-1" value={newPayment.method} onChange={(e) => setNewPayment({ ...newPayment, method: e.target.value })} />
@@ -401,7 +288,6 @@
 
 
 
-// الكود الاعلى نسخة اصلية
 
 
 
@@ -410,8 +296,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
 
-export default function FolioPage({ params, session }) {
-    const { bookingId } = params;
+export default function FolioPage({ bookingId, groupId, session }) {
     const sessionUser = session?.user || null;
     const socket = useSocket();
 
@@ -427,61 +312,61 @@ export default function FolioPage({ params, session }) {
     const canDeletePayment = ["Admin", "Manager"].includes(role);
     const canCloseFolio = ["Admin", "Manager"].includes(role);
 
-    // Fetch folios
     const fetchFolios = useCallback(async () => {
-        if (!bookingId) return;
+        setLoading(true);
         try {
-            const res = await fetch(`/api/folios/${bookingId}`);
-            if (!res.ok) throw new Error("Failed to fetch folio");
+            let url = `/api/folios/${bookingId}`;
+            if (groupId) {
+                url = `/api/folios/group/${groupId}`;
+            }
+            const res = await fetch(url);
+            if (!res.ok) throw new Error("Failed to fetch folios");
             const data = await res.json();
-            setFolios(data);
+            // إذا كان group folio، حوّل إلى array لتوحيد التعامل
+            setFolios(Array.isArray(data) ? data : [data]);
         } catch (err) {
             console.error(err);
         } finally {
             setLoading(false);
         }
-    }, [bookingId]);
+    }, [bookingId, groupId]);
+
+    useEffect(() => { fetchFolios(); }, [fetchFolios]);
 
     useEffect(() => {
-        fetchFolios();
-    }, [fetchFolios]);
-
-    // Socket listeners
-    useEffect(() => {
-        if (!socket || !bookingId) return;
+        if (!socket) return;
         const onFolioUpdated = () => fetchFolios();
-        ["BOOKING_UPDATED","CHARGE_ADDED","CHARGE_DELETED","PAYMENT_ADDED","PAYMENT_DELETED","FOLIO_CLOSED"].forEach(event => {
+        ["BOOKING_UPDATED", "CHARGE_ADDED", "CHARGE_DELETED", "PAYMENT_ADDED", "PAYMENT_DELETED", "FOLIO_CLOSED"].forEach(event => {
             socket.on(event, onFolioUpdated);
         });
         return () => {
-            ["BOOKING_UPDATED","CHARGE_ADDED","CHARGE_DELETED","PAYMENT_ADDED","PAYMENT_DELETED","FOLIO_CLOSED"].forEach(event => {
+            ["BOOKING_UPDATED", "CHARGE_ADDED", "CHARGE_DELETED", "PAYMENT_ADDED", "PAYMENT_DELETED", "FOLIO_CLOSED"].forEach(event => {
                 socket.off(event, onFolioUpdated);
             });
         };
-    }, [socket, bookingId]);
+    }, [socket, fetchFolios]);
 
     if (loading) return <p className="text-center mt-4">جاري التحميل...</p>;
-    if (!folios || folios.length === 0) return <p className="text-center mt-4">الفاتورة غير موجودة</p>;
+    if (!folios.length) return <p className="text-center mt-4">لا توجد فواتير</p>;
 
-    // دمج كل الـ charges و payments لجميع الفواتير ضمن الـ group
-    const allCharges = folios.flatMap(f => f.charges.map(c => ({...c, folioId: f.id, guestName: f.guest?.name})));
-    const allPayments = folios.flatMap(f => f.payments.map(p => ({...p, folioId: f.id, guestName: f.guest?.name})));
+    // دمج كل charges و payments لجميع الفواتير ضمن المجموعة
+    const allCharges = folios.flatMap(f => f.charges.map(c => ({ ...c, folioId: f.id, guestName: f.booking?.guest?.firstName + " " + f.booking?.guest?.lastName })));
+    const allPayments = folios.flatMap(f => f.payments.map(p => ({ ...p, folioId: f.id, guestName: p.booking?.guest?.firstName + " " + p.booking?.guest?.lastName })));
 
-    // الحسابات
     const subtotal = allCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
     const taxTotal = allCharges.reduce((sum, c) => sum + (Number(c.amount || 0) * Number(c.tax || 0)) / 100, 0);
     const totalCharges = subtotal + taxTotal;
     const totalPayments = allPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const balance = totalCharges - totalPayments;
 
-    // CRUD Functions
+    // CRUD functions
     const handleAddCharge = async () => {
         if (!canAddCharge) return alert("ليس لديك صلاحية لإضافة Charges");
         try {
             const amount = Number(newCharge.amount);
             const taxPercent = Number(newCharge.tax || 0);
 
-            await fetch(`/api/folios/${bookingId}/charges`, {
+            await fetch(`/api/folios/${folios[0].id}/charges`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ...newCharge, amount, tax: taxPercent, postedById: sessionUser.id }),
@@ -497,7 +382,7 @@ export default function FolioPage({ params, session }) {
     const handleDeleteCharge = async (chargeId) => {
         if (!canDeleteCharge) return alert("ليس لديك صلاحية لحذف Charges");
         try {
-            await fetch(`/api/folios/${bookingId}/charges`, {
+            await fetch(`/api/folios/${folios[0].id}/charges`, {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ chargeId }),
@@ -512,7 +397,7 @@ export default function FolioPage({ params, session }) {
     const handleAddPayment = async () => {
         if (!canAddPayment) return alert("ليس لديك صلاحية لإضافة Payments");
         try {
-            await fetch(`/api/folios/${bookingId}/payments`, {
+            await fetch(`/api/folios/${folios[0].id}/payments`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ...newPayment, amount: Number(newPayment.amount), postedById: sessionUser.id }),
@@ -528,7 +413,7 @@ export default function FolioPage({ params, session }) {
     const handleDeletePayment = async (paymentId) => {
         if (!canDeletePayment) return alert("ليس لديك صلاحية لحذف Payments");
         try {
-            await fetch(`/api/folios/${bookingId}/payments`, {
+            await fetch(`/api/folios/${folios[0].id}/payments`, {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ paymentId }),
@@ -543,58 +428,28 @@ export default function FolioPage({ params, session }) {
     const toggleFolioStatus = async () => {
         if (!canCloseFolio) return alert("ليس لديك صلاحية لإغلاق أو إعادة فتح الفاتورة");
         try {
-            await fetch(`/api/folios/${bookingId}/close`, { method: "POST" });
+            await fetch(`/api/folios/${folios[0].id}/close`, { method: "POST" });
             fetchFolios();
         } catch (err) {
             console.error(err);
         }
     };
 
-    const printFolio = () => {
-        const printWindow = window.open("", "_blank");
-        if (!printWindow) return alert("Unable to open print window.");
-
-        printWindow.document.write(`<html><head><title>Folio</title></head><body>`);
-        folios.forEach(f => {
-            printWindow.document.write(`<h2>Folio ID: ${f.id} (${f.guest?.name || "N/A"})</h2>`);
-            printWindow.document.write(`<p>Status: ${f.status}</p>`);
-            printWindow.document.write(`<p>Room: ${f.booking?.room?.number || "-"}</p>`);
-            printWindow.document.write(`<table border="1" cellpadding="4" cellspacing="0"><thead><tr><th>Code</th><th>Description</th><th>Amount</th><th>Tax %</th><th>Tax Value</th><th>Total</th></tr></thead><tbody>`);
-            f.charges.forEach(c => {
-                const taxValue = (Number(c.amount || 0) * Number(c.tax || 0)) / 100;
-                const total = Number(c.amount || 0) + taxValue;
-                printWindow.document.write(`<tr><td>${c.code}</td><td>${c.description}</td><td>${Number(c.amount).toFixed(2)}</td><td>${c.tax}%</td><td>${taxValue.toFixed(2)}</td><td>${total.toFixed(2)}</td></tr>`);
-            });
-            printWindow.document.write(`</tbody></table><hr/>`);
-        });
-        printWindow.document.write(`</body></html>`);
-        printWindow.document.close();
-        printWindow.focus();
-        printWindow.print();
-    };
-
     return (
         <div className="p-6 max-w-5xl mx-auto">
-            {/* Folio Summary */}
             <div className="rounded shadow p-4 mb-6">
                 <h2 className="text-2xl font-bold mb-3">Folio Summary</h2>
-                <p>Subtotal (قبل الضريبة): <span className="text-gray-800 font-bold">{subtotal.toFixed(2)}</span></p>
-                <p>Tax Total (الضريبة): <span className="text-orange-600 font-bold">{taxTotal.toFixed(2)}</span></p>
-                <p>Total Charges (الإجمالي مع الضريبة): <span className="text-red-600 font-bold">{totalCharges.toFixed(2)}</span></p>
+                <p>Subtotal: <span className="text-gray-800 font-bold">{subtotal.toFixed(2)}</span></p>
+                <p>Tax Total: <span className="text-orange-600 font-bold">{taxTotal.toFixed(2)}</span></p>
+                <p>Total Charges: <span className="text-red-600 font-bold">{totalCharges.toFixed(2)}</span></p>
                 <p>Total Payments: <span className="text-green-600 font-bold">{totalPayments.toFixed(2)}</span></p>
                 <p>Balance: <span className="text-blue-600 font-bold">{balance.toFixed(2)}</span></p>
                 <div className="flex gap-3 mt-4 flex-wrap">
-                    <button
-                        onClick={toggleFolioStatus}
-                        className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
-                        disabled={!canCloseFolio}
-                    >
+                    <button onClick={toggleFolioStatus} className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600" disabled={!canCloseFolio}>
                         {folios.some(f => f.status === "Open") ? "Close Folio" : "Reopen Folio"}
                     </button>
-                    <button onClick={printFolio} className="bg-blue-500 text-white px-4 py-2 rounded">Print</button>
                 </div>
             </div>
-
             {/* Charges Table */}
             <div className="rounded shadow p-4 mb-6">
                 <h3 className="text-xl font-semibold mb-3">Charges</h3>
@@ -693,4 +548,3 @@ export default function FolioPage({ params, session }) {
         </div>
     );
 }
-

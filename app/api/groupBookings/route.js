@@ -4,22 +4,20 @@
 //     try {
 //         const { searchParams } = new URL(req.url);
 //         const groupId = searchParams.get("groupId");
-//         if (!groupId) {
-//             return new Response("GroupId is required", { status: 400 });
-//         }
+//         if (!groupId) return new Response("GroupId is required", { status: 400 });
 
 //         const bookings = await prisma.booking.findMany({
 //             where: { groupId },
 //             include: {
 //                 guest: true,
 //                 property: true,
-//                 room: true,       // ✅ عندك room مش roomType
+//                 room: true,
 //                 ratePlan: true,
 //                 folio: true,
 //                 company: true,
 //                 group: true,
-//                 extras: true
-//             }
+//                 extras: true,
+//             },
 //         });
 
 //         return new Response(JSON.stringify(bookings), { status: 200 });
@@ -29,15 +27,16 @@
 //     }
 // }
 
+
 // export async function POST(req) {
 //     try {
 //         const data = await req.json();
 
-//         // تحقق من وجود المجموعة
+//         // تأكد من وجود المجموعة
 //         const group = await prisma.groupMaster.findUnique({ where: { id: data.groupId } });
 //         if (!group) throw new Error("Group not found");
 
-//         // إنشاء Guest افتراضي إذا لم يوجد guestId
+//         // اختياري: إنشاء Guest جديد باسم "Group Guest" إذا لم يُرسل guestId
 //         let guestId = data.guestId;
 //         if (!guestId) {
 //             const guest = await prisma.guest.create({
@@ -45,34 +44,43 @@
 //                     firstName: "Group Guest",
 //                     lastName: group.name,
 //                     hotelGroupId: null,
-//                     propertyId: data.propertyId
-//                 }
+//                     propertyId: data.propertyId,
+//                 },
 //             });
 //             guestId = guest.id;
 //         }
 
+//         // إنشاء الحجز
 //         const booking = await prisma.booking.create({
 //             data: {
-//                 group: { connect: { id: data.groupId } },
 //                 property: { connect: { id: data.propertyId } },
-//                 roomType: data.roomTypeId ? { connect: { id: data.roomTypeId } } : undefined,
+//                 group: data.groupId ? { connect: { id: data.groupId } } : undefined,
 //                 guest: { connect: { id: guestId } },
+//                 room: data.roomId ? { connect: { id: data.roomId } } : undefined,
+//                 roomBlock: data.roomBlockId ? { connect: { id: data.roomBlockId } } : undefined, // ✅ جديد
+//                 ratePlan: data.ratePlanId ? { connect: { id: data.ratePlanId } } : undefined,
+
 //                 checkIn: new Date(data.checkIn),
 //                 checkOut: new Date(data.checkOut),
 //                 adults: data.adults,
 //                 children: data.children,
 //                 specialRequests: data.specialRequests,
-//                 status: "Booked"
+//                 status: "Booked",
 //             },
 //             include: {
 //                 group: true,
 //                 property: true,
 //                 guest: true,
-//                 roomType: true
-//             }
+//                 room: true,
+//                 roomBlock: true, // ✅ جديد
+//                 ratePlan: true,
+//                 folio: true,
+//                 company: true,
+//                 extras: true,
+//             },
 //         });
 
-//         // 📢 بث
+//         // 📢 بث الحدث عبر socket بعد الإنشاء
 //         try {
 //             await fetch("http://localhost:3001/api/broadcast", {
 //                 method: "POST",
@@ -85,11 +93,15 @@
 
 //         return new Response(JSON.stringify(booking), { status: 200 });
 //     } catch (err) {
-//         console.error("Create group booking failed:", err);
+//         console.error(err);
 //         return new Response(JSON.stringify({ error: err.message }), { status: 500 });
 //     }
 // }
 
+
+
+
+// الكود الاعلى نسخة اصلية
 
 
 
@@ -127,11 +139,11 @@ export async function POST(req) {
     try {
         const data = await req.json();
 
-        // تأكد من وجود المجموعة
+        // --- تحقق من وجود المجموعة ---
         const group = await prisma.groupMaster.findUnique({ where: { id: data.groupId } });
         if (!group) throw new Error("Group not found");
 
-        // اختياري: إنشاء Guest جديد باسم "Group Guest" إذا لم يُرسل guestId
+        // --- إنشاء Guest افتراضي إذا لم يُرسل guestId ---
         let guestId = data.guestId;
         if (!guestId) {
             const guest = await prisma.guest.create({
@@ -145,20 +157,20 @@ export async function POST(req) {
             guestId = guest.id;
         }
 
-        // إنشاء الحجز
+        // --- إنشاء الحجز ---
         const booking = await prisma.booking.create({
             data: {
                 property: { connect: { id: data.propertyId } },
                 group: data.groupId ? { connect: { id: data.groupId } } : undefined,
                 guest: { connect: { id: guestId } },
-                room: data.roomId ? { connect: { id: data.roomId } } : undefined,       // ✅ room بدل roomType
-                ratePlan: data.ratePlanId ? { connect: { id: data.ratePlanId } } : undefined, // ✅ ratePlan
-
+                room: data.roomId ? { connect: { id: data.roomId } } : undefined,
+                roomBlock: data.roomBlockId ? { connect: { id: data.roomBlockId } } : undefined,
+                ratePlan: data.ratePlanId ? { connect: { id: data.ratePlanId } } : undefined,
                 checkIn: new Date(data.checkIn),
                 checkOut: new Date(data.checkOut),
-                adults: data.adults,
-                children: data.children,
-                specialRequests: data.specialRequests,
+                adults: data.adults ?? 1,
+                children: data.children ?? 0,
+                specialRequests: data.specialRequests || "",
                 status: "Booked",
             },
             include: {
@@ -166,14 +178,39 @@ export async function POST(req) {
                 property: true,
                 guest: true,
                 room: true,
+                roomBlock: true,
                 ratePlan: true,
-                folio: true,
+                folio: true,      // قد يكون null بعد الإنشاء
                 company: true,
                 extras: true,
             },
         });
 
-        // 📢 بث الحدث عبر socket بعد الإنشاء
+        // --- إنشاء Folio تلقائي ---
+        let folio = await prisma.folio.create({
+            data: {
+                bookingId: booking.id,
+                status: "Open",
+                charges: [],
+                payments: [],
+            },
+        });
+
+        booking.folio = folio; // لإعادة Folio مع booking
+
+        // --- إنشاء Extras إذا أرسلها المستخدم ---
+        if (data.extras?.length) {
+            const createdExtras = await Promise.all(
+                data.extras.map(ex =>
+                    prisma.extra.create({
+                        data: { ...ex, bookingId: booking.id }
+                    })
+                )
+            );
+            booking.extras = createdExtras;
+        }
+
+        // --- بث الحدث عبر Socket ---
         try {
             await fetch("http://localhost:3001/api/broadcast", {
                 method: "POST",
@@ -185,8 +222,9 @@ export async function POST(req) {
         }
 
         return new Response(JSON.stringify(booking), { status: 200 });
+
     } catch (err) {
-        console.error(err);
+        console.error("Create group booking failed:", err);
         return new Response(JSON.stringify({ error: err.message }), { status: 500 });
     }
 }

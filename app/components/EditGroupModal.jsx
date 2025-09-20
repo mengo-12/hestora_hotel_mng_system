@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
 
-export default function EditGroupModal({ isOpen, onClose, group, properties, companies, guests, onGroupUpdated }) {
+export default function EditGroupModal({ isOpen, onClose, group, properties, companies, guests, roomBlocks, onGroupUpdated }) {
     const socket = useSocket();
 
     const [name, setName] = useState("");
@@ -11,6 +11,7 @@ export default function EditGroupModal({ isOpen, onClose, group, properties, com
     const [propertyId, setPropertyId] = useState("");
     const [companyId, setCompanyId] = useState("");
     const [leaderId, setLeaderId] = useState("");
+    const [selectedRoomBlockIds, setSelectedRoomBlockIds] = useState([]);
 
     useEffect(() => {
         if (group) {
@@ -20,6 +21,7 @@ export default function EditGroupModal({ isOpen, onClose, group, properties, com
             setPropertyId(group.propertyId || "");
             setCompanyId(group.companyId || "");
             setLeaderId(group.leaderId || "");
+            setSelectedRoomBlockIds(group.roomBlocks?.map(rb => rb.id) || []);
         }
     }, [group]);
 
@@ -27,7 +29,7 @@ export default function EditGroupModal({ isOpen, onClose, group, properties, com
         if (!group) return;
 
         try {
-            const payload = { name, code, description, propertyId, companyId, leaderId };
+            const payload = { name, code, description, propertyId, companyId, leaderId, roomBlockIds: selectedRoomBlockIds };
             const res = await fetch(`/api/groups/${group.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -44,7 +46,6 @@ export default function EditGroupModal({ isOpen, onClose, group, properties, com
             alert(err.message);
         }
     };
-
 
     if (!isOpen) return null;
 
@@ -118,19 +119,24 @@ export default function EditGroupModal({ isOpen, onClose, group, properties, com
                     />
                 </div>
 
+                <div className="mb-3">
+                    <label className="block mb-1">Room Blocks (Optional)</label>
+                    <select
+                        multiple
+                        value={selectedRoomBlockIds}
+                        onChange={e => {
+                            const options = Array.from(e.target.selectedOptions).map(o => o.value);
+                            setSelectedRoomBlockIds(options);
+                        }}
+                        className="w-full border rounded p-2 h-32"
+                    >
+                        {roomBlocks.map(rb => <option key={rb.id} value={rb.id}>{rb.name}</option>)}
+                    </select>
+                </div>
+
                 <div className="flex justify-end space-x-2 mt-4">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
-                    >
-                        Save Changes
-                    </button>
+                    <button onClick={onClose} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Cancel</button>
+                    <button onClick={handleSubmit} className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">Save Changes</button>
                 </div>
             </div>
         </div>

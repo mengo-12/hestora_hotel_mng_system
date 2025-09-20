@@ -6,16 +6,18 @@ export default function EditGroupBookingModal({
     isOpen,
     onClose,
     booking,
-    properties = [],  // قيمة افتراضية
+    properties = [],
+    roomBlocks = [], // ✅ جديد
     onBookingUpdated
 }) {
     const socket = useSocket();
 
-    const [groups, setGroups] = useState([]); // ← تم إضافة جلب المجموعات
+    const [groups, setGroups] = useState([]);
     const [groupId, setGroupId] = useState("");
     const [propertyId, setPropertyId] = useState("");
     const [roomTypeId, setRoomTypeId] = useState("");
     const [roomTypes, setRoomTypes] = useState([]);
+    const [roomBlockId, setRoomBlockId] = useState(""); // ✅ جديد
     const [checkIn, setCheckIn] = useState("");
     const [checkOut, setCheckOut] = useState("");
     const [adults, setAdults] = useState(1);
@@ -42,6 +44,7 @@ export default function EditGroupBookingModal({
             setGroupId(booking.groupId || "");
             setPropertyId(booking.propertyId || "");
             setRoomTypeId(booking.roomTypeId || "");
+            setRoomBlockId(booking.roomBlockId || ""); // ✅ جديد
             setCheckIn(booking.checkIn ? booking.checkIn.slice(0, 10) : "");
             setCheckOut(booking.checkOut ? booking.checkOut.slice(0, 10) : "");
             setAdults(booking.adults || 1);
@@ -78,9 +81,19 @@ export default function EditGroupBookingModal({
             return;
         }
 
-        try {
-            const payload = { groupId, propertyId, roomTypeId, checkIn, checkOut, adults, children, specialRequests };
+        const payload = {
+            groupId,
+            propertyId,
+            roomTypeId,
+            roomBlockId, // ✅ أرسل RoomBlock
+            checkIn,
+            checkOut,
+            adults,
+            children,
+            specialRequests
+        };
 
+        try {
             const res = await fetch(`/api/groupBookings/${booking.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -143,6 +156,19 @@ export default function EditGroupBookingModal({
                     >
                         <option value="">Select Room Type</option>
                         {roomTypes.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
+                    </select>
+                </div>
+
+                {/* Room Block */}
+                <div className="mb-3">
+                    <label className="block mb-1">Room Block</label>
+                    <select
+                        value={roomBlockId}
+                        onChange={e => setRoomBlockId(e.target.value)}
+                        className="w-full border rounded p-2"
+                    >
+                        <option value="">Select Room Block</option>
+                        {roomBlocks.map(rb => <option key={rb.id} value={rb.id}>{rb.name}</option>)}
                     </select>
                 </div>
 

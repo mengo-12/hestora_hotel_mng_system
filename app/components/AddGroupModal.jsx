@@ -1,8 +1,8 @@
 'use client';
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
 
-export default function AddGroupModal({ isOpen, onClose, properties, companies, guests, onGroupAdded }) {
+export default function AddGroupModal({ isOpen, onClose, properties, companies, guests, roomBlocks, onGroupAdded }) {
     const socket = useSocket();
 
     const [name, setName] = useState("");
@@ -11,6 +11,7 @@ export default function AddGroupModal({ isOpen, onClose, properties, companies, 
     const [propertyId, setPropertyId] = useState("");
     const [companyId, setCompanyId] = useState("");
     const [leaderId, setLeaderId] = useState("");
+    const [selectedRoomBlockIds, setSelectedRoomBlockIds] = useState([]);
 
     const handleSubmit = async () => {
         if (!name || !code || !propertyId) {
@@ -19,7 +20,7 @@ export default function AddGroupModal({ isOpen, onClose, properties, companies, 
         }
 
         try {
-            const payload = { name, code, description, propertyId, companyId, leaderId };
+            const payload = { name, code, description, propertyId, companyId, leaderId, roomBlockIds: selectedRoomBlockIds };
 
             const res = await fetch("/api/groups", {
                 method: "POST",
@@ -33,11 +34,9 @@ export default function AddGroupModal({ isOpen, onClose, properties, companies, 
 
             if (onGroupAdded) onGroupAdded(newGroup);
 
-            // 🔔 بث المجموعة الجديدة عبر Socket
             if (socket) socket.emit("GROUP_CREATED", newGroup);
 
-            // Reset form & close modal
-            setName(""); setCode(""); setDescription(""); setPropertyId(""); setCompanyId(""); setLeaderId("");
+            setName(""); setCode(""); setDescription(""); setPropertyId(""); setCompanyId(""); setLeaderId(""); setSelectedRoomBlockIds([]);
             onClose();
 
         } catch (err) {
@@ -121,19 +120,24 @@ export default function AddGroupModal({ isOpen, onClose, properties, companies, 
                     />
                 </div>
 
+                <div className="mb-3">
+                    <label className="block mb-1">Room Blocks (Optional)</label>
+                    <select
+                        multiple
+                        value={selectedRoomBlockIds}
+                        onChange={e => {
+                            const options = Array.from(e.target.selectedOptions).map(o => o.value);
+                            setSelectedRoomBlockIds(options);
+                        }}
+                        className="w-full border rounded p-2 h-32"
+                    >
+                        {roomBlocks.map(rb => <option key={rb.id} value={rb.id}>{rb.name}</option>)}
+                    </select>
+                </div>
+
                 <div className="flex justify-end space-x-2 mt-4">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
-                        Add Group
-                    </button>
+                    <button onClick={onClose} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Cancel</button>
+                    <button onClick={handleSubmit} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Group</button>
                 </div>
             </div>
         </div>

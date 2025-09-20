@@ -26,6 +26,7 @@ export default function Sidebar() {
         { name: 'Rooms', href: '/rooms' },
         { name: 'Bookings', href: '/bookings' },
         { name: 'Guests', href: '/guests' },
+        { name: 'Folio', href: '/folios' },
         { name: 'Companies', href: '/companies' },
         { name: 'Groups', href: '/groups' },
         { name: 'Groups bookings', href: '/groupBookings' },

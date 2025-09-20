@@ -27,8 +27,8 @@ model HotelGroup {
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
-  company    Company?   @relation("CompanyGroups", fields: [companyId], references: [id])
-  companyId  String?
+  company   Company? @relation("CompanyGroups", fields: [companyId], references: [id])
+  companyId String?
 }
 
 //////////////////////////////////
@@ -53,18 +53,18 @@ model Property {
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
-  rooms              Room[]
-  roomTypes          RoomType[]
-  bookings           Booking[]
-  users              User[]
-  ratePlans          RatePlan[]
-  housekeeping       HousekeepingTask[]
-  companies          Company[]
-  inventory          Inventory[]
-  guests             Guest[]
-  auditLogs          AuditLog[]
-  groups             GroupMaster[]
-  roomBlocks         RoomBlock[]
+  rooms        Room[]
+  roomTypes    RoomType[]
+  bookings     Booking[]
+  users        User[]
+  ratePlans    RatePlan[]
+  housekeeping HousekeepingTask[]
+  companies    Company[]
+  inventory    Inventory[]
+  guests       Guest[]
+  auditLogs    AuditLog[]
+  groups       GroupMaster[]
+  roomBlocks   RoomBlock[]
 }
 
 //////////////////////////////////
@@ -84,7 +84,11 @@ model RoomType {
   ratePlans   RatePlan[]
   inventory   Inventory[]
 
-  roomBlocks  RoomBlock[]
+  roomBlocks RoomBlock[]
+
+  bookings  Booking[] @relation("BookingRoomType")
+  company   Company?  @relation("CompanyRoomTypes", fields: [companyId], references: [id])
+  companyId String?
 
   @@unique([propertyId, code])
 }
@@ -149,8 +153,8 @@ model Booking {
   id              String    @id @default(cuid())
   property        Property  @relation(fields: [propertyId], references: [id])
   propertyId      String
-  guest           Guest     @relation(fields: [guestId], references: [id])
-  guestId         String
+  guest           Guest?     @relation(fields: [guestId], references: [id])
+  guestId         String?
   room            Room?     @relation(fields: [roomId], references: [id])
   roomId          String?
   checkIn         DateTime
@@ -163,13 +167,18 @@ model Booking {
   specialRequests String?
   folio           Folio?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  company         Company? @relation(fields: [companyId], references: [id])
-  companyId       String?
-  group           GroupMaster? @relation(fields: [groupId], references: [id])
-  groupId         String?
-  extras    Extra[] // هذا هو الحقل العكسي
+  roomType   RoomType? @relation("BookingRoomType", fields: [roomTypeId], references: [id])
+  roomTypeId String?
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  company     Company?     @relation(fields: [companyId], references: [id])
+  companyId   String?
+  group       GroupMaster? @relation(fields: [groupId], references: [id])
+  groupId     String?
+  roomBlock   RoomBlock?   @relation("BookingRoomBlock", fields: [roomBlockId], references: [id])
+  roomBlockId String?
+  extras      Extra[] // هذا هو الحقل العكسي
 }
 
 //////////////////////////////////
@@ -193,7 +202,7 @@ model RatePlan {
   parentRatePlanId String?
   derivedRates     RatePlan[] @relation("DerivedRates") // العلاقة المعاكسة
 
-  rateRules      RateRule[] @relation("RatePlanRules")
+  rateRules      RateRule[]          @relation("RatePlanRules")
   occupancyRates RatePlanOccupancy[]
   policies       RatePlanPolicy[]
   extras         RatePlanExtra[]
@@ -203,10 +212,10 @@ model RatePlan {
 }
 
 model RateRule {
-  id                    String   @id @default(cuid())
-  ratePlanId            String
-  ratePlan              RatePlan @relation("RatePlanRules", fields: [ratePlanId], references: [id])
-  
+  id         String   @id @default(cuid())
+  ratePlanId String
+  ratePlan   RatePlan @relation("RatePlanRules", fields: [ratePlanId], references: [id])
+
   startDate             DateTime?
   endDate               DateTime?
   priceOverride         Float?
@@ -214,29 +223,29 @@ model RateRule {
   maxLOS                Int?
   minOccupancy          Int?
   maxOccupancy          Int?
-  closedToArrival       Boolean @default(false)
-  closedToDeparture     Boolean @default(false)
+  closedToArrival       Boolean   @default(false)
+  closedToDeparture     Boolean   @default(false)
   policy                String?
   mealPlan              String?
-  isPublic              Boolean @default(true)
+  isPublic              Boolean   @default(true)
   derivedFromRatePlanId String?
   seasonName            String?
-  blackout              Boolean @default(false)
-  
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  blackout              Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model RatePlanOccupancy {
-  id          String   @id @default(cuid())
-  ratePlanId  String
-  ratePlan    RatePlan @relation(fields: [ratePlanId], references: [id])
-  
-  occupancy   Int
-  price       Float
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  ratePlanId String
+  ratePlan   RatePlan @relation(fields: [ratePlanId], references: [id])
+
+  occupancy Int
+  price     Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model RatePlanPolicy {
@@ -302,19 +311,23 @@ model HousekeepingTask {
 // Folio / Billing
 //////////////////////////////////
 model Folio {
-  id        String    @id @default(cuid())
-  booking   Booking   @relation(fields: [bookingId], references: [id])
-  bookingId String    @unique
-  guest     Guest     @relation(fields: [guestId], references: [id])
-  guestId   String
-  status    String    @default("Open") // Open, Closed
-  charges   Charge[]
-  payments  Payment[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  extras    Extra[] // الحقل العكسي
-  company   Company?  @relation("CompanyFolios", fields: [companyId], references: [id])
-  companyId String?
+  id          String       @id @default(cuid())
+  booking     Booking?      @relation(fields: [bookingId], references: [id])
+  bookingId   String?       @unique
+  guest       Guest?        @relation(fields: [guestId], references: [id])
+  guestId     String?
+  group       GroupMaster? @relation(fields: [groupId], references: [id])
+  groupId     String?
+  roomBlock   RoomBlock?   @relation(fields: [roomBlockId], references: [id])
+  roomBlockId String?
+  status      String       @default("Open") // Open, Closed
+  charges     Charge[]
+  payments    Payment[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  extras      Extra[] // الحقل العكسي
+  company     Company?     @relation("CompanyFolios", fields: [companyId], references: [id])
+  companyId   String?
 }
 
 model Charge {
@@ -346,23 +359,25 @@ model Payment {
 // Companies / Contracts
 //////////////////////////////////
 model Company {
-  id            String    @id @default(cuid())
-  property      Property  @relation(fields: [propertyId], references: [id])
+  id            String   @id @default(cuid())
+  property      Property @relation(fields: [propertyId], references: [id])
   propertyId    String
   code          String
   name          String
   creditLimit   Decimal?
   rateAgreement String?
 
-  bookings      Booking[]
-  folios        Folio[]       @relation("CompanyFolios")
-  groups        HotelGroup[]  @relation("CompanyGroups")
-  groupMasters  GroupMaster[]  @relation("CompanyGroups")
-  
-  @@unique([propertyId, code])
+  bookings     Booking[]
+  folios       Folio[]       @relation("CompanyFolios")
+  groups       HotelGroup[]  @relation("CompanyGroups")
+  groupMasters GroupMaster[] @relation("CompanyGroups")
+  roomBlocks   RoomBlock[]   @relation("CompanyRoomBlocks")
+  roomTypes    RoomType[]    @relation("CompanyRoomTypes")
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([propertyId, code])
 }
 
 //////////////////////////////////
@@ -463,43 +478,49 @@ model SystemSetting {
 // Groups (Conferences, Events, Tours)
 //////////////////////////////////
 model GroupMaster {
-  id          String     @id @default(cuid())
-  property    Property   @relation(fields: [propertyId], references: [id])
-  propertyId  String
-  company     Company?   @relation("CompanyGroups", fields: [companyId], references: [id])
-  companyId   String?
-  leader      Guest?     @relation("GroupLeader", fields: [leaderId], references: [id])
-  leaderId    String?
+  id         String   @id @default(cuid())
+  property   Property @relation(fields: [propertyId], references: [id])
+  propertyId String
+  company    Company? @relation("CompanyGroups", fields: [companyId], references: [id])
+  companyId  String?
+  leader     Guest?   @relation("GroupLeader", fields: [leaderId], references: [id])
+  leaderId   String?
 
-  code        String     @unique
+  code        String  @unique
   name        String
   description String?
 
-  status      String     @default("Active") // Active, Closed, Cancelled
-  startDate   DateTime?
-  endDate     DateTime?
+  status    String    @default("Active") // Active, Closed, Cancelled
+  startDate DateTime?
+  endDate   DateTime?
 
-  roomBlocks  RoomBlock[]
-  bookings    Booking[]  // الحجوزات المرتبطة بالمجموعة
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  roomBlocks RoomBlock[]
+  bookings   Booking[] // الحجوزات المرتبطة بالمجموعة
+  folios     Folio[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 }
 
 model RoomBlock {
-  id         String     @id @default(cuid())
+  id         String      @id @default(cuid())
   group      GroupMaster @relation(fields: [groupId], references: [id])
   groupId    String
+  company    Company?    @relation("CompanyRoomBlocks", fields: [companyId], references: [id])
+  companyId  String?
   roomType   RoomType    @relation(fields: [roomTypeId], references: [id])
   roomTypeId String
   property   Property    @relation(fields: [propertyId], references: [id])
   propertyId String
 
-  blockDate  DateTime
+  blockDate    DateTime
   roomsBlocked Int
-  roomsPicked  Int @default(0)
+  roomsPicked  Int      @default(0)
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  bookings Booking[] @relation("BookingRoomBlock")
+  folios   Folio[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum Role {

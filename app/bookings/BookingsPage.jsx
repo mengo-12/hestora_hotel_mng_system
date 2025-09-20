@@ -18,6 +18,7 @@ export default function BookingsPage({ session, userProperties }) {
     const [rooms, setRooms] = useState([]);
     const [ratePlans, setRatePlans] = useState([]);
     const [companies, setCompanies] = useState([]);
+    const [groups, setGroups] = useState([]);
     const [processingId, setProcessingId] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState("");
@@ -50,6 +51,7 @@ export default function BookingsPage({ session, userProperties }) {
         }
     };
 
+
     useEffect(() => {
         fetchBookings();
         fetchProperties();
@@ -57,6 +59,7 @@ export default function BookingsPage({ session, userProperties }) {
         fetchRooms();
         fetchRatePlans();
         fetchCompanies();
+        fetchGroups();
 
         if (!socket) return;
         socket.on("BOOKING_CREATED", (freshBooking) => setBookings(prev => [...prev, freshBooking]));
@@ -84,6 +87,18 @@ export default function BookingsPage({ session, userProperties }) {
     const fetchRooms = async () => { try { setRooms(await (await fetch("/api/rooms")).json()); } catch { setRooms([]); } };
     const fetchRatePlans = async () => { try { setRatePlans(await (await fetch("/api/ratePlans")).json()); } catch { setRatePlans([]); } };
     const fetchCompanies = async () => { try { setCompanies(await (await fetch("/api/companies")).json()); } catch { setCompanies([]); } };
+
+    const fetchGroups = async () => {
+        try {
+            const res = await fetch('/api/groups');
+            const data = await res.json();
+            setGroups(Array.isArray(data) ? data : []);
+        } catch (err) {
+            console.error('Failed to fetch groups:', err);
+            setGroups([]);
+        }
+    };
+
 
     const handleAction = async (id, action) => {
         // صلاحيات
@@ -182,7 +197,7 @@ export default function BookingsPage({ session, userProperties }) {
                 )}
             </div>
 
-            {showAddModal && canAdd && <AddBookingModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} properties={properties} guests={guests} rooms={rooms} ratePlans={ratePlans} companies={companies} />}
+            {showAddModal && canAdd && <AddBookingModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} properties={properties} guests={guests} rooms={rooms} ratePlans={ratePlans} companies={companies} groups={groups} />}
             {showBulkModal && canAdd && <BulkBookingModal isOpen={showBulkModal} onClose={() => setShowBulkModal(false)} properties={properties} guests={guests} rooms={rooms} ratePlans={ratePlans} companies={companies} />}
             {editBooking && canEdit && <EditBookingModal booking={editBooking} isOpen={!!editBooking} onClose={() => setEditBooking(null)} properties={properties} guests={guests} rooms={rooms} ratePlans={ratePlans} companies={companies} />}
 

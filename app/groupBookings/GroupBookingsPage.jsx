@@ -1,4 +1,3 @@
-// app/group-bookings/GroupBookingsPage.jsx
 'use client';
 import { useEffect, useState } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
@@ -6,7 +5,7 @@ import AddGroupBookingModal from "@/app/components/AddGroupBookingModal";
 import EditGroupBookingModal from "@/app/components/EditGroupBookingModal";
 import { useRouter } from "next/navigation";
 
-export default function GroupBookingsPage({ session, userProperties, groups }) {
+export default function GroupBookingsPage({ session, userProperties, groups, roomBlocks }) {
     const router = useRouter();
     const [bookings, setBookings] = useState([]);
     const [selectedBooking, setSelectedBooking] = useState(null);
@@ -110,6 +109,7 @@ export default function GroupBookingsPage({ session, userProperties, groups }) {
                         <h2 className="text-lg font-semibold">{b.guest?.firstName} {b.guest?.lastName}</h2>
                         <p><b>Group:</b> {b.group?.name}</p>
                         <p><b>Room:</b> {b.room?.number || "N/A"}</p>
+                        <p><b>Room Block:</b> {b.roomBlock?.name || "N/A"}</p>
                         <p><b>Status:</b> {b.status}</p>
                         <p><b>Check-In:</b> {new Date(b.checkIn).toLocaleDateString()}</p>
                         <p><b>Check-Out:</b> {new Date(b.checkOut).toLocaleDateString()}</p>
@@ -128,8 +128,23 @@ export default function GroupBookingsPage({ session, userProperties, groups }) {
             </div>
 
             {/* Modals */}
-            {showAddModal && canAdd && <AddGroupBookingModal isOpen={showAddModal} onClose={()=>setShowAddModal(false)} groups={groups} properties={userProperties} />}
-            {editBooking && canEdit && <EditGroupBookingModal booking={editBooking} isOpen={!!editBooking} onClose={()=>setEditBooking(null)} groups={groups} properties={userProperties} />}
+            {showAddModal && canAdd && 
+                <AddGroupBookingModal 
+                    isOpen={showAddModal} 
+                    onClose={()=>setShowAddModal(false)} 
+                    groups={groups} 
+                    properties={userProperties} 
+                    roomBlocks={roomBlocks} 
+                />}
+            {editBooking && canEdit && 
+                <EditGroupBookingModal 
+                    booking={editBooking} 
+                    isOpen={!!editBooking} 
+                    onClose={()=>setEditBooking(null)} 
+                    groups={groups} 
+                    properties={userProperties} 
+                    roomBlocks={roomBlocks} 
+                />}
 
             {/* Selected Booking Details */}
             {selectedBooking && 
@@ -138,6 +153,7 @@ export default function GroupBookingsPage({ session, userProperties, groups }) {
                         <h2 className="text-xl font-bold mb-4">{selectedBooking.guest?.firstName} {selectedBooking.guest?.lastName}</h2>
                         <p><b>Group:</b> {selectedBooking.group?.name}</p>
                         <p><b>Room:</b> {selectedBooking.room?.number || "N/A"}</p>
+                        <p><b>Room Block:</b> {selectedBooking.roomBlock?.name || "N/A"}</p>
                         <p><b>Check-In:</b> {new Date(selectedBooking.checkIn).toLocaleString()}</p>
                         <p><b>Check-Out:</b> {new Date(selectedBooking.checkOut).toLocaleString()}</p>
                         <p><b>Status:</b> {selectedBooking.status}</p>

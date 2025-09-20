@@ -2,7 +2,7 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
-// --- جلب كل المجموعات ---
+// --- GET: جلب كل المجموعات ---
 export async function GET(req) {
     try {
         const groups = await prisma.groupMaster.findMany({
@@ -14,7 +14,6 @@ export async function GET(req) {
             },
             orderBy: { createdAt: "desc" },
         });
-
         return new Response(JSON.stringify(groups), { status: 200 });
     } catch (err) {
         console.error("Failed to fetch groups:", err);
@@ -22,13 +21,13 @@ export async function GET(req) {
     }
 }
 
-// --- إنشاء مجموعة جديدة ---
+// --- POST: إنشاء مجموعة جديدة ---
 export async function POST(req) {
     try {
         const session = await getServerSession(authOptions);
         if (!session) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
 
-        const { propertyId, companyId, leaderId, code, name, description, startDate, endDate } = await req.json();
+        const { propertyId, companyId, leaderId, code, name, description, startDate, endDate, roomBlockIds } = await req.json();
         if (!propertyId || !code || !name) return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
 
         const newGroup = await prisma.groupMaster.create({
@@ -41,11 +40,13 @@ export async function POST(req) {
                 description: description || "",
                 startDate: startDate ? new Date(startDate) : null,
                 endDate: endDate ? new Date(endDate) : null,
+                roomBlocks: {
+                    connect: roomBlockIds?.map(id => ({ id })) || []
+                }
             },
             include: { property: true, company: true, leader: true, roomBlocks: true },
         });
 
-        // 🔔 بث المجموعة الجديدة
         try {
             await fetch("http://localhost:3001/api/broadcast", {
                 method: "POST",
@@ -62,6 +63,7 @@ export async function POST(req) {
         return new Response(JSON.stringify({ error: "Failed to create group" }), { status: 500 });
     }
 }
+
 
 
 // --- حذف مجموعة ---

@@ -295,15 +295,14 @@ export default function GroupsPage({ session, userProperties }) {
     const socket = useSocket();
     const role = session?.user?.role || "Guest";
 
-    // --- Permissions ---
     const canAdd = ["Admin", "FrontDesk", "Manager"].includes(role);
     const canEdit = ["Admin", "FrontDesk", "Manager"].includes(role);
     const canDelete = ["Admin"].includes(role);
 
-    // --- State ---
     const [groups, setGroups] = useState([]);
     const [companies, setCompanies] = useState([]);
     const [guests, setGuests] = useState([]);
+    const [roomBlocks, setRoomBlocks] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const [searchTerm, setSearchTerm] = useState("");
@@ -311,24 +310,26 @@ export default function GroupsPage({ session, userProperties }) {
     const [addModalOpen, setAddModalOpen] = useState(false);
     const [editModalOpen, setEditModalOpen] = useState(false);
 
-    // --- Fetch Data ---
     useEffect(() => {
         const fetchAll = async () => {
             setLoading(true);
             try {
-                const [grpRes, cmpRes, gstRes] = await Promise.all([
-                    fetch("/api/groups"), fetch("/api/companies"), fetch("/api/guests")
+                const [grpRes, cmpRes, gstRes, rbRes] = await Promise.all([
+                    fetch("/api/groups"), 
+                    fetch("/api/companies"), 
+                    fetch("/api/guests"),
+                    fetch("/api/roomBlocks")
                 ]);
                 setGroups(await grpRes.json() || []);
                 setCompanies(await cmpRes.json() || []);
                 setGuests(await gstRes.json() || []);
+                setRoomBlocks(await rbRes.json() || []);
             } catch (err) { console.error(err); }
             finally { setLoading(false); }
         };
         fetchAll();
     }, []);
 
-    // --- Socket Updates ---
     useEffect(() => {
         if (!socket) return;
         socket.on("GROUP_CREATED", g => setGroups(prev => [g, ...prev]));
@@ -352,7 +353,6 @@ export default function GroupsPage({ session, userProperties }) {
     const handleGroupAdded = g => { setGroups(prev=>[g,...prev]); setAddModalOpen(false); if(socket)socket.emit("GROUP_CREATED",g); };
     const handleGroupUpdated = g => { setGroups(prev=>prev.map(x=>x.id===g.id?g:x)); setEditModalOpen(false); if(socket)socket.emit("GROUP_UPDATED",g); };
 
-    // --- Filtered Groups ---
     const filteredGroups = groups.filter(g => {
         const searchLower = searchTerm.toLowerCase();
         return g.name.toLowerCase().includes(searchLower) || g.code.toLowerCase().includes(searchLower);
@@ -387,6 +387,7 @@ export default function GroupsPage({ session, userProperties }) {
                                 <p><b>Property:</b> {userProperties.find(p => p.id === g.propertyId)?.name || "-"}</p>
                                 <p><b>Company:</b> {g.company?.name || "-"}</p>
                                 <p><b>Leader:</b> {g.leader ? `${g.leader.firstName} ${g.leader.lastName}` : "-"}</p>
+                                <p><b>Room Blocks:</b> {g.roomBlocks?.map(rb => rb.name).join(", ") || "-"}</p>
                                 <p><b>Status:</b> {g.status}</p>
                                 <p><b>Start:</b> {g.startDate ? new Date(g.startDate).toLocaleDateString() : "-"}</p>
                                 <p><b>End:</b> {g.endDate ? new Date(g.endDate).toLocaleDateString() : "-"}</p>
@@ -397,8 +398,31 @@ export default function GroupsPage({ session, userProperties }) {
                     )}
                 </div>
 
-                {addModalOpen && canAdd && <AddGroupModal isOpen={addModalOpen} onClose={() => setAddModalOpen(false)} properties={userProperties} companies={companies} guests={guests} onGroupAdded={handleGroupAdded}/>}
-                {editModalOpen && selectedGroup && <EditGroupModal isOpen={editModalOpen} onClose={() => setEditModalOpen(false)} group={selectedGroup} properties={userProperties} companies={companies} guests={guests} groups={groups} onGroupUpdated={handleGroupUpdated}/>}
+                {addModalOpen && canAdd &&
+                    <AddGroupModal
+                        isOpen={addModalOpen}
+                        onClose={() => setAddModalOpen(false)}
+                        properties={userProperties}
+                        companies={companies}
+                        roomBlocks={roomBlocks}
+                        guests={guests}
+                        onGroupAdded={handleGroupAdded}
+                    />
+                }
+
+                {editModalOpen && selectedGroup &&
+                    <EditGroupModal
+                        isOpen={editModalOpen}
+                        onClose={() => setEditModalOpen(false)}
+                        group={selectedGroup}
+                        properties={userProperties}
+                        companies={companies}
+                        roomBlocks={roomBlocks}
+                        guests={guests}
+                        groups={groups}
+                        onGroupUpdated={handleGroupUpdated}
+                    />
+                }
             </div>
         </ProtectedPage>
     );
