@@ -5,7 +5,7 @@ import { useSocket } from "@/app/components/SocketProvider";
 
 export default function CompanyFolioPage({ params }) {
     const companyId = params?.companyId;
-    const socket = useSocket(); // 🟢 إضافة
+    const socket = useSocket();
 
     const [session, setSession] = useState(null);
     const [bookings, setBookings] = useState([]);
@@ -34,41 +34,35 @@ export default function CompanyFolioPage({ params }) {
             });
     }, []);
 
-    // دالة fetch مع فحص JSON
+    // دالة fetch آمنة
     const safeFetchJson = async (url, options = {}) => {
         try {
             const res = await fetch(url, options);
             const text = await res.text();
             if (!res.ok) throw new Error(`HTTP error ${res.status}: ${text}`);
-            try {
-                return JSON.parse(text);
-            } catch (err) {
-                throw new Error(`Invalid JSON response: ${text}`);
-            }
+            return JSON.parse(text);
         } catch (err) {
             console.error("Fetch error:", err);
             throw err;
         }
     };
 
-    // جلب الحجوزات والفواتير
+    // جلب بيانات الشركة: bookings + folios
     const fetchCompanyData = async () => {
         if (!companyId || !session) return;
         setLoading(true);
         setError(null);
         try {
             const data = await safeFetchJson(`/api/folios/company/${companyId}`);
-
-            // API يعيد { charges, payments, bookings }
             setBookings(Array.isArray(data.bookings) ? data.bookings : []);
 
-            // نحتاج هنا لتكوين folios وهمية لكل Guest إذا لم تكن موجودة
+            // Folio وهمي يجمع كل Charges و Payments
             const foliosData = [
                 {
                     id: "companyFolio",
                     charges: Array.isArray(data.charges) ? data.charges : [],
                     payments: Array.isArray(data.payments) ? data.payments : [],
-                    booking: null, // لا يوجد booking محدد هنا
+                    booking: null,
                 }
             ];
             setFolios(foliosData);
@@ -81,21 +75,36 @@ export default function CompanyFolioPage({ params }) {
 
     useEffect(() => { fetchCompanyData(); }, [companyId, session]);
 
-    // 🟢 البثوص الذكية
+    // 🟢 استماع لأحداث صفحة Booking لجميع الحجوزات التابعة للشركة
     useEffect(() => {
         if (!socket) return;
 
-        const onFolioUpdated = () => fetchCompanyData();
+        // دالة الاستقبال لجميع الأحداث
+        const onBookingEvent = (payload) => {
+            const bookingIds = bookings.map(b => b.id);
 
-        ["BOOKING_UPDATED", "CHARGE_ADDED", "CHARGE_DELETED", "PAYMENT_ADDED", "PAYMENT_DELETED", "FOLIO_CLOSED"]
-            .forEach(event => socket.on(event, onFolioUpdated));
+            // إذا البايلود يحتوي bookingId ضمن الحجوزات الحالية
+            const payloadBookingId = payload?.data?.bookingId || payload?.bookingId;
+            const payloadCompanyId = payload?.data?.companyId || payload?.companyId;
 
-        return () => {
-            ["BOOKING_UPDATED", "CHARGE_ADDED", "CHARGE_DELETED", "PAYMENT_ADDED", "PAYMENT_DELETED", "FOLIO_CLOSED"]
-                .forEach(event => socket.off(event, onFolioUpdated));
+            if ((payloadBookingId && bookingIds.includes(payloadBookingId)) || (payloadCompanyId === companyId)) {
+                fetchCompanyData(); // تحديث تلقائي للفواتير
+            }
         };
-    }, [socket]);
 
+        const events = ["BOOKING_UPDATED", "BOOKING_CREATED", "FOLIO_CREATED", "CHARGE_ADDED", "CHARGE_DELETED", "PAYMENT_ADDED", "PAYMENT_DELETED", "FOLIO_CLOSED"];
+
+        // الاشتراك في الأحداث
+        events.forEach(event => socket.on(event, onBookingEvent));
+
+        // تنظيف الاشتراك عند تفكيك المكون
+        return () => events.forEach(event => socket.off(event, onBookingEvent));
+
+    }, [socket, bookings, companyId]);
+
+    // الكود الاعلى يعمل لكن عن التعديل او الاضافة يعديد تحميل الصفحة تلقائي
+
+    
 
     if (!session) return <p>Loading session...</p>;
     if (loading) return <p className="p-4">جاري تحميل بيانات الشركة...</p>;
@@ -105,7 +114,7 @@ export default function CompanyFolioPage({ params }) {
     const allCharges = folios.flatMap(f => (f.charges ?? []).map(c => ({
         ...c,
         folioId: f.id,
-        guestName: f.booking?.guest ? `${f.booking.guest.firstName} ${f.booking.guest.lastName}` : "-"
+        guestName: c.booking?.guest ? `${c.booking.guest.firstName} ${c.booking.guest.lastName}` : "-"
     })));
     const allPayments = folios.flatMap(f => (f.payments ?? []).map(p => ({
         ...p,
@@ -118,7 +127,6 @@ export default function CompanyFolioPage({ params }) {
     const totalCharges = subtotal + taxTotal;
     const totalPayments = allPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const balance = totalCharges - totalPayments;
-
     // CRUD functions
     const handleAddCharge = async () => {
         if (!canAddCharge) return alert("ليس لديك صلاحية لإضافة Charges");
