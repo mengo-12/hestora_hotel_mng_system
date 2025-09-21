@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
 import ProtectedPage from "@/app/components/ProtectedPage";
 import AddCompanyModal from "@/app/components/AddCompanyModal";
@@ -31,6 +31,8 @@ export default function CompaniesPage({ session }) {
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [selectedCompany, setSelectedCompany] = useState(null);
 
+    const refreshTimeoutRef = useRef(null);
+
     // --- Fetch Companies ---
     const fetchCompanies = async () => {
         try {
@@ -49,19 +51,56 @@ export default function CompaniesPage({ session }) {
     };
 
     useEffect(() => {
+        // initial load
         fetchCompanies();
         fetchProperties();
 
         if (!socket) return;
 
-        socket.on("COMPANY_ADDED", (company) => setCompanies(prev => Array.isArray(prev) ? [company, ...prev] : [company]));
-        socket.on("COMPANY_UPDATED", (updatedCompany) => setCompanies(prev => Array.isArray(prev) ? prev.map(c => c.id === updatedCompany.id ? updatedCompany : c) : [updatedCompany]));
-        socket.on("COMPANY_DELETED", ({ id }) => setCompanies(prev => Array.isArray(prev) ? prev.filter(c => c.id !== id) : []));
+        // ---- handlers for company CRUD (existing) ----
+        const onCompanyAdded = (company) => setCompanies(prev => Array.isArray(prev) ? [company, ...prev] : [company]);
+        const onCompanyUpdated = (updatedCompany) => setCompanies(prev => Array.isArray(prev) ? prev.map(c => c.id === updatedCompany.id ? updatedCompany : c) : [updatedCompany]);
+        const onCompanyDeleted = ({ id }) => setCompanies(prev => Array.isArray(prev) ? prev.filter(c => c.id !== id) : []);
 
+        // ---- handler for folio/booking changes: just refresh companies (debounced) ----
+        const onFolioChange = () => {
+            // debounce to avoid many immediate fetches when server emits several events
+            if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+            refreshTimeoutRef.current = setTimeout(() => {
+                fetchCompanies();
+                refreshTimeoutRef.current = null;
+            }, 250); // 250ms debounce (tweakable)
+        };
+
+        // subscribe
+        socket.on("COMPANY_ADDED", onCompanyAdded);
+        socket.on("COMPANY_UPDATED", onCompanyUpdated);
+        socket.on("COMPANY_DELETED", onCompanyDeleted);
+
+        // folio/booking events that should update company totals
+        const folioEvents = [
+            "CHARGE_ADDED",
+            "CHARGE_DELETED",
+            "PAYMENT_ADDED",
+            "PAYMENT_DELETED",
+            "FOLIO_CREATED",
+            "FOLIO_CLOSED",
+            "BOOKING_CREATED",
+            "BOOKING_UPDATED",
+            "BOOKING_DELETED"
+        ];
+        folioEvents.forEach(ev => socket.on(ev, onFolioChange));
+
+        // cleanup
         return () => {
-            socket.off("COMPANY_ADDED");
-            socket.off("COMPANY_UPDATED");
-            socket.off("COMPANY_DELETED");
+            socket.off("COMPANY_ADDED", onCompanyAdded);
+            socket.off("COMPANY_UPDATED", onCompanyUpdated);
+            socket.off("COMPANY_DELETED", onCompanyDeleted);
+            folioEvents.forEach(ev => socket.off(ev, onFolioChange));
+            if (refreshTimeoutRef.current) {
+                clearTimeout(refreshTimeoutRef.current);
+                refreshTimeoutRef.current = null;
+            }
         };
     }, [socket]);
 
@@ -149,7 +188,6 @@ export default function CompaniesPage({ session }) {
     return (
         <ProtectedPage session={session} allowedRoles={["Admin", "FrontDesk", "Manager"]}>
             <div className="p-4 space-y-4">
-
                 <div className="flex justify-between items-center">
                     <h2 className="text-xl font-bold">Companies</h2>
                     <div className="flex gap-2 items-center">
@@ -201,5 +239,3 @@ export default function CompaniesPage({ session }) {
         </ProtectedPage>
     );
 }
-
-
