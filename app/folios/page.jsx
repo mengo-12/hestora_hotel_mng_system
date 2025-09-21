@@ -15,19 +15,25 @@ export default function FoliosPage() {
             const res = await fetch("/api/bookings");
             if (!res.ok) throw new Error("Failed to fetch bookings");
             const data = await res.json();
-            
+
             // تصفية لتجنب تكرار الحجوزات الجماعية
             const uniqueBookings = [];
             const groupsAdded = new Set();
+            const companiesAdded = new Set();
 
             data.forEach(b => {
                 if (b.groupId) {
                     if (!groupsAdded.has(b.groupId)) {
-                        uniqueBookings.push(b);
+                        uniqueBookings.push({ type: "group", id: b.groupId, name: b.group?.name || "مجموعة" });
                         groupsAdded.add(b.groupId);
                     }
+                } else if (b.companyId) {
+                    if (!companiesAdded.has(b.companyId)) {
+                        uniqueBookings.push({ type: "company", id: b.companyId, name: b.company?.name || "شركة" });
+                        companiesAdded.add(b.companyId);
+                    }
                 } else {
-                    uniqueBookings.push(b);
+                    uniqueBookings.push({ type: "individual", id: b.id, guest: b.guest, room: b.room });
                 }
             });
 
@@ -53,23 +59,22 @@ export default function FoliosPage() {
             <ul className="space-y-2">
                 {bookings.map(b => (
                     <li key={b.id}>
-                        <button 
+                        <button
                             className="text-blue-600 hover:underline"
                             onClick={() => {
-                                if (b.groupId) {
-                                    router.push(`/folios/group/${b.groupId}`);
-                                } else {
-                                    router.push(`/folios/${b.id}`);
-                                }
+                                if (b.type === "group") router.push(`/folios/group/${b.id}`);
+                                else if (b.type === "company") router.push(`/folios/company/${b.id}`);
+                                else router.push(`/folios/${b.id}`);
                             }}
                         >
-                            {b.groupId 
-                                ? `Group: ${b.group?.name || "مجموعة"}`
-                                : `${b.guest?.firstName} ${b.guest?.lastName}`
-                            } - Room: {b.room?.number || "N/A"}
+                            {b.type === "group" && `Group: ${b.name}`}
+                            {b.type === "company" && `Company: ${b.name}`}
+                            {b.type === "individual" && `${b.guest?.firstName} ${b.guest?.lastName}`}
+                            {b.room?.number && ` - Room: ${b.room.number}`}
                         </button>
                     </li>
                 ))}
+
             </ul>
         </div>
     );
