@@ -75,7 +75,8 @@ export default function CompanyFolioPage({ params }) {
 
     useEffect(() => { fetchCompanyData(); }, [companyId, session]);
 
-    // 🟢 استماع لأحداث صفحة Booking لجميع الحجوزات التابعة للشركة
+
+
     useEffect(() => {
         if (!socket) return;
 
@@ -83,16 +84,34 @@ export default function CompanyFolioPage({ params }) {
         const onBookingEvent = (payload) => {
             const bookingIds = bookings.map(b => b.id);
 
-            // إذا البايلود يحتوي bookingId ضمن الحجوزات الحالية
-            const payloadBookingId = payload?.data?.bookingId || payload?.bookingId;
-            const payloadCompanyId = payload?.data?.companyId || payload?.companyId;
+            const event = payload?.event;
+            const data = payload?.data || {};
 
-            if ((payloadBookingId && bookingIds.includes(payloadBookingId)) || (payloadCompanyId === companyId)) {
+            // في الحذف: payload.data.id يحتوي على id
+            const payloadBookingId = data?.bookingId || data?.id || payload?.bookingId || payload?.id;
+            const payloadCompanyId = data?.companyId || payload?.companyId;
+
+            // التعامل مع كل الأحداث
+            if (
+                (event === "BOOKING_DELETED" && payloadBookingId) || // حذف
+                (payloadBookingId && bookingIds.includes(payloadBookingId)) || // تعديل أو إنشاء
+                (payloadCompanyId === companyId) // أي حدث متعلق بالشركة
+            ) {
                 fetchCompanyData(); // تحديث تلقائي للفواتير
             }
         };
 
-        const events = ["BOOKING_UPDATED", "BOOKING_CREATED", "FOLIO_CREATED", "CHARGE_ADDED", "CHARGE_DELETED", "PAYMENT_ADDED", "PAYMENT_DELETED", "FOLIO_CLOSED"];
+        const events = [
+            "BOOKING_UPDATED",
+            "BOOKING_CREATED",
+            "BOOKING_DELETED",
+            "FOLIO_CREATED",
+            "CHARGE_ADDED",
+            "CHARGE_DELETED",
+            "PAYMENT_ADDED",
+            "PAYMENT_DELETED",
+            "FOLIO_CLOSED"
+        ];
 
         // الاشتراك في الأحداث
         events.forEach(event => socket.on(event, onBookingEvent));
@@ -102,9 +121,6 @@ export default function CompanyFolioPage({ params }) {
 
     }, [socket, bookings, companyId]);
 
-    // الكود الاعلى يعمل لكن عن التعديل او الاضافة يعديد تحميل الصفحة تلقائي
-
-    
 
     if (!session) return <p>Loading session...</p>;
     if (loading) return <p className="p-4">جاري تحميل بيانات الشركة...</p>;
