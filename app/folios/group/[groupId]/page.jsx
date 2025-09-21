@@ -1,126 +1,11 @@
-// 'use client';
-// import { useEffect, useState } from "react";
-// import FolioPage from "../../[bookingId]/FolioPage";
-// import { getSession } from "next-auth/react";
-
-
-// export default function Page({ params }) {
-//     const groupId = params.groupId;
-
-//     const [session, setSession] = useState(null);
-//     const [bookings, setBookings] = useState([]);
-//     const [loading, setLoading] = useState(true);
-//     const [error, setError] = useState(null);
-
-//     // جلب الجلسة
-//     useEffect(() => {
-//         getSession().then(sess => setSession(sess)).catch(err => {
-//             console.error("getSession error:", err);
-//             setSession(null);
-//         });
-//     }, []);
-
-//     // جلب حجوزات المجموعة من endpoint مخصص (defensive fetch + dedupe)
-//     useEffect(() => {
-//         if (!groupId) return;
-//         setLoading(true);
-//         (async () => {
-//             try {
-//                 const res = await fetch(`/api/groupBookings?groupId=${groupId}`);
-//                 if (!res.ok) {
-//                     const txt = await res.text().catch(()=>null);
-//                     throw new Error(`Failed to fetch group bookings (${res.status}) ${txt || ''}`);
-//                 }
-//                 const data = await res.json();
-//                 // Defensive: تأكد أن البيانات مصفوفة
-//                 const arr = Array.isArray(data) ? data : [];
-//                 // تأكد أن كل عنصر فعلاً يعود لنفس الـ groupId (حماية ضد API غير متوقع)
-//                 const filtered = arr.filter(b => b.groupId === groupId || String(b.groupId) === String(groupId));
-//                 // Dedupe by booking.id (in case API أعاد duplicates)
-//                 const map = new Map();
-//                 for (const b of filtered) {
-//                     map.set(b.id, b);
-//                 }
-//                 const unique = Array.from(map.values());
-//                 setBookings(unique);
-//             } catch (err) {
-//                 console.error("Fetch group bookings error:", err);
-//                 setError(err.message || "Failed to fetch bookings");
-//                 setBookings([]);
-//             } finally {
-//                 setLoading(false);
-//             }
-//         })();
-//     }, [groupId]);
-
-//     if (!session) return <p>Loading session...</p>;
-//     if (loading) return <p className="p-4">جاري تحميل بيانات المجموعة...</p>;
-//     if (error) return <p className="p-4 text-red-500">{error}</p>;
-
-//     // حسابات — نستخدم unique roomIds لنعكس الواقع (إذا هناك أكثر من حجز بنفس الغرفة فلن نحتسبها مرتين)
-//     const uniqueRoomIds = new Set(bookings.filter(b => b.roomId).map(b => b.roomId));
-//     const totalRooms = uniqueRoomIds.size || bookings.length; // fallback إذا لا غرف محددة
-//     // حالات check-in: حسب schema لديك القيم الممكنة ["Booked","InHouse","CheckedOut","NoShow","Reserved"]
-//     const pickedRooms = bookings.filter(b => ["InHouse", "CheckedIn"].includes(b.status)).length;
-//     const remainingRooms = Math.max(0, totalRooms - pickedRooms);
-
-//     return (
-//         <div className="p-6 space-y-6">
-//             {/* Rooming List */}
-//             <div className="rounded shadow p-4">
-//                 <div className="flex justify-between items-center mb-3">
-//                     <h2 className="text-xl font-bold">Rooming List</h2>
-//                     <div className="text-sm text-gray-600">
-//                         <span className="font-semibold mr-4">Total rooms: {totalRooms}</span>
-//                         <span className="text-green-600 mr-4">Picked: {pickedRooms}</span>
-//                         <span className="text-red-600">Remaining: {remainingRooms}</span>
-//                     </div>
-//                 </div>
-
-//                 <table className="w-full border text-sm">
-//                     <thead>
-//                         <tr>
-//                             <th className="border p-2">Guest</th>
-//                             <th className="border p-2">Room</th>
-//                             <th className="border p-2">Status</th>
-//                             <th className="border p-2">Check-in</th>
-//                             <th className="border p-2">Check-out</th>
-//                             <th className="border p-2">Debug (groupId)</th>
-//                         </tr>
-//                     </thead>
-//                     <tbody>
-//                         {bookings.map(b => (
-//                             <tr key={b.id}>
-//                                 <td className="border p-2">{b.guest?.firstName} {b.guest?.lastName}</td>
-//                                 <td className="border p-2">{b.room?.number || "-"}</td>
-//                                 <td className="border p-2">{b.status}</td>
-//                                 <td className="border p-2">{b.checkIn ? new Date(b.checkIn).toLocaleDateString() : "-"}</td>
-//                                 <td className="border p-2">{b.checkOut ? new Date(b.checkOut).toLocaleDateString() : "-"}</td>
-//                                 <td className="border p-2 text-xs text-gray-500">{String(b.groupId)}</td>
-//                             </tr>
-//                         ))}
-//                     </tbody>
-//                 </table>
-//             </div>
-
-//             Folio
-//             <FolioPage groupId={groupId} session={session} />
-//         </div>
-//     );
-// }
-
-
-
-// الكود الاعلى اصلي
-
-
-
 'use client';
 import { useEffect, useState } from "react";
 import { getSession } from "next-auth/react";
+import { useSocket } from "@/app/components/SocketProvider";
 
 export default function GroupFolioPage({ params }) {
     const groupId = params.groupId;
+    const socket = useSocket();
 
     const [session, setSession] = useState(null);
     const [bookings, setBookings] = useState([]);
@@ -168,6 +53,31 @@ export default function GroupFolioPage({ params }) {
     };
 
     useEffect(() => { fetchGroupData(); }, [groupId]);
+
+    useEffect(() => {
+        if (!socket || !groupId) return;
+        const onFolioUpdated = () => fetchGroupData();
+
+        [
+            "BOOKING_UPDATED",
+            "CHARGE_ADDED",
+            "CHARGE_DELETED",
+            "PAYMENT_ADDED",
+            "PAYMENT_DELETED",
+            "FOLIO_CLOSED"
+        ].forEach(event => socket.on(event, onFolioUpdated));
+
+        return () => {
+            [
+                "BOOKING_UPDATED",
+                "CHARGE_ADDED",
+                "CHARGE_DELETED",
+                "PAYMENT_ADDED",
+                "PAYMENT_DELETED",
+                "FOLIO_CLOSED"
+            ].forEach(event => socket.off(event, onFolioUpdated));
+        };
+    }, [socket, groupId]);
 
     if (!session) return <p>Loading session...</p>;
     if (loading) return <p className="p-4">جاري تحميل بيانات المجموعة...</p>;
@@ -356,14 +266,14 @@ export default function GroupFolioPage({ params }) {
 
                 {canAddCharge && (
                     <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                        <select value={newCharge.guestId} onChange={(e) => setNewCharge({...newCharge, guestId: e.target.value})} className="border p-2 rounded">
+                        <select value={newCharge.guestId} onChange={(e) => setNewCharge({ ...newCharge, guestId: e.target.value })} className="border p-2 rounded">
                             <option value="">اختر الضيف</option>
                             {bookings.map(b => <option key={b.id} value={b.guest?.id}>{b.guest?.firstName} {b.guest?.lastName}</option>)}
                         </select>
-                        <input placeholder="Code" className="border p-2 rounded flex-1" value={newCharge.code} onChange={(e) => setNewCharge({...newCharge, code: e.target.value})} />
-                        <input placeholder="Description" className="border p-2 rounded flex-1" value={newCharge.description} onChange={(e) => setNewCharge({...newCharge, description: e.target.value})} />
-                        <input placeholder="Amount" type="number" className="border p-2 rounded w-24" value={newCharge.amount} onChange={(e) => setNewCharge({...newCharge, amount: e.target.value})} />
-                        <input placeholder="Tax %" type="number" className="border p-2 rounded w-24" value={newCharge.tax} onChange={(e) => setNewCharge({...newCharge, tax: e.target.value})} />
+                        <input placeholder="Code" className="border p-2 rounded flex-1" value={newCharge.code} onChange={(e) => setNewCharge({ ...newCharge, code: e.target.value })} />
+                        <input placeholder="Description" className="border p-2 rounded flex-1" value={newCharge.description} onChange={(e) => setNewCharge({ ...newCharge, description: e.target.value })} />
+                        <input placeholder="Amount" type="number" className="border p-2 rounded w-24" value={newCharge.amount} onChange={(e) => setNewCharge({ ...newCharge, amount: e.target.value })} />
+                        <input placeholder="Tax %" type="number" className="border p-2 rounded w-24" value={newCharge.tax} onChange={(e) => setNewCharge({ ...newCharge, tax: e.target.value })} />
                         <button onClick={handleAddCharge} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Add</button>
                     </div>
                 )}
@@ -401,13 +311,13 @@ export default function GroupFolioPage({ params }) {
 
                 {canAddPayment && (
                     <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                        <select value={newPayment.guestId} onChange={(e) => setNewPayment({...newPayment, guestId: e.target.value})} className="border p-2 rounded">
+                        <select value={newPayment.guestId} onChange={(e) => setNewPayment({ ...newPayment, guestId: e.target.value })} className="border p-2 rounded">
                             <option value="">اختر الضيف</option>
                             {bookings.map(b => <option key={b.id} value={b.guest?.id}>{b.guest?.firstName} {b.guest?.lastName}</option>)}
                         </select>
-                        <input placeholder="Method" className="border p-2 rounded flex-1" value={newPayment.method} onChange={(e) => setNewPayment({...newPayment, method: e.target.value})} />
-                        <input placeholder="Amount" type="number" className="border p-2 rounded w-24" value={newPayment.amount} onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})} />
-                        <input placeholder="Reference" className="border p-2 rounded flex-1" value={newPayment.ref} onChange={(e) => setNewPayment({...newPayment, ref: e.target.value})} />
+                        <input placeholder="Method" className="border p-2 rounded flex-1" value={newPayment.method} onChange={(e) => setNewPayment({ ...newPayment, method: e.target.value })} />
+                        <input placeholder="Amount" type="number" className="border p-2 rounded w-24" value={newPayment.amount} onChange={(e) => setNewPayment({ ...newPayment, amount: e.target.value })} />
+                        <input placeholder="Reference" className="border p-2 rounded flex-1" value={newPayment.ref} onChange={(e) => setNewPayment({ ...newPayment, ref: e.target.value })} />
                         <button onClick={handleAddPayment} className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Add</button>
                     </div>
                 )}

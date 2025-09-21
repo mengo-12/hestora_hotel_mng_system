@@ -1,11 +1,3 @@
-// import FolioPage from "./FolioPage";
-
-// export default function Page({ params }) {
-//     const { bookingId } = params;
-//     return <FolioPage bookingId={bookingId} />;
-// }
-
-
 'use client';
 import { useEffect, useState } from 'react';
 import { useSocket } from '@/app/components/SocketProvider';
