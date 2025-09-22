@@ -59,7 +59,9 @@ export default function GroupFolioPage({ params }) {
         const onFolioUpdated = () => fetchGroupData();
 
         [
+            "BOOKING_CREATED",
             "BOOKING_UPDATED",
+            "BOOKING_DELETED",
             "CHARGE_ADDED",
             "CHARGE_DELETED",
             "PAYMENT_ADDED",
@@ -69,7 +71,9 @@ export default function GroupFolioPage({ params }) {
 
         return () => {
             [
+                "BOOKING_CREATED",
                 "BOOKING_UPDATED",
+                "BOOKING_DELETED",
                 "CHARGE_ADDED",
                 "CHARGE_DELETED",
                 "PAYMENT_ADDED",

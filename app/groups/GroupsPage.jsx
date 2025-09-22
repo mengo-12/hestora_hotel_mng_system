@@ -282,7 +282,7 @@
 //                 headers: { "Content-Type": "application/json" },
 //                 body: JSON.stringify({ billingInstruction: value }),
 //             });
-            
+
 //             if (!res.ok) throw new Error("Failed to update billing instruction");
 //             const updated = await res.json();
 //             setGroups(prev => prev.map(g => g.id === groupId ? updated : g));
@@ -503,18 +503,64 @@ export default function GroupsPage({ session, userProperties }) {
     }, []);
 
     // --- Socket Updates ---
+    // --- Socket Updates ---
     useEffect(() => {
         if (!socket) return;
-        socket.on("GROUP_CREATED", g => setGroups(prev => [g, ...prev]));
-        socket.on("GROUP_UPDATED", g => {
+        const refreshTimeoutRef = { current: null };
+
+        // CRUD events
+        const onGroupCreated = g => setGroups(prev => [g, ...prev]);
+        const onGroupUpdated = g => {
             setGroups(prev => prev.map(x => x.id === g.id ? g : x));
             setBillingInstructions(prev => ({ ...prev, [g.id]: g.billingInstruction || "" }));
-        });
-        socket.on("GROUP_DELETED", ({ id }) => {
+        };
+        const onGroupDeleted = ({ id }) => {
             setGroups(prev => prev.filter(x => x.id !== id));
             setBillingInstructions(prev => { const copy = { ...prev }; delete copy[id]; return copy; });
-        });
-        return () => { socket.off("GROUP_CREATED"); socket.off("GROUP_UPDATED"); socket.off("GROUP_DELETED"); };
+        };
+
+        // folio/booking changes → إعادة تحميل المجموعات (للتوتال)
+        const onFolioChange = () => {
+            if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+            refreshTimeoutRef.current = setTimeout(async () => {
+                try {
+                    const res = await fetch("/api/groups");
+                    const groupsData = await res.json();
+                    setGroups(groupsData);
+                    const billingMap = {};
+                    groupsData.forEach(g => { billingMap[g.id] = g.billingInstruction || ""; });
+                    setBillingInstructions(billingMap);
+                } catch (err) {
+                    console.error("Failed to refresh groups after folio change:", err);
+                }
+                refreshTimeoutRef.current = null;
+            }, 300); // 300ms debounce
+        };
+
+        socket.on("GROUP_CREATED", onGroupCreated);
+        socket.on("GROUP_UPDATED", onGroupUpdated);
+        socket.on("GROUP_DELETED", onGroupDeleted);
+
+        const folioEvents = [
+            "CHARGE_ADDED",
+            "CHARGE_DELETED",
+            "PAYMENT_ADDED",
+            "PAYMENT_DELETED",
+            "FOLIO_CREATED",
+            "FOLIO_CLOSED",
+            "BOOKING_CREATED",
+            "BOOKING_UPDATED",
+            "BOOKING_DELETED"
+        ];
+        folioEvents.forEach(ev => socket.on(ev, onFolioChange));
+
+        return () => {
+            socket.off("GROUP_CREATED", onGroupCreated);
+            socket.off("GROUP_UPDATED", onGroupUpdated);
+            socket.off("GROUP_DELETED", onGroupDeleted);
+            folioEvents.forEach(ev => socket.off(ev, onFolioChange));
+            if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+        };
     }, [socket]);
 
     // --- Actions ---

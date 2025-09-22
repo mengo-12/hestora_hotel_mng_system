@@ -1,10 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSocket } from '@/app/components/SocketProvider';
 import { use } from 'react';
 
 export default function BookingFolioPage({ params, session }) {
-    const { bookingId } = use(params); // <-- هنا نفك الـ Promise
+    const { bookingId } = use(params);
     const sessionUser = session?.user || null;
     const socket = useSocket();
 
@@ -23,38 +23,58 @@ export default function BookingFolioPage({ params, session }) {
     const canDeletePayment = ['Admin', 'Manager'].includes(role);
     const canCloseFolio = ['Admin', 'Manager'].includes(role);
 
-    useEffect(() => {
-        async function fetchFolio() {
-            setLoading(true);
-            try {
-                // جلب الفاتورة
-                const folioRes = await fetch(`/api/folios/${bookingId}`);
-                const folioData = await folioRes.json();
-                setFolio(folioData);
+    // ✅ fetchFolio function متاحة في أي مكان
+    const fetchFolio = useCallback(async () => {
+        setLoading(true);
+        try {
+            const folioRes = await fetch(`/api/folios/${bookingId}`);
+            const folioData = await folioRes.json();
+            setFolio(folioData);
 
-                // جلب charges
-                const chargesRes = await fetch(`/api/folios/${bookingId}/charges`);
-                setCharges(await chargesRes.json());
+            const chargesRes = await fetch(`/api/folios/${bookingId}/charges`);
+            setCharges(await chargesRes.json());
 
-                // جلب payments
-                const paymentsRes = await fetch(`/api/folios/${bookingId}/payments`);
-                setPayments(await paymentsRes.json());
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
+            const paymentsRes = await fetch(`/api/folios/${bookingId}/payments`);
+            setPayments(await paymentsRes.json());
+        } catch (err) {
+            console.error("Failed to fetch folio:", err);
+        } finally {
+            setLoading(false);
         }
-
-        fetchFolio();
     }, [bookingId]);
 
     useEffect(() => {
+        fetchFolio();
+    }, [fetchFolio]);
+
+    // ✅ socket listener مع debounce
+    useEffect(() => {
         if (!socket) return;
-        const onUpdate = () => fetchFolio();
-        ['BOOKING_UPDATED', 'CHARGE_ADDED', 'CHARGE_DELETED', 'PAYMENT_ADDED', 'PAYMENT_DELETED', 'FOLIO_CLOSED'].forEach(e => socket.on(e, onUpdate));
-        return () => ['BOOKING_UPDATED', 'CHARGE_ADDED', 'CHARGE_DELETED', 'PAYMENT_ADDED', 'PAYMENT_DELETED', 'FOLIO_CLOSED'].forEach(e => socket.off(e, onUpdate));
-    }, [socket]);
+        let timeout = null;
+
+        const onUpdate = () => {
+            if (timeout) clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                fetchFolio();
+                timeout = null;
+            }, 300); // debounce 300ms
+        };
+
+        const events = [
+            'BOOKING_UPDATED',
+            'CHARGE_ADDED',
+            'CHARGE_DELETED',
+            'PAYMENT_ADDED',
+            'PAYMENT_DELETED',
+            'FOLIO_CLOSED'
+        ];
+        events.forEach(e => socket.on(e, onUpdate));
+
+        return () => {
+            events.forEach(e => socket.off(e, onUpdate));
+            if (timeout) clearTimeout(timeout);
+        };
+    }, [socket, fetchFolio]);
 
     if (loading) return <p className="text-center mt-4">جاري التحميل...</p>;
     if (!folio) return <p className="text-center mt-4">لا توجد فواتير</p>;

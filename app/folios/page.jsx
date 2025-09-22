@@ -1,12 +1,16 @@
 'use client';
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useSocket } from "@/app/components/SocketProvider";
 
 export default function FoliosPage() {
     const router = useRouter();
+    const socket = useSocket();
+
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const refreshTimeoutRef = useRef(null);
 
     // جلب جميع الحجوزات
     const fetchBookings = async () => {
@@ -16,7 +20,7 @@ export default function FoliosPage() {
             if (!res.ok) throw new Error("Failed to fetch bookings");
             const data = await res.json();
 
-            // تصفية لتجنب تكرار الحجوزات الجماعية
+            // تصفية لتجنب تكرار الحجوزات الجماعية أو الشركات
             const uniqueBookings = [];
             const groupsAdded = new Set();
             const companiesAdded = new Set();
@@ -38,7 +42,6 @@ export default function FoliosPage() {
             });
 
             setBookings(uniqueBookings);
-
         } catch (err) {
             console.error(err);
             setError(err.message);
@@ -49,6 +52,30 @@ export default function FoliosPage() {
 
     useEffect(() => { fetchBookings(); }, []);
 
+    // ✅ البث socket لتحديث الحجوزات
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleBookingChange = () => {
+            if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+            refreshTimeoutRef.current = setTimeout(() => {
+                fetchBookings();
+                refreshTimeoutRef.current = null;
+            }, 300);
+        };
+
+        const events = ["BOOKING_CREATED", "BOOKING_UPDATED", "BOOKING_DELETED"];
+        events.forEach(e => socket.on(e, handleBookingChange));
+
+        return () => {
+            events.forEach(e => socket.off(e, handleBookingChange));
+            if (refreshTimeoutRef.current) {
+                clearTimeout(refreshTimeoutRef.current);
+                refreshTimeoutRef.current = null;
+            }
+        };
+    }, [socket]);
+
     if (loading) return <p className="p-4">Loading...</p>;
     if (error) return <p className="p-4 text-red-500">{error}</p>;
 
@@ -58,7 +85,7 @@ export default function FoliosPage() {
             {bookings.length === 0 && <p>No bookings found.</p>}
             <ul className="space-y-2">
                 {bookings.map(b => (
-                    <li key={b.id}>
+                    <li key={`${b.type}-${b.id}`}>
                         <button
                             className="text-blue-600 hover:underline"
                             onClick={() => {
@@ -74,7 +101,6 @@ export default function FoliosPage() {
                         </button>
                     </li>
                 ))}
-
             </ul>
         </div>
     );
