@@ -6,9 +6,7 @@ import { authOptions } from "@/lib/auth";
 // --- تعديل حجز حسب ID ---
 export async function PUT(req, { params }) {
     try {
-        // ✅ Next 13+ App Router: params يمكن أن يكون Promise
         const { id } = await params;
-
         const session = await getServerSession(authOptions);
         const currentUserId = session?.user?.id || "SYSTEM_USER_ID";
 
@@ -36,7 +34,7 @@ export async function PUT(req, { params }) {
         if (!currentBooking)
             return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404 });
 
-        // --- تحديث الحجز ---
+        // --- تحديث بيانات الحجز الأساسية ---
         const updatedBooking = await prisma.booking.update({
             where: { id },
             data: {
@@ -58,7 +56,7 @@ export async function PUT(req, { params }) {
         const folioId = updatedBooking.folio?.id;
 
         if (folioId) {
-            // حذف Extras المحددة
+            // --- حذف Extras القديمة من Folio و Charges ---
             if (deletedIds.length > 0) {
                 for (const exId of deletedIds) {
                     const ex = await prisma.extra.findUnique({ where: { id: exId } });
@@ -69,20 +67,23 @@ export async function PUT(req, { params }) {
                 }
             }
 
-
+            // --- تحديث أو إضافة Extras جديدة ---
             for (const ex of extras) {
                 const price = new Prisma.Decimal(ex.price || 0);
                 const qty = new Prisma.Decimal(ex.quantity || 1);
-                const taxRate = new Prisma.Decimal(ex.tax || 0);
+
+                // ✅ تصحيح الضريبة: دايم نخزنها كنسبة
+                let taxPercent = Number(ex.tax) || 0;
+                if (taxPercent > 0 && taxPercent < 1) {
+                    taxPercent = taxPercent * 100; // 0.15 → 15
+                }
+                taxPercent = new Prisma.Decimal(taxPercent);
 
                 const subTotal = price.times(qty);
-                const taxAmount = taxRate.greaterThan(1)
-                    ? subTotal.times(taxRate.dividedBy(100)) // لو الضريبة نسبة (15)
-                    : subTotal.times(taxRate); // لو الضريبة 0.15
-
-                const amount = subTotal; // السعر الأساسي فقط
+                const amount = subTotal;
 
                 if (ex.id) {
+                    // تعديل Extra موجود
                     await prisma.extra.update({
                         where: { id: ex.id },
                         data: {
@@ -90,16 +91,20 @@ export async function PUT(req, { params }) {
                             description: ex.description || "",
                             unitPrice: price,
                             quantity: qty,
-                            tax: taxAmount,
+                            tax: taxPercent, // ✅ نخزن النسبة فقط
                             status: ex.status || "Unpaid"
                         }
                     });
 
                     await prisma.charge.updateMany({
                         where: { folioId, description: ex.name },
-                        data: { amount, tax: taxAmount }
+                        data: {
+                            amount,
+                            tax: taxPercent // ✅ نخزن النسبة نفسها في charge
+                        }
                     });
                 } else {
+                    // إضافة Extra جديد
                     const newExtra = await prisma.extra.create({
                         data: {
                             bookingId: id,
@@ -109,7 +114,7 @@ export async function PUT(req, { params }) {
                             description: ex.description || "",
                             unitPrice: price,
                             quantity: qty,
-                            tax: taxAmount,
+                            tax: taxPercent, // ✅ نخزن النسبة فقط
                             status: ex.status || "Unpaid"
                         }
                     });
@@ -119,8 +124,8 @@ export async function PUT(req, { params }) {
                             folioId,
                             code: "EXTRA",
                             description: newExtra.name,
-                            amount, // السعر الأساسي
-                            tax: taxAmount, // الضريبة منفصلة
+                            amount,
+                            tax: taxPercent, // ✅ نخزن النسبة نفسها
                             postedById: currentUserId
                         }
                     });
@@ -128,40 +133,46 @@ export async function PUT(req, { params }) {
             }
         }
 
-
-
-            // --- تحديث حالة الغرفة ---
-            if (updatedBooking.roomId) {
-                if (status === "InHouse") {
-                    await prisma.room.update({ where: { id: updatedBooking.roomId }, data: { status: "OCCUPIED" } });
-                } else if (status === "CheckedOut") {
-                    await prisma.room.update({ where: { id: updatedBooking.roomId }, data: { status: "VACANT" } });
-                }
+        // --- تحديث حالة الغرفة ---
+        if (updatedBooking.roomId) {
+            if (status === "InHouse") {
+                await prisma.room.update({ where: { id: updatedBooking.roomId }, data: { status: "OCCUPIED" } });
+            } else if (status === "CheckedOut") {
+                await prisma.room.update({ where: { id: updatedBooking.roomId }, data: { status: "VACANT" } });
             }
-
-            // --- جلب نسخة جديدة محدثة بعد التعديلات ---
-            const freshBooking = await prisma.booking.findUnique({
-                where: { id },
-                include: { guest: true, room: { include: { roomType: true } }, ratePlan: true, company: true, folio: { include: { charges: true, extras: true } }, extras: true }
-            });
-
-            // --- بث عالمي بعد أي تعديل ---
-            try {
-                await fetch("http://localhost:3001/api/broadcast", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ event: "BOOKING_UPDATED", data: freshBooking }),
-                });
-            } catch (err) {
-                console.error("Socket broadcast failed:", err);
-            }
-
-            return new Response(JSON.stringify(freshBooking), { status: 200 });
-        } catch (err) {
-            console.error("Booking update failed:", err);
-            return new Response(JSON.stringify({ error: "Failed to update booking" }), { status: 500 });
         }
+
+        // --- جلب نسخة محدثة بعد التعديلات ---
+        const freshBooking = await prisma.booking.findUnique({
+            where: { id },
+            include: {
+                guest: true,
+                room: { include: { roomType: true } },
+                ratePlan: true,
+                company: true,
+                folio: { include: { charges: true, extras: true } },
+                extras: true
+            }
+        });
+
+        // --- بث التحديث عالميًا ---
+        try {
+            await fetch("http://localhost:3001/api/broadcast", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ event: "BOOKING_UPDATED", data: freshBooking }),
+            });
+        } catch (err) {
+            console.error("Socket broadcast failed:", err);
+        }
+
+        return new Response(JSON.stringify(freshBooking), { status: 200 });
+    } catch (err) {
+        console.error("Booking update failed:", err);
+        return new Response(JSON.stringify({ error: "Failed to update booking" }), { status: 500 });
     }
+}
+
 
 
 
@@ -172,44 +183,44 @@ export async function PUT(req, { params }) {
 
 // --- حذف الحجز ---
 export async function DELETE(req, { params }) {
-        const id = params.id;
-        if (!id) return new Response(JSON.stringify({ error: "Booking ID is required" }), { status: 400 });
+    const id = params.id;
+    if (!id) return new Response(JSON.stringify({ error: "Booking ID is required" }), { status: 400 });
 
-        try {
-            // حذف Extras المرتبطة
-            await prisma.extra.deleteMany({ where: { bookingId: id } });
+    try {
+        // حذف Extras المرتبطة
+        await prisma.extra.deleteMany({ where: { bookingId: id } });
 
-            // حذف Charges و Payments المرتبطة بكل Folio
-            const folios = await prisma.folio.findMany({ where: { bookingId: id } });
-            for (const f of folios) {
-                await prisma.charge.deleteMany({ where: { folioId: f.id } });
-                await prisma.payment.deleteMany({ where: { folioId: f.id } });
-            }
-
-            // حذف Folios
-            await prisma.folio.deleteMany({ where: { bookingId: id } });
-
-            // حذف الحجز نفسه
-            await prisma.booking.delete({ where: { id } });
-
-            // --- Broadcast عالمي ---
-            try {
-                await fetch("http://localhost:3001/api/broadcast", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ event: "BOOKING_DELETED", data: { id } }),
-                });
-            } catch (err) { console.error("Socket broadcast failed:", err); }
-
-
-            return new Response(JSON.stringify({ message: "Booking deleted successfully" }), { status: 200 });
-            // return new Response(JSON.stringify({ success: true }), { status: 200 });
-
-        } catch (err) {
-            console.error("Failed to delete booking:", err);
-            return new Response(JSON.stringify({ error: "Failed to delete booking" }), { status: 500 });
+        // حذف Charges و Payments المرتبطة بكل Folio
+        const folios = await prisma.folio.findMany({ where: { bookingId: id } });
+        for (const f of folios) {
+            await prisma.charge.deleteMany({ where: { folioId: f.id } });
+            await prisma.payment.deleteMany({ where: { folioId: f.id } });
         }
+
+        // حذف Folios
+        await prisma.folio.deleteMany({ where: { bookingId: id } });
+
+        // حذف الحجز نفسه
+        await prisma.booking.delete({ where: { id } });
+
+        // --- Broadcast عالمي ---
+        try {
+            await fetch("http://localhost:3001/api/broadcast", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ event: "BOOKING_DELETED", data: { id } }),
+            });
+        } catch (err) { console.error("Socket broadcast failed:", err); }
+
+
+        return new Response(JSON.stringify({ message: "Booking deleted successfully" }), { status: 200 });
+        // return new Response(JSON.stringify({ success: true }), { status: 200 });
+
+    } catch (err) {
+        console.error("Failed to delete booking:", err);
+        return new Response(JSON.stringify({ error: "Failed to delete booking" }), { status: 500 });
     }
+}
 
 
 

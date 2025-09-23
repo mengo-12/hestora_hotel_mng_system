@@ -36,7 +36,7 @@ export default function EditBookingModal({ booking, isOpen, onClose, properties,
                 name: e.name,
                 price: Number(e.unitPrice || 0),
                 quantity: Number(e.quantity || 1),
-                tax: Number(e.tax || 0),
+                tax: Number(e.tax || 0), // نخزن النسبة (15)
                 status: e.status || "Unpaid"
             }));
             setExtras(mappedExtras);
@@ -51,7 +51,6 @@ export default function EditBookingModal({ booking, isOpen, onClose, properties,
         const { name, value } = e.target;
         setForm(prev => ({ ...prev, [name]: value }));
 
-        // إذا تغير الفندق، جلب Rate Plans جديدة وتفريغ الاختيار الحالي
         if (name === "propertyId") {
             fetchRatePlans(value);
             setForm(prev => ({ ...prev, ratePlanId: "" }));
@@ -72,7 +71,7 @@ export default function EditBookingModal({ booking, isOpen, onClose, properties,
             name: extraName,
             price: Number(extraPrice),
             quantity: Number(extraQty) || 1,
-            tax: Number(extraTax) || 0,
+            tax: Number(extraTax) || 0, // نسبة
             status: "Unpaid"
         };
         setExtras(prev => [...prev, newExtra]);
@@ -148,7 +147,7 @@ export default function EditBookingModal({ booking, isOpen, onClose, properties,
     // المجموع الفرعي
     const subtotal = roomPrice + extrasSubtotal;
 
-    // الضريبة (مثلاً ضريبة عامة 15% + ضرائب الخدمات)
+    // الضريبة العامة على الغرفة (مثلاً 15%)
     const generalTax = (roomPrice * 15) / 100;
     const totalTax = generalTax + extrasTax;
 
@@ -215,7 +214,7 @@ export default function EditBookingModal({ booking, isOpen, onClose, properties,
                         <input type="text" placeholder="Service Name" value={extraName} onChange={e => setExtraName(e.target.value)} className="border rounded p-1" />
                         <input type="number" placeholder="Price" value={extraPrice} onChange={e => setExtraPrice(e.target.value)} className="border rounded p-1" />
                         <input type="number" placeholder="Qty" min={1} value={extraQty} onChange={e => setExtraQty(Number(e.target.value))} className="border rounded p-1" />
-                        <input type="number" placeholder="Tax" value={extraTax} onChange={e => setExtraTax(e.target.value)} className="border rounded p-1" />
+                        <input type="number" placeholder="Tax %" value={extraTax} onChange={e => setExtraTax(e.target.value)} className="border rounded p-1" />
                         <button onClick={addExtra} className="px-2 py-1 bg-green-500 text-white rounded">Add</button>
                     </div>
 
@@ -226,34 +225,43 @@ export default function EditBookingModal({ booking, isOpen, onClose, properties,
                                     <th className="border p-1">Name</th>
                                     <th className="border p-1">Price</th>
                                     <th className="border p-1">Qty</th>
-                                    <th className="border p-1">Tax</th>
+                                    <th className="border p-1">Tax %</th>
                                     <th className="border p-1">Total</th>
                                     <th className="border p-1">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {extras.map((ex, idx) => (
-                                    <tr key={ex.tempId}>
-                                        <td className="border p-1">
-                                            <input type="text" value={ex.name} onChange={e => handleExtraChange(idx, "name", e.target.value)} className="w-full border rounded p-1" />
-                                        </td>
-                                        <td className="border p-1">
-                                            <input type="number" value={ex.price} onChange={e => handleExtraChange(idx, "price", Number(e.target.value))} className="w-full border rounded p-1" />
-                                        </td>
-                                        <td className="border p-1">
-                                            <input type="number" min={1} value={ex.quantity} onChange={e => handleExtraChange(idx, "quantity", Number(e.target.value))} className="w-full border rounded p-1" />
-                                        </td>
-                                        <td className="border p-1">
-                                            <input type="number" value={ex.tax} onChange={e => handleExtraChange(idx, "tax", Number(e.target.value))} className="w-full border rounded p-1" />
-                                        </td>
-                                        <td className="border p-1">
-                                            ${((Number(ex.price) || 0) * (Number(ex.quantity) || 1) + (Number(ex.tax) || 0)).toFixed(2)}
-                                        </td>
-                                        <td className="border p-1 text-center">
-                                            <button onClick={() => removeExtra(idx)} className="px-2 py-1 bg-red-500 text-white rounded">Delete</button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {extras.map((ex, idx) => {
+                                    const price = Number(ex.price || 0);
+                                    const qty = Number(ex.quantity || 1);
+                                    const taxRate = Number(ex.tax || 0);
+                                    const lineSubtotal = price * qty;
+                                    const lineTax = (lineSubtotal * taxRate) / 100;
+                                    const lineTotal = lineSubtotal + lineTax;
+
+                                    return (
+                                        <tr key={ex.tempId}>
+                                            <td className="border p-1">
+                                                <input type="text" value={ex.name} onChange={e => handleExtraChange(idx, "name", e.target.value)} className="w-full border rounded p-1" />
+                                            </td>
+                                            <td className="border p-1">
+                                                <input type="number" value={ex.price} onChange={e => handleExtraChange(idx, "price", Number(e.target.value))} className="w-full border rounded p-1" />
+                                            </td>
+                                            <td className="border p-1">
+                                                <input type="number" min={1} value={ex.quantity} onChange={e => handleExtraChange(idx, "quantity", Number(e.target.value))} className="w-full border rounded p-1" />
+                                            </td>
+                                            <td className="border p-1">
+                                                <input type="number" value={ex.tax} onChange={e => handleExtraChange(idx, "tax", Number(e.target.value))} className="w-full border rounded p-1" />
+                                            </td>
+                                            <td className="border p-1 text-right">
+                                                ${lineTotal.toFixed(2)}
+                                            </td>
+                                            <td className="border p-1 text-center">
+                                                <button onClick={() => removeExtra(idx)} className="px-2 py-1 bg-red-500 text-white rounded">Delete</button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     )}
