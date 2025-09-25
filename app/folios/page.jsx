@@ -294,12 +294,19 @@ export default function FoliosPage({ properties }) {
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredBookings.map(b => {
-                        // تحويل التاريخ إلى الصيغة المطلوبة
                         const formatDate = (dateStr) => {
                             if (!dateStr) return "";
                             const d = new Date(dateStr);
                             return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
                         };
+
+                        const typeConfig = {
+                            individual: { label: "Individual", icon: <FaUser className="text-blue-500 w-5 h-5" />, badgeColor: "bg-blue-100 text-blue-700 dark:bg-blue-700 dark:text-blue-100" },
+                            group: { label: "Group", icon: <FaUsers className="text-green-500 w-5 h-5" />, badgeColor: "bg-green-100 text-green-700 dark:bg-green-700 dark:text-green-100" },
+                            company: { label: "Company", icon: <FaBuilding className="text-purple-500 w-5 h-5" />, badgeColor: "bg-purple-100 text-purple-700 dark:bg-purple-700 dark:text-purple-100" }
+                        };
+
+                        const config = typeConfig[b.type] || {};
 
                         return (
                             <div
@@ -316,10 +323,13 @@ export default function FoliosPage({ properties }) {
                                     <h2 className="text-xl font-bold text-gray-900 dark:text-white truncate">
                                         {b.type === "individual" ? `${b.guest?.firstName} ${b.guest?.lastName}` : b.name}
                                     </h2>
-                                    <div className="p-2 rounded-full bg-gray-100 dark:bg-gray-700">
-                                        {b.type === "individual" && <FaUser className="text-blue-500 w-5 h-5" />}
-                                        {b.type === "group" && <FaUsers className="text-green-500 w-5 h-5" />}
-                                        {b.type === "company" && <FaBuilding className="text-purple-500 w-5 h-5" />}
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-2 rounded-full bg-gray-100 dark:bg-gray-700">
+                                            {config.icon}
+                                        </div>
+                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${config.badgeColor}`}>
+                                            {config.label}
+                                        </span>
                                     </div>
                                 </div>
 
@@ -355,6 +365,7 @@ export default function FoliosPage({ properties }) {
                     })}
                 </div>
             )}
+
 
 
 
