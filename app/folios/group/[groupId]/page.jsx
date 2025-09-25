@@ -528,27 +528,26 @@ export default function GroupFolioPage({ params }) {
         <div className="p-6 space-y-8  dark:bg-gray-900 min-h-screen text-gray-800 dark:text-gray-100">
             <h1 className="text-2xl font-bold mb-6">📑 فاتورة الحجز الجماعي</h1>
 
-            {/* KPIs */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col items-center">
-                    <FaUser className="text-blue-500 text-2xl mb-2" />
-                    <span className="text-gray-500 dark:text-gray-300">Guests</span>
-                    <span className="text-xl font-bold">{bookings.length}</span>
-                </div>
-                <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col items-center">
-                    <FaBed className="text-green-500 text-2xl mb-2" />
-                    <span className="text-gray-500 dark:text-gray-300">Rooms</span>
-                    <span className="text-xl font-bold">{bookings.filter(b => b.room).length}</span>
-                </div>
-                <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col items-center">
-                    <FaReceipt className="text-orange-500 text-2xl mb-2" />
-                    <span className="text-gray-500 dark:text-gray-300">Charges</span>
-                    <span className="text-xl font-bold">{totalCharges.toFixed(2)}</span>
-                </div>
-                <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col items-center">
-                    <FaMoneyBillWave className="text-green-600 text-2xl mb-2" />
-                    <span className="text-gray-500 dark:text-gray-300">Payments</span>
-                    <span className="text-xl font-bold">{totalPayments.toFixed(2)}</span>
+
+                        {/* Folio Summary */}
+            <div className="bg-white dark:bg-gray-800 shadow-xl rounded-2xl p-6">
+                <h2 className="text-xl font-bold mb-4">Folio Summary</h2>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="p-3 rounded bg-gray-100 dark:bg-gray-700">
+                        Subtotal: <span className="font-bold">{subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="p-3 rounded bg-gray-100 dark:bg-gray-700">
+                        Tax: <span className="text-orange-500 font-bold">{taxTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="p-3 rounded bg-gray-100 dark:bg-gray-700">
+                        Charges: <span className="text-red-500 font-bold">{totalCharges.toFixed(2)}</span>
+                    </div>
+                    <div className="p-3 rounded bg-gray-100 dark:bg-gray-700">
+                        Payments: <span className="text-green-500 font-bold">{totalPayments.toFixed(2)}</span>
+                    </div>
+                    <div className="p-3 rounded bg-gray-100 dark:bg-gray-700">
+                        Balance: <span className="text-blue-500 font-bold">{balance.toFixed(2)}</span>
+                    </div>
                 </div>
             </div>
 
@@ -562,6 +561,8 @@ export default function GroupFolioPage({ params }) {
             {bookings.length} Guests
         </span>
     </div>
+
+    
 
     <div className="overflow-hidden border border-gray-200 dark:border-gray-700 rounded-xl">
         <table className="w-full text-sm">
