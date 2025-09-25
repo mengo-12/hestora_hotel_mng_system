@@ -269,29 +269,65 @@ function BookingCard({ booking, router, canCheckinCheckout, canCancelNoshow, can
     const isOverstay = booking.status === "InHouse" && checkOutDate < now;
 
     return (
-        <div className={`p-4 rounded-lg shadow flex flex-col md:flex-row justify-between gap-4 items-center bg-white dark:bg-gray-800 cursor-pointer hover:shadow-lg transition`}>
-            <div className="flex flex-col gap-1">
-                <h2 className="font-semibold text-gray-700 dark:text-gray-200">{booking.guest?.firstName} {booking.guest?.lastName}</h2>
-                <p className="text-gray-600 dark:text-gray-300">Room: {booking.room?.number || "N/A"}</p>
-                <p className="text-gray-600 dark:text-gray-300">Guests: {booking.adults || 0} Adults, {booking.children || 0} Children</p>
-                <p className="text-gray-600 dark:text-gray-300">RatePlan: {booking.ratePlan?.name || "N/A"}</p>
-                <p className={`font-semibold px-2 py-1 rounded ${config.bg} ${config.text}`}>Status: {booking.status}</p>
-                <p className="text-gray-600 dark:text-gray-300">Check-in: {new Date(booking.checkIn).toLocaleDateString()}</p>
-                <p className="text-gray-600 dark:text-gray-300">Check-out: {new Date(booking.checkOut).toLocaleDateString()}</p>
+        <div className="p-4 rounded-2xl shadow-lg bg-white dark:bg-gray-700 text-black dark:text-white flex flex-col justify-between gap-3 cursor-pointer hover:shadow-xl transition transform hover:scale-105">
+
+            {/* Header: Guest Name & Status */}
+            <div className="flex justify-between items-start mb-2">
+                <div>
+                    <h2 className="text-lg font-semibold">
+                        {booking.guest?.firstName} {booking.guest?.lastName}
+                    </h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-300">
+                        {booking.ratePlan?.name || "N/A"}
+                    </p>
+                </div>
+                <span className={`px-2 py-1 text-xs rounded ${config.bg} ${config.text}`}>
+                    {booking.status}
+                </span>
             </div>
 
-            <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
-                {booking.status === "Reserved" && booking.roomId && canCheckinCheckout &&
-                    <button className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition">Check-In</button>}
-                {booking.status === "Reserved" && booking.roomId && canCancelNoshow &&
+            {/* KPI / Summary */}
+            <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+                <div className="flex flex-col">
+                    <span className="text-gray-400 dark:text-gray-300">Room</span>
+                    <span className="font-medium">{booking.room?.number || "N/A"}</span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-gray-400 dark:text-gray-300">Guests</span>
+                    <span className="font-medium">{booking.adults || 0} Adults, {booking.children || 0} Children</span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-gray-400 dark:text-gray-300">Check-In</span>
+                    <span className="font-medium">{new Date(booking.checkIn).toLocaleDateString()}</span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-gray-400 dark:text-gray-300">Check-Out</span>
+                    <span className="font-medium">{new Date(booking.checkOut).toLocaleDateString()}</span>
+                </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-wrap gap-2 mt-2">
+                {booking.status === "Reserved" && booking.roomId && canCheckinCheckout && (
+                    <button className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition">Check-In</button>
+                )}
+                {booking.status === "Reserved" && booking.roomId && canCancelNoshow && (
                     <>
                         <button className="px-3 py-1 bg-yellow-500 text-black rounded hover:bg-yellow-600 transition">Cancel</button>
                         <button className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition">No-Show</button>
-                    </>}
-                {booking.status === "InHouse" && booking.roomId && canCheckinCheckout &&
-                    <button className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition">Check-Out</button>}
-                {canFolio &&
-                    <button className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition" onClick={() => router.push(`/bookings/${booking.id}/folio`)}>Open Folio</button>}
+                    </>
+                )}
+                {booking.status === "InHouse" && booking.roomId && canCheckinCheckout && (
+                    <button className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition">Check-Out</button>
+                )}
+                {canFolio && (
+                    <button
+                        className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                        onClick={() => router.push(`/bookings/${booking.id}/folio`)}
+                    >
+                        Open Folio
+                    </button>
+                )}
             </div>
         </div>
     );

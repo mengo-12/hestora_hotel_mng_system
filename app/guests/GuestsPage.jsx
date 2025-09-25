@@ -336,21 +336,62 @@ export default function GuestsPage({ session, userProperties }) {
             {/* Guests Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredGuests.map(guest => (
-                    <div key={guest.id} className="p-4 rounded-lg shadow flex flex-col justify-between gap-2 bg-white dark:bg-gray-800 dark:text-white cursor-pointer hover:shadow-lg transition transform hover:scale-105">
-                        <div className="flex justify-between items-center">
+                    <div
+                        key={guest.id}
+                        className="p-4 rounded-2xl shadow-lg bg-white dark:bg-gray-800 dark:text-white flex flex-col justify-between gap-3 cursor-pointer hover:shadow-xl transition transform hover:scale-105"
+                    >
+                        {/* Header */}
+                        <div className="flex justify-between items-start mb-2">
                             <div className="flex items-center gap-2">
                                 {getGuestIcon(guest)}
-                                <h2 className="text-xl font-bold text-gray-500 dark:text-white">{guest.firstName} {guest.lastName}</h2>
+                                <h2 className="text-lg font-semibold text-gray-700 dark:text-white">
+                                    {guest.firstName} {guest.lastName}
+                                </h2>
                             </div>
                             <div className="flex gap-1">
-                                {canEdit && <button onClick={e => { e.stopPropagation(); setEditGuest(guest); }} className="bg-white dark:bg-gray-700 text-black px-2 py-1 rounded hover:bg-gray-200 text-xs">✏️ Edit</button>}
-                                {canDelete && <button onClick={async e => { e.stopPropagation(); if (!confirm("Delete this guest?")) return; await fetch(`/api/guests/${guest.id}`, { method: "DELETE" }); setGuests(prev => prev.filter(g => g.id !== guest.id)); }} className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-xs">🗑 Delete</button>}
+                                {canEdit && (
+                                    <button
+                                        onClick={e => { e.stopPropagation(); setEditGuest(guest); }}
+                                        className="px-2 py-1 bg-yellow-500 hover:bg-yellow-600 text-white text-xs rounded"
+                                    >
+                                        Edit
+                                    </button>
+                                )}
+                                {canDelete && (
+                                    <button
+                                        onClick={async e => {
+                                            e.stopPropagation();
+                                            if (!confirm("Delete this guest?")) return;
+                                            await fetch(`/api/guests/${guest.id}`, { method: "DELETE" });
+                                            setGuests(prev => prev.filter(g => g.id !== guest.id));
+                                        }}
+                                        className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded"
+                                    >
+                                        Delete
+                                    </button>
+                                )}
                             </div>
                         </div>
-                        <p className="text-sm text-black dark:text-gray-500">Phone: {guest.phone || "N/A"}</p>
-                        <p className="text-sm text-black dark:text-gray-500">Email: {guest.email || "N/A"}</p>
-                        <p className="text-sm text-black dark:text-gray-500">Property: {guest.property?.name || "N/A"}</p>
-                        <p className="text-sm text-black dark:text-gray-500">Hotel Group: {guest.hotelGroup?.name || "N/A"}</p>
+
+                        {/* KPI / Summary */}
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="flex flex-col">
+                                <span className="text-gray-400 dark:text-gray-300">Phone</span>
+                                <span className="font-medium">{guest.phone || "N/A"}</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-gray-400 dark:text-gray-300">Email</span>
+                                <span className="font-medium">{guest.email || "N/A"}</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-gray-400 dark:text-gray-300">Property</span>
+                                <span className="font-medium">{guest.property?.name || "N/A"}</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-gray-400 dark:text-gray-300">Hotel Group</span>
+                                <span className="font-medium">{guest.hotelGroup?.name || "N/A"}</span>
+                            </div>
+                        </div>
                     </div>
                 ))}
             </div>

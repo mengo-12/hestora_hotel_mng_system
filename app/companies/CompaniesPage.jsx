@@ -356,28 +356,55 @@ export default function CompaniesPage({ session, userProperties }) {
             {/* Companies Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredCompanies.map(company => (
-                    <div key={company.id} className="p-5 rounded-2xl shadow-lg bg-white dark:bg-gray-800 dark:text-white flex flex-col justify-between gap-4 hover:shadow-2xl transition-transform transform hover:scale-105">
-                        
+                    <div
+                        key={company.id}
+                        className="p-5 rounded-2xl shadow-lg bg-white dark:bg-gray-800 dark:text-white flex flex-col justify-between gap-4 hover:shadow-2xl transition-transform transform hover:scale-105"
+                    >
                         {/* Header */}
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-start mb-3">
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-700 dark:text-white">{company.name}</h2>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Code: {company.code}</p>
+                                <h2 className="text-lg font-semibold text-gray-700 dark:text-white">{company.name}</h2>
+                                <p className="text-sm text-gray-500 dark:text-gray-300">Code: {company.code}</p>
                             </div>
                             <div className="flex gap-2">
-                                {canEdit && <button onClick={e => { e.stopPropagation(); setEditCompany(company); }} className="bg-yellow-400 hover:bg-yellow-500 text-black px-3 py-1 rounded text-xs font-medium">✏️ Edit</button>}
-                                {canDelete && <button onClick={e => { e.stopPropagation(); handleDelete(company.id); }} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-medium">🗑 Delete</button>}
+                                {canEdit && (
+                                    <button
+                                        onClick={e => { e.stopPropagation(); setEditCompany(company); }}
+                                        className="px-3 py-1 bg-yellow-500 hover:bg-yellow-600 text-white text-xs rounded"
+                                    >
+                                        Edit
+                                    </button>
+                                )}
+                                {canDelete && (
+                                    <button
+                                        onClick={e => { e.stopPropagation(); handleDelete(company.id); }}
+                                        className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded"
+                                    >
+                                        Delete
+                                    </button>
+                                )}
                             </div>
                         </div>
 
-                        {/* Company Info */}
-                        <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
-                            <p><span className="font-semibold">Property:</span> {properties.find(p => p.id === company.propertyId)?.name || "-"}</p>
-                            <p><span className="font-semibold">Credit Limit:</span> {company.creditLimit ?? "-"}</p>
-                            <p><span className="font-semibold">Rate Agreement:</span> {company.rateAgreement ?? "-"}</p>
-                            <p><span className="font-semibold">Total Balance:</span> {company.companyTotals?.balance ?? 0}</p>
+                        {/* KPI / Summary */}
+                        <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                            <div className="flex flex-col">
+                                <span className="text-gray-400 dark:text-gray-300">Property</span>
+                                <span className="font-medium">{properties.find(p => p.id === company.propertyId)?.name || "-"}</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-gray-400 dark:text-gray-300">Credit Limit</span>
+                                <span className="font-medium">{company.creditLimit ?? "-"}</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-gray-400 dark:text-gray-300">Rate Agreement</span>
+                                <span className="font-medium">{company.rateAgreement ?? "-"}</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-gray-400 dark:text-gray-300">Total Balance</span>
+                                <span className="font-bold text-red-600">{company.companyTotals?.balance ?? 0}</span>
+                            </div>
                         </div>
-
                     </div>
                 ))}
                 {filteredCompanies.length === 0 && <p className="col-span-full text-center text-gray-500">No companies found.</p>}
