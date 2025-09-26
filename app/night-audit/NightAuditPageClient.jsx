@@ -513,107 +513,107 @@ export default function NightAuditAdminClient({ initialPropertyId, initialProper
 
             {/* KPI Cards */}
             {/* {summary && ( */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col items-center">
-                        <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
-                            <BedDouble className="w-5 h-5" /> Rooms Sold
-                        </div>
-                        <div className="text-2xl font-bold">{summary?.roomsSold || 0}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col items-center">
+                    <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
+                        <BedDouble className="w-5 h-5" /> Rooms Sold
                     </div>
-                    <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col items-center">
-                        <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
-                            <Percent className="w-5 h-5" /> Occupancy
-                        </div>
-                        <div className="text-2xl font-bold">{summary?.occupancy ?? 0}%</div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col items-center">
-                        <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
-                            <DollarSign className="w-5 h-5" /> ADR
-                        </div>
-                        <div className="text-2xl font-bold">{summary?.adr || 0}</div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col items-center">
-                        <div className="flex items-center gap-2 text-purple-800 dark:text-purple-200">
-                            <BarChart3 className="w-5 h-5" /> RevPAR
-                        </div>
-                        <div className="text-2xl font-bold">{summary?.revpar || 0}</div>
-                    </div>
+                    <div className="text-2xl font-bold">{summary?.roomsSold || 0}</div>
                 </div>
+                <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col items-center">
+                    <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+                        <Percent className="w-5 h-5" /> Occupancy
+                    </div>
+                    <div className="text-2xl font-bold">{summary?.occupancy ?? 0}%</div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col items-center">
+                    <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
+                        <DollarSign className="w-5 h-5" /> ADR
+                    </div>
+                    <div className="text-2xl font-bold">{summary?.adr || 0}</div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col items-center">
+                    <div className="flex items-center gap-2 text-purple-800 dark:text-purple-200">
+                        <BarChart3 className="w-5 h-5" /> RevPAR
+                    </div>
+                    <div className="text-2xl font-bold">{summary?.revpar || 0}</div>
+                </div>
+            </div>
             {/* )} */}
 
-{/* Audit Filters */}
-<div className="flex flex-col md:flex-row gap-4 mb-6 flex-wrap md:flex-nowrap items-end bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-lg">
+            {/* Audit Filters */}
+            <div className="flex flex-col md:flex-row gap-4 mb-6 flex-wrap md:flex-nowrap items-end bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-lg">
 
-    {/* Property Select */}
-    <div className="flex items-center gap-2 w-full md:w-1/4">
-        <Building2 className="w-5 h-5 text-gray-500 dark:text-gray-300" />
-        <select 
-            value={selectedProperty} 
-            onChange={e => setSelectedProperty(e.target.value)} 
-            className="flex-1 p-3 border border-gray-300 dark:border-gray-700 rounded-xl shadow-sm dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 transition duration-200"
-        >
-            <option value="">-- Select Property --</option>
-            {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-    </div>
+                {/* Property Select */}
+                <div className="flex items-center gap-2 w-full md:w-1/4">
+                    <Building2 className="w-5 h-5 text-gray-500 dark:text-gray-300" />
+                    <select
+                        value={selectedProperty}
+                        onChange={e => setSelectedProperty(e.target.value)}
+                        className="flex-1 p-3 border border-gray-300 dark:border-gray-700 rounded-xl shadow-sm dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 transition duration-200"
+                    >
+                        <option value="">-- Select Property --</option>
+                        {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                </div>
 
-    {/* Audit Date */}
-    <div className="flex items-center gap-2 w-full md:w-1/5">
-        <CalendarDays className="w-5 h-5 text-gray-500 dark:text-gray-300" />
-        <input 
-            type="date" 
-            value={auditDate} 
-            onChange={e => setAuditDate(e.target.value)} 
-            className="flex-1 p-3 border border-gray-300 dark:border-gray-700 rounded-xl shadow-sm dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 transition duration-200"
-        />
-    </div>
+                {/* Audit Date */}
+                <div className="flex items-center gap-2 w-full md:w-1/5">
+                    <CalendarDays className="w-5 h-5 text-gray-500 dark:text-gray-300" />
+                    <input
+                        type="date"
+                        value={auditDate}
+                        onChange={e => setAuditDate(e.target.value)}
+                        className="flex-1 p-3 border border-gray-300 dark:border-gray-700 rounded-xl shadow-sm dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 transition duration-200"
+                    />
+                </div>
 
-    {/* Fetch Data */}
-    <button 
-        onClick={() => fetchAuditData(selectedProperty, auditDate)} 
-        className="bg-gray-600 text-white px-4 py-3 rounded-xl flex items-center gap-2 hover:bg-gray-700 transition shadow-md w-full md:w-auto justify-center"
-    >
-        <BarChart3 className="w-5 h-5" /> Fetch Data
-    </button>
+                {/* Fetch Data */}
+                <button
+                    onClick={() => fetchAuditData(selectedProperty, auditDate)}
+                    className="bg-gray-600 text-white px-4 py-3 rounded-xl flex items-center gap-2 hover:bg-gray-700 transition shadow-md w-full md:w-auto justify-center"
+                >
+                    <BarChart3 className="w-5 h-5" /> Fetch Data
+                </button>
 
-    {/* Run Audit */}
-    <button 
-        onClick={runAudit} 
-        disabled={running || !canRunAudit} 
-        className={`px-4 py-3 rounded-xl flex items-center gap-2 shadow-md transition w-full md:w-auto justify-center ${running ? "bg-blue-400" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
-    >
-        {running ? <Loader2 className="animate-spin w-5 h-5" /> : <PlayCircle className="w-5 h-5" />}
-        {running ? "Running..." : "Run Night Audit"}
-    </button>
+                {/* Run Audit */}
+                <button
+                    onClick={runAudit}
+                    disabled={running || !canRunAudit}
+                    className={`px-4 py-3 rounded-xl flex items-center gap-2 shadow-md transition w-full md:w-auto justify-center ${running ? "bg-blue-400" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
+                >
+                    {running ? <Loader2 className="animate-spin w-5 h-5" /> : <PlayCircle className="w-5 h-5" />}
+                    {running ? "Running..." : "Run Night Audit"}
+                </button>
 
-    {/* Export PDF */}
-    <button 
-        onClick={exportPDF} 
-        className="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-xl flex items-center gap-2 transition shadow-md w-full md:w-auto justify-center"
-        disabled={!canExport}
-    >
-        <FileDown className="w-5 h-5" /> PDF
-    </button>
+                {/* Export PDF */}
+                <button
+                    onClick={exportPDF}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-xl flex items-center gap-2 transition shadow-md w-full md:w-auto justify-center"
+                    disabled={!canExport}
+                >
+                    <FileDown className="w-5 h-5" /> PDF
+                </button>
 
-    {/* Export CSV */}
-    <button 
-        onClick={exportCSV} 
-        className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-3 rounded-xl flex items-center gap-2 transition shadow-md w-full md:w-auto justify-center"
-        disabled={!canExport}
-    >
-        <FileSpreadsheet className="w-5 h-5" /> CSV
-    </button>
+                {/* Export CSV */}
+                <button
+                    onClick={exportCSV}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-3 rounded-xl flex items-center gap-2 transition shadow-md w-full md:w-auto justify-center"
+                    disabled={!canExport}
+                >
+                    <FileSpreadsheet className="w-5 h-5" /> CSV
+                </button>
 
-    {/* Print */}
-    <button 
-        onClick={handlePrint} 
-        className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-3 rounded-xl flex items-center gap-2 transition shadow-md w-full md:w-auto justify-center"
-        disabled={!canExport}
-    >
-        <Printer className="w-5 h-5" /> Print
-    </button>
+                {/* Print */}
+                <button
+                    onClick={handlePrint}
+                    className="bg-gray-700 hover:bg-gray-800 text-white px-4 py-3 rounded-xl flex items-center gap-2 transition shadow-md w-full md:w-auto justify-center"
+                    disabled={!canExport}
+                >
+                    <Printer className="w-5 h-5" /> Print
+                </button>
 
-</div>
+            </div>
 
 
             {/* Error */}
@@ -658,10 +658,10 @@ export default function NightAuditAdminClient({ initialPropertyId, initialProper
                                         <td className="px-4 py-3">
                                             <span
                                                 className={`px-2 py-1 text-xs font-semibold rounded-full ${b.status === "CheckedIn"
-                                                        ? "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300"
-                                                        : b.status === "CheckedOut"
-                                                            ? "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                                                            : "bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300"
+                                                    ? "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300"
+                                                    : b.status === "CheckedOut"
+                                                        ? "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                                        : "bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300"
                                                     }`}
                                             >
                                                 {b.status}
