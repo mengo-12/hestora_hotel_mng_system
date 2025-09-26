@@ -529,7 +529,7 @@ export default function GroupFolioPage({ params }) {
             <h1 className="text-2xl font-bold mb-6">📑 فاتورة الحجز الجماعي</h1>
 
 
-                        {/* Folio Summary */}
+            {/* Folio Summary */}
             <div className="bg-white dark:bg-gray-800 shadow-xl rounded-2xl p-6">
                 <h2 className="text-xl font-bold mb-4">Folio Summary</h2>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -551,159 +551,156 @@ export default function GroupFolioPage({ params }) {
                 </div>
             </div>
 
-{/* Rooming List */}
-<div className="bg-white dark:bg-gray-800 shadow-xl rounded-2xl p-6">
-    <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold flex items-center gap-2 text-gray-800 dark:text-gray-100">
-            <FaBed className="text-blue-500" /> Rooming List
-        </h2>
-        <span className="text-sm px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300">
-            {bookings.length} Guests
-        </span>
-    </div>
-
-    
-
-    <div className="overflow-hidden border border-gray-200 dark:border-gray-700 rounded-xl">
-        <table className="w-full text-sm">
-            <thead className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-                <tr>
-                    <th className="px-4 py-3 text-left">👤 Guest</th>
-                    <th className="px-4 py-3 text-left">🏨 Room</th>
-                    <th className="px-4 py-3 text-left">📌 Status</th>
-                    <th className="px-4 py-3 text-left">📅 Check-in</th>
-                    <th className="px-4 py-3 text-left">📅 Check-out</th>
-                </tr>
-            </thead>
-            <tbody>
-                {bookings.map((b, i) => (
-                    <tr
-                        key={b.id}
-                        className={`${
-                            i % 2 === 0
-                                ? "bg-gray-50 dark:bg-gray-900/40"
-                                : "bg-white dark:bg-gray-800"
-                        } hover:bg-blue-50 dark:hover:bg-gray-700 transition`}
-                    >
-                        <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
-                            {b.guest?.firstName} {b.guest?.lastName}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
-                            {b.room?.number || "-"}
-                        </td>
-                        <td className="px-4 py-3">
-                            <span
-                                className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                                    b.status === "CheckedIn"
-                                        ? "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300"
-                                        : b.status === "CheckedOut"
-                                        ? "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                                        : "bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300"
-                                }`}
-                            >
-                                {b.status}
-                            </span>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
-                            {b.checkIn ? new Date(b.checkIn).toLocaleDateString() : "-"}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
-                            {b.checkOut ? new Date(b.checkOut).toLocaleDateString() : "-"}
-                        </td>
-                    </tr>
-                ))}
-
-                {bookings.length === 0 && (
-                    <tr>
-                        <td
-                            colSpan="5"
-                            className="px-4 py-6 text-center text-gray-500 dark:text-gray-400"
-                        >
-                            لا يوجد ضيوف في القائمة
-                        </td>
-                    </tr>
-                )}
-            </tbody>
-        </table>
-    </div>
-</div>
+            {/* Rooming List */}
+            <div className="bg-white dark:bg-gray-800 shadow-xl rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                        <FaBed className="text-blue-500" /> Rooming List
+                    </h2>
+                    <span className="text-sm px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300">
+                        {bookings.length} Guests
+                    </span>
+                </div>
 
 
-{/* Charges */}
-<div className="bg-white dark:bg-gray-800 shadow-xl rounded-2xl p-6">
-    <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-bold flex items-center gap-2 text-gray-800 dark:text-gray-100">
-            <FaReceipt className="text-orange-500" /> Charges
-        </h3>
-        <span className="text-sm px-3 py-1 rounded-full bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-300">
-            {allCharges.length} Items
-        </span>
-    </div>
 
-    <div className="overflow-hidden border border-gray-200 dark:border-gray-700 rounded-xl">
-        <table className="w-full text-sm">
-            <thead className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
-                <tr>
-                    <th className="px-4 py-3 text-left">👤 Guest</th>
-                    <th className="px-4 py-3 text-left"># Code</th>
-                    <th className="px-4 py-3 text-left">📝 Description</th>
-                    <th className="px-4 py-3 text-left">💰 Amount</th>
-                    <th className="px-4 py-3 text-left">📊 Tax %</th>
-                    <th className="px-4 py-3 text-center">⚙️ Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {allCharges.map((c, i) => (
-                    <tr
-                        key={`${c.id}-${c.folioId}`}
-                        className={`${
-                            i % 2 === 0
-                                ? "bg-gray-50 dark:bg-gray-900/40"
-                                : "bg-white dark:bg-gray-800"
-                        } hover:bg-orange-50 dark:hover:bg-gray-700 transition`}
-                    >
-                        <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
-                            {c.guestName}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
-                            {c.code}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
-                            {c.description}
-                        </td>
-                        <td className="px-4 py-3 font-semibold text-green-600 dark:text-green-400">
-                            {Number(c.amount).toFixed(2)}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
-                            {c.tax}%
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                            {canDeleteCharge && (
-                                <button
-                                    onClick={() => handleDeleteCharge(c.id)}
-                                    className="px-3 py-1 rounded-lg bg-red-100 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800 text-red-600 dark:text-red-300 transition flex items-center gap-1 mx-auto"
+                <div className="overflow-hidden border border-gray-200 dark:border-gray-700 rounded-xl">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                            <tr>
+                                <th className="px-4 py-3 text-left">👤 Guest</th>
+                                <th className="px-4 py-3 text-left">🏨 Room</th>
+                                <th className="px-4 py-3 text-left">📌 Status</th>
+                                <th className="px-4 py-3 text-left">📅 Check-in</th>
+                                <th className="px-4 py-3 text-left">📅 Check-out</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {bookings.map((b, i) => (
+                                <tr
+                                    key={b.id}
+                                    className={`${i % 2 === 0
+                                            ? "bg-gray-50 dark:bg-gray-900/40"
+                                            : "bg-white dark:bg-gray-800"
+                                        } hover:bg-blue-50 dark:hover:bg-gray-700 transition`}
                                 >
-                                    🗑 <span className="hidden sm:inline">حذف</span>
-                                </button>
-                            )}
-                        </td>
-                    </tr>
-                ))}
+                                    <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
+                                        {b.guest?.firstName} {b.guest?.lastName}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                        {b.room?.number || "-"}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <span
+                                            className={`px-2 py-1 text-xs font-semibold rounded-full ${b.status === "CheckedIn"
+                                                    ? "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300"
+                                                    : b.status === "CheckedOut"
+                                                        ? "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                                        : "bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300"
+                                                }`}
+                                        >
+                                            {b.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                        {b.checkIn ? new Date(b.checkIn).toLocaleDateString() : "-"}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                        {b.checkOut ? new Date(b.checkOut).toLocaleDateString() : "-"}
+                                    </td>
+                                </tr>
+                            ))}
 
-                {allCharges.length === 0 && (
-                    <tr>
-                        <td
-                            colSpan="6"
-                            className="px-4 py-6 text-center text-gray-500 dark:text-gray-400"
-                        >
-                            لا توجد رسوم مضافة بعد
-                        </td>
-                    </tr>
-                )}
-            </tbody>
-        </table>
-    </div>
-</div>
+                            {bookings.length === 0 && (
+                                <tr>
+                                    <td
+                                        colSpan="5"
+                                        className="px-4 py-6 text-center text-gray-500 dark:text-gray-400"
+                                    >
+                                        لا يوجد ضيوف في القائمة
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+
+            {/* Charges */}
+            <div className="bg-white dark:bg-gray-800 shadow-xl rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                        <FaReceipt className="text-orange-500" /> Charges
+                    </h3>
+                    <span className="text-sm px-3 py-1 rounded-full bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-300">
+                        {allCharges.length} Items
+                    </span>
+                </div>
+
+                <div className="overflow-hidden border border-gray-200 dark:border-gray-700 rounded-xl">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                            <tr>
+                                <th className="px-4 py-3 text-left">👤 Guest</th>
+                                <th className="px-4 py-3 text-left"># Code</th>
+                                <th className="px-4 py-3 text-left">📝 Description</th>
+                                <th className="px-4 py-3 text-left">💰 Amount</th>
+                                <th className="px-4 py-3 text-left">📊 Tax %</th>
+                                <th className="px-4 py-3 text-center">⚙️ Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {allCharges.map((c, i) => (
+                                <tr
+                                    key={`${c.id}-${c.folioId}`}
+                                    className={`${i % 2 === 0
+                                            ? "bg-gray-50 dark:bg-gray-900/40"
+                                            : "bg-white dark:bg-gray-800"
+                                        } hover:bg-orange-50 dark:hover:bg-gray-700 transition`}
+                                >
+                                    <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
+                                        {c.guestName}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                        {c.code}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                        {c.description}
+                                    </td>
+                                    <td className="px-4 py-3 font-semibold text-green-600 dark:text-green-400">
+                                        {Number(c.amount).toFixed(2)}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                                        {c.tax}%
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        {canDeleteCharge && (
+                                            <button
+                                                onClick={() => handleDeleteCharge(c.id)}
+                                                className="px-3 py-1 rounded-lg bg-red-100 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800 text-red-600 dark:text-red-300 transition flex items-center gap-1 mx-auto"
+                                            >
+                                                🗑 <span className="hidden sm:inline">حذف</span>
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+
+                            {allCharges.length === 0 && (
+                                <tr>
+                                    <td
+                                        colSpan="6"
+                                        className="px-4 py-6 text-center text-gray-500 dark:text-gray-400"
+                                    >
+                                        لا توجد رسوم مضافة بعد
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
 
             {/* Payments */}
@@ -723,7 +720,7 @@ export default function GroupFolioPage({ params }) {
                                         <th className="p-2 text-center">Action</th>
                                     </tr>
                                 </thead>
-                                
+
                                 <tbody>
                                     {allPayments.map((p) => (
                                         <tr key={`${p.id}-${p.folioId}`} className="border-t dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700">
