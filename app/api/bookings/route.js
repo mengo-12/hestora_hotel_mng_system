@@ -380,6 +380,7 @@ export async function GET(req) {
                 room: { include: { roomType: true } },
                 ratePlan: true,
                 company: true,
+                group: true,
                 extras: true,
                 folio: {
                     include: {
