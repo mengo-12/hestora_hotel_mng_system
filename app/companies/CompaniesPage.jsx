@@ -35,24 +35,24 @@
 //     const [editModalOpen, setEditModalOpen] = useState(false);
 //     const [selectedCompany, setSelectedCompany] = useState(null);
 
-//     const refreshTimeoutRef = useRef(null);
+    // const refreshTimeoutRef = useRef(null);
 
-//     // --- Fetch Companies ---
-//     const fetchCompanies = async () => {
-//         try {
-//             const res = await fetch("/api/companies");
-//             const data = await res.json();
-//             if (Array.isArray(data)) setCompanies(data);
-//         } catch (err) { console.error("Failed to fetch companies:", err); }
-//     };
+    // // --- Fetch Companies ---
+    // const fetchCompanies = async () => {
+    //     try {
+    //         const res = await fetch("/api/companies");
+    //         const data = await res.json();
+    //         if (Array.isArray(data)) setCompanies(data);
+    //     } catch (err) { console.error("Failed to fetch companies:", err); }
+    // };
 
-//     const fetchProperties = async () => {
-//         try {
-//             const res = await fetch("/api/properties");
-//             const data = await res.json();
-//             if (Array.isArray(data)) setProperties(data);
-//         } catch (err) { console.error(err); }
-//     };
+    // const fetchProperties = async () => {
+    //     try {
+    //         const res = await fetch("/api/properties");
+    //         const data = await res.json();
+    //         if (Array.isArray(data)) setProperties(data);
+    //     } catch (err) { console.error(err); }
+    // };
 
 //     useEffect(() => {
 //         // initial load
@@ -108,11 +108,11 @@
 //         };
 //     }, [socket]);
 
-//     // --- Debounce search ---
-//     useEffect(() => {
-//         const handler = setTimeout(() => setDebouncedSearch(searchTerm), 300);
-//         return () => clearTimeout(handler);
-//     }, [searchTerm]);
+    // // --- Debounce search ---
+    // useEffect(() => {
+    //     const handler = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    //     return () => clearTimeout(handler);
+    // }, [searchTerm]);
 
 //     // --- Table Columns ---
 //     const columns = useMemo(() => [
@@ -162,32 +162,32 @@
 //     } = useTable({ columns, data, initialState: { pageIndex: 0, pageSize: 10 } }, useGlobalFilter, useSortBy, usePagination);
 
 //     // --- Handlers ---
-//     const handleCompanyAdded = (newCompany) => {
-//         setCompanies(prev => Array.isArray(prev) ? [newCompany, ...prev] : [newCompany]);
-//         if (socket) socket.emit("COMPANY_ADDED", newCompany);
-//         setAddModalOpen(false);
-//     };
+    // const handleCompanyAdded = (newCompany) => {
+    //     setCompanies(prev => Array.isArray(prev) ? [newCompany, ...prev] : [newCompany]);
+    //     if (socket) socket.emit("COMPANY_ADDED", newCompany);
+    //     setAddModalOpen(false);
+    // };
 
-//     const handleEdit = (company) => {
-//         setSelectedCompany(company);
-//         setEditModalOpen(true);
-//     };
+    // const handleEdit = (company) => {
+    //     setSelectedCompany(company);
+    //     setEditModalOpen(true);
+    // };
 
-//     const handleCompanyUpdated = (updatedCompany) => {
-//         setCompanies(prev => Array.isArray(prev) ? prev.map(c => c.id === updatedCompany.id ? updatedCompany : c) : [updatedCompany]);
-//         if (socket) socket.emit("COMPANY_UPDATED", updatedCompany);
-//         setEditModalOpen(false);
-//     };
+    // const handleCompanyUpdated = (updatedCompany) => {
+    //     setCompanies(prev => Array.isArray(prev) ? prev.map(c => c.id === updatedCompany.id ? updatedCompany : c) : [updatedCompany]);
+    //     if (socket) socket.emit("COMPANY_UPDATED", updatedCompany);
+    //     setEditModalOpen(false);
+    // };
 
-//     const handleDelete = async (companyId) => {
-//         if (!confirm("Are you sure you want to delete this company?")) return;
-//         try {
-//             const res = await fetch(`/api/companies/${companyId}`, { method: "DELETE" });
-//             if (!res.ok) throw new Error("Failed to delete company");
-//             setCompanies(prev => Array.isArray(prev) ? prev.filter(c => c.id !== companyId) : []);
-//             if (socket) socket.emit("COMPANY_DELETED", { id: companyId });
-//         } catch (err) { console.error(err); alert(err.message); }
-//     };
+    // const handleDelete = async (companyId) => {
+    //     if (!confirm("Are you sure you want to delete this company?")) return;
+    //     try {
+    //         const res = await fetch(`/api/companies/${companyId}`, { method: "DELETE" });
+    //         if (!res.ok) throw new Error("Failed to delete company");
+    //         setCompanies(prev => Array.isArray(prev) ? prev.filter(c => c.id !== companyId) : []);
+    //         if (socket) socket.emit("COMPANY_DELETED", { id: companyId });
+    //     } catch (err) { console.error(err); alert(err.message); }
+    // };
 
 //     return (
 //         <ProtectedPage session={session} allowedRoles={["Admin", "FrontDesk", "Manager"]}>
@@ -246,7 +246,7 @@
 
 
 'use client';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
 import ProtectedPage from "@/app/components/ProtectedPage";
 import AddCompanyModal from "@/app/components/AddCompanyModal";
@@ -267,6 +267,9 @@ export default function CompaniesPage({ session, userProperties }) {
     const [filterProperty, setFilterProperty] = useState("");
     const [addModalOpen, setAddModalOpen] = useState(false);
     const [editCompany, setEditCompany] = useState(null);
+    const [selectedCompany, setSelectedCompany] = useState(null);
+
+        const refreshTimeoutRef = useRef(null);
 
     useEffect(() => {
         if (!canView) return;
@@ -286,6 +289,69 @@ export default function CompaniesPage({ session, userProperties }) {
             }
         };
     }, [socket, canView]);
+
+        useEffect(() => {
+        // initial load
+        fetchCompanies();
+        fetchProperties();
+        if (!canView) return;
+
+
+        if (!socket) return;
+
+        // ---- handlers for company CRUD (existing) ----
+        const onCompanyAdded = (company) => setCompanies(prev => Array.isArray(prev) ? [company, ...prev] : [company]);
+        const onCompanyUpdated = (updatedCompany) => setCompanies(prev => Array.isArray(prev) ? prev.map(c => c.id === updatedCompany.id ? updatedCompany : c) : [updatedCompany]);
+        const onCompanyDeleted = ({ id }) => setCompanies(prev => Array.isArray(prev) ? prev.filter(c => c.id !== id) : []);
+
+        // ---- handler for folio/booking changes: just refresh companies (debounced) ----
+        const onFolioChange = () => {
+            // debounce to avoid many immediate fetches when server emits several events
+            if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+            refreshTimeoutRef.current = setTimeout(() => {
+                fetchCompanies();
+                refreshTimeoutRef.current = null;
+            }, 250); // 250ms debounce (tweakable)
+        };
+
+        // subscribe
+        socket.on("COMPANY_ADDED", onCompanyAdded);
+        socket.on("COMPANY_UPDATED", onCompanyUpdated);
+        socket.on("COMPANY_DELETED", onCompanyDeleted);
+
+        // folio/booking events that should update company totals
+        const folioEvents = [
+            "CHARGE_ADDED",
+            "CHARGE_DELETED",
+            "PAYMENT_ADDED",
+            "PAYMENT_DELETED",
+            "FOLIO_CREATED",
+            "FOLIO_CLOSED",
+            "BOOKING_CREATED",
+            "BOOKING_UPDATED",
+            "BOOKING_DELETED"
+        ];
+        folioEvents.forEach(ev => socket.on(ev, onFolioChange));
+
+        // cleanup
+        return () => {
+            socket.off("COMPANY_ADDED", onCompanyAdded);
+            socket.off("COMPANY_UPDATED", onCompanyUpdated);
+            socket.off("COMPANY_DELETED", onCompanyDeleted);
+            folioEvents.forEach(ev => socket.off(ev, onFolioChange));
+            if (refreshTimeoutRef.current) {
+                clearTimeout(refreshTimeoutRef.current);
+                refreshTimeoutRef.current = null;
+            }
+        };
+    }, [socket, canView]);
+
+        // --- Debounce search ---
+    useEffect(() => {
+        const handler = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
+
 
     useEffect(() => {
         let filtered = companies;
@@ -318,12 +384,30 @@ export default function CompaniesPage({ session, userProperties }) {
         } catch (err) { console.error(err); }
     };
 
+
+        const handleCompanyAdded = (newCompany) => {
+        setCompanies(prev => Array.isArray(prev) ? [newCompany, ...prev] : [newCompany]);
+        if (socket) socket.emit("COMPANY_ADDED", newCompany);
+        setAddModalOpen(false);
+    };
+
+    const handleEdit = (company) => {
+        setSelectedCompany(company);
+        setEditModalOpen(true);
+    };
+
+    const handleCompanyUpdated = (updatedCompany) => {
+        setCompanies(prev => Array.isArray(prev) ? prev.map(c => c.id === updatedCompany.id ? updatedCompany : c) : [updatedCompany]);
+        if (socket) socket.emit("COMPANY_UPDATED", updatedCompany);
+        setEditModalOpen(false);
+    };
+
     const handleDelete = async (companyId) => {
-        if (!confirm("Delete this company?")) return;
+        if (!confirm("Are you sure you want to delete this company?")) return;
         try {
             const res = await fetch(`/api/companies/${companyId}`, { method: "DELETE" });
             if (!res.ok) throw new Error("Failed to delete company");
-            setCompanies(prev => prev.filter(c => c.id !== companyId));
+            setCompanies(prev => Array.isArray(prev) ? prev.filter(c => c.id !== companyId) : []);
             if (socket) socket.emit("COMPANY_DELETED", { id: companyId });
         } catch (err) { console.error(err); alert(err.message); }
     };

@@ -58,165 +58,165 @@
 //         fetchAll();
 //     }, []);
 
-//     // --- Socket Updates ---
-//     // --- Socket Updates ---
-//     useEffect(() => {
-//         if (!socket) return;
-//         const refreshTimeoutRef = { current: null };
+// // --- Socket Updates ---
+// // --- Socket Updates ---
+// useEffect(() => {
+//     if (!socket) return;
+//     const refreshTimeoutRef = { current: null };
 
-//         // CRUD events
-//         const onGroupCreated = g => setGroups(prev => [g, ...prev]);
-//         const onGroupUpdated = g => {
-//             setGroups(prev => prev.map(x => x.id === g.id ? g : x));
-//             setBillingInstructions(prev => ({ ...prev, [g.id]: g.billingInstruction || "" }));
-//         };
-//         const onGroupDeleted = ({ id }) => {
-//             setGroups(prev => prev.filter(x => x.id !== id));
-//             setBillingInstructions(prev => { const copy = { ...prev }; delete copy[id]; return copy; });
-//         };
-
-//         // folio/booking changes → إعادة تحميل المجموعات (للتوتال)
-//         const onFolioChange = () => {
-//             if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
-//             refreshTimeoutRef.current = setTimeout(async () => {
-//                 try {
-//                     const res = await fetch("/api/groups");
-//                     const groupsData = await res.json();
-//                     setGroups(groupsData);
-//                     const billingMap = {};
-//                     groupsData.forEach(g => { billingMap[g.id] = g.billingInstruction || ""; });
-//                     setBillingInstructions(billingMap);
-//                 } catch (err) {
-//                     console.error("Failed to refresh groups after folio change:", err);
-//                 }
-//                 refreshTimeoutRef.current = null;
-//             }, 300); // 300ms debounce
-//         };
-
-//         socket.on("GROUP_CREATED", onGroupCreated);
-//         socket.on("GROUP_UPDATED", onGroupUpdated);
-//         socket.on("GROUP_DELETED", onGroupDeleted);
-
-//         const folioEvents = [
-//             "CHARGE_ADDED",
-//             "CHARGE_DELETED",
-//             "PAYMENT_ADDED",
-//             "PAYMENT_DELETED",
-//             "FOLIO_CREATED",
-//             "FOLIO_CLOSED",
-//             "BOOKING_CREATED",
-//             "BOOKING_UPDATED",
-//             "BOOKING_DELETED"
-//         ];
-//         folioEvents.forEach(ev => socket.on(ev, onFolioChange));
-
-//         return () => {
-//             socket.off("GROUP_CREATED", onGroupCreated);
-//             socket.off("GROUP_UPDATED", onGroupUpdated);
-//             socket.off("GROUP_DELETED", onGroupDeleted);
-//             folioEvents.forEach(ev => socket.off(ev, onFolioChange));
-//             if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
-//         };
-//     }, [socket]);
-
-//     // --- Actions ---
-//     const handleDeleteGroup = async id => {
-//         if (!confirm("Are you sure you want to delete this group?")) return;
-//         try {
-//             const res = await fetch(`/api/groups/${id}`, { method: "DELETE" });
-//             if (!res.ok) throw new Error();
-//             setGroups(prev => prev.filter(g => g.id !== id));
-//             setBillingInstructions(prev => { const copy = { ...prev }; delete copy[id]; return copy; });
-//         } catch {
-//             alert("Failed to delete group");
-//         }
-//     };
-
-//     const handleBillingChange = async (groupId, value) => {
-//         setBillingInstructions(prev => ({ ...prev, [groupId]: value }));
-//         try {
-//             const res = await fetch(`/api/groups/${groupId}`, {
-//                 method: "PATCH",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify({ billingInstruction: value }),
-//             });
-//             if (!res.ok) throw new Error();
-//             const updated = await res.json();
-//             setGroups(prev => prev.map(g => g.id === groupId ? updated : g));
-//         } catch {
-//             alert("Failed to update billing instruction");
-//         }
-//     };
-
-//     const handleGroupAdded = g => {
-//         setGroups(prev => [g, ...prev]);
-//         setAddModalOpen(false);
-//         setBillingInstructions(prev => ({ ...prev, [g.id]: g.billingInstruction || "" }));
-//     };
-
-//     const handleGroupUpdated = g => {
+//     // CRUD events
+//     const onGroupCreated = g => setGroups(prev => [g, ...prev]);
+//     const onGroupUpdated = g => {
 //         setGroups(prev => prev.map(x => x.id === g.id ? g : x));
-//         setEditModalOpen(false);
 //         setBillingInstructions(prev => ({ ...prev, [g.id]: g.billingInstruction || "" }));
 //     };
+//     const onGroupDeleted = ({ id }) => {
+//         setGroups(prev => prev.filter(x => x.id !== id));
+//         setBillingInstructions(prev => { const copy = { ...prev }; delete copy[id]; return copy; });
+//     };
 
-//     // --- Table Columns ---
-//     const columns = useMemo(() => [
-//         { Header: "Code", accessor: "code" },
-//         { Header: "Name", accessor: "name" },
-//         { Header: "Property", accessor: d => userProperties.find(p => p.id === d.propertyId)?.name || "-" },
-//         { Header: "Company", accessor: d => d.company?.name || "-" },
-//         { Header: "Leader", accessor: d => d.leader ? `${d.leader.firstName} ${d.leader.lastName}` : "-" },
-//         { Header: "Status", accessor: "status" },
-//         { Header: "Start", accessor: d => d.startDate ? new Date(d.startDate).toLocaleDateString() : "-" },
-//         { Header: "End", accessor: d => d.endDate ? new Date(d.endDate).toLocaleDateString() : "-" },
-//         {
-//             Header: "Totals",
-//             accessor: "groupTotals",
-//             Cell: ({ row }) => {
-//                 const totals = row.original.groupTotals || {};
-//                 return (
-//                     <div className="text-right">
-//                         <div>Sub: ${totals.subtotal?.toFixed(2) || 0}</div>
-//                         <div>Tax: ${totals.taxTotal?.toFixed(2) || 0}</div>
-//                         <div>Total: ${totals.totalCharges?.toFixed(2) || 0}</div>
-//                         <div>Payments: ${totals.totalPayments?.toFixed(2) || 0}</div>
-//                         <div className="font-bold text-green-600">Bal: ${totals.balance?.toFixed(2) || 0}</div>
-//                     </div>
-//                 );
+//     // folio/booking changes → إعادة تحميل المجموعات (للتوتال)
+//     const onFolioChange = () => {
+//         if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+//         refreshTimeoutRef.current = setTimeout(async () => {
+//             try {
+//                 const res = await fetch("/api/groups");
+//                 const groupsData = await res.json();
+//                 setGroups(groupsData);
+//                 const billingMap = {};
+//                 groupsData.forEach(g => { billingMap[g.id] = g.billingInstruction || ""; });
+//                 setBillingInstructions(billingMap);
+//             } catch (err) {
+//                 console.error("Failed to refresh groups after folio change:", err);
 //             }
-//         },
-//         {
-//             Header: "Billing",
-//             accessor: "billingInstruction",
-//             Cell: ({ row }) => (
-//                 <select value={billingInstructions[row.original.id] || ""} onChange={e => handleBillingChange(row.original.id, e.target.value)} className="border rounded p-1">
-//                     <option value="">-- Select --</option>
-//                     <option value="Guest">Guest</option>
-//                     <option value="Group">Group</option>
-//                     <option value="Company">Company</option>
-//                 </select>
-//             )
-//         },
-//         {
-//             Header: "Actions",
-//             Cell: ({ row }) => (
-//                 <div className="flex gap-1 flex-wrap">
-//                     {canEdit && <button onClick={() => { setSelectedGroup(row.original); setEditModalOpen(true); }} className="px-2 py-1 text-xs bg-blue-500 text-white rounded">Edit</button>}
-//                     {canDelete && <button onClick={() => handleDeleteGroup(row.original.id)} className="px-2 py-1 text-xs bg-red-500 text-white rounded">Delete</button>}
-//                     <button onClick={() => router.push(`/groupBookings?groupId=${row.original.id}`)} className="px-2 py-1 text-xs bg-gray-500 text-white rounded">Rooming List</button>
+//             refreshTimeoutRef.current = null;
+//         }, 300); // 300ms debounce
+//     };
+
+//     socket.on("GROUP_CREATED", onGroupCreated);
+//     socket.on("GROUP_UPDATED", onGroupUpdated);
+//     socket.on("GROUP_DELETED", onGroupDeleted);
+
+//     const folioEvents = [
+//         "CHARGE_ADDED",
+//         "CHARGE_DELETED",
+//         "PAYMENT_ADDED",
+//         "PAYMENT_DELETED",
+//         "FOLIO_CREATED",
+//         "FOLIO_CLOSED",
+//         "BOOKING_CREATED",
+//         "BOOKING_UPDATED",
+//         "BOOKING_DELETED"
+//     ];
+//     folioEvents.forEach(ev => socket.on(ev, onFolioChange));
+
+//     return () => {
+//         socket.off("GROUP_CREATED", onGroupCreated);
+//         socket.off("GROUP_UPDATED", onGroupUpdated);
+//         socket.off("GROUP_DELETED", onGroupDeleted);
+//         folioEvents.forEach(ev => socket.off(ev, onFolioChange));
+//         if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+//     };
+// }, [socket]);
+
+// // --- Actions ---
+// const handleDeleteGroup = async id => {
+//     if (!confirm("Are you sure you want to delete this group?")) return;
+//     try {
+//         const res = await fetch(`/api/groups/${id}`, { method: "DELETE" });
+//         if (!res.ok) throw new Error();
+//         setGroups(prev => prev.filter(g => g.id !== id));
+//         setBillingInstructions(prev => { const copy = { ...prev }; delete copy[id]; return copy; });
+//     } catch {
+//         alert("Failed to delete group");
+//     }
+// };
+
+// const handleBillingChange = async (groupId, value) => {
+//     setBillingInstructions(prev => ({ ...prev, [groupId]: value }));
+//     try {
+//         const res = await fetch(`/api/groups/${groupId}`, {
+//             method: "PATCH",
+//             headers: { "Content-Type": "application/json" },
+//             body: JSON.stringify({ billingInstruction: value }),
+//         });
+//         if (!res.ok) throw new Error();
+//         const updated = await res.json();
+//         setGroups(prev => prev.map(g => g.id === groupId ? updated : g));
+//     } catch {
+//         alert("Failed to update billing instruction");
+//     }
+// };
+
+// const handleGroupAdded = g => {
+//     setGroups(prev => [g, ...prev]);
+//     setAddModalOpen(false);
+//     setBillingInstructions(prev => ({ ...prev, [g.id]: g.billingInstruction || "" }));
+// };
+
+// const handleGroupUpdated = g => {
+//     setGroups(prev => prev.map(x => x.id === g.id ? g : x));
+//     setEditModalOpen(false);
+//     setBillingInstructions(prev => ({ ...prev, [g.id]: g.billingInstruction || "" }));
+// };
+
+// // --- Table Columns ---
+// const columns = useMemo(() => [
+//     { Header: "Code", accessor: "code" },
+//     { Header: "Name", accessor: "name" },
+//     { Header: "Property", accessor: d => userProperties.find(p => p.id === d.propertyId)?.name || "-" },
+//     { Header: "Company", accessor: d => d.company?.name || "-" },
+//     { Header: "Leader", accessor: d => d.leader ? `${d.leader.firstName} ${d.leader.lastName}` : "-" },
+//     { Header: "Status", accessor: "status" },
+//     { Header: "Start", accessor: d => d.startDate ? new Date(d.startDate).toLocaleDateString() : "-" },
+//     { Header: "End", accessor: d => d.endDate ? new Date(d.endDate).toLocaleDateString() : "-" },
+//     {
+//         Header: "Totals",
+//         accessor: "groupTotals",
+//         Cell: ({ row }) => {
+//             const totals = row.original.groupTotals || {};
+//             return (
+//                 <div className="text-right">
+//                     <div>Sub: ${totals.subtotal?.toFixed(2) || 0}</div>
+//                     <div>Tax: ${totals.taxTotal?.toFixed(2) || 0}</div>
+//                     <div>Total: ${totals.totalCharges?.toFixed(2) || 0}</div>
+//                     <div>Payments: ${totals.totalPayments?.toFixed(2) || 0}</div>
+//                     <div className="font-bold text-green-600">Bal: ${totals.balance?.toFixed(2) || 0}</div>
 //                 </div>
-//             )
+//             );
 //         }
-//     ], [billingInstructions, userProperties]);
+//     },
+//     {
+//         Header: "Billing",
+//         accessor: "billingInstruction",
+//         Cell: ({ row }) => (
+//             <select value={billingInstructions[row.original.id] || ""} onChange={e => handleBillingChange(row.original.id, e.target.value)} className="border rounded p-1">
+//                 <option value="">-- Select --</option>
+//                 <option value="Guest">Guest</option>
+//                 <option value="Group">Group</option>
+//                 <option value="Company">Company</option>
+//             </select>
+//         )
+//     },
+//     {
+//         Header: "Actions",
+//         Cell: ({ row }) => (
+//             <div className="flex gap-1 flex-wrap">
+//                 {canEdit && <button onClick={() => { setSelectedGroup(row.original); setEditModalOpen(true); }} className="px-2 py-1 text-xs bg-blue-500 text-white rounded">Edit</button>}
+//                 {canDelete && <button onClick={() => handleDeleteGroup(row.original.id)} className="px-2 py-1 text-xs bg-red-500 text-white rounded">Delete</button>}
+//                 <button onClick={() => router.push(`/groupBookings?groupId=${row.original.id}`)} className="px-2 py-1 text-xs bg-gray-500 text-white rounded">Rooming List</button>
+//             </div>
+//         )
+//     }
+// ], [billingInstructions, userProperties]);
 
-//     const data = useMemo(() => groups.filter(g =>
-//         g.name.toLowerCase().includes(searchTerm.toLowerCase()) || g.code.toLowerCase().includes(searchTerm.toLowerCase())
-//     ), [groups, searchTerm]);
+// const data = useMemo(() => groups.filter(g =>
+//     g.name.toLowerCase().includes(searchTerm.toLowerCase()) || g.code.toLowerCase().includes(searchTerm.toLowerCase())
+// ), [groups, searchTerm]);
 
-//     const tableInstance = useTable({ columns, data }, useGlobalFilter, useSortBy, usePagination);
+// const tableInstance = useTable({ columns, data }, useGlobalFilter, useSortBy, usePagination);
 
-//     const { getTableProps, getTableBodyProps, headerGroups, rows, prepareRow } = tableInstance;
+// const { getTableProps, getTableBodyProps, headerGroups, rows, prepareRow } = tableInstance;
 
 //     return (
 //         <ProtectedPage session={session} allowedRoles={["Admin", "FrontDesk", "Manager"]}>
@@ -295,12 +295,13 @@
 
 
 'use client';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
 import ProtectedPage from "@/app/components/ProtectedPage";
 import AddGroupModal from "@/app/components/AddGroupModal";
 import EditGroupModal from "@/app/components/EditGroupModal";
 import { useRouter } from "next/navigation";
+import { useTable, useSortBy, useGlobalFilter, usePagination } from "react-table";
 import { Building2, User, Briefcase, Calendar } from "lucide-react";
 
 export default function GroupsPage({ session, userProperties }) {
@@ -361,6 +362,166 @@ export default function GroupsPage({ session, userProperties }) {
         };
         fetchAll();
     }, []);
+
+    // --- Socket Updates ---
+    // --- Socket Updates ---
+    useEffect(() => {
+        if (!socket) return;
+        const refreshTimeoutRef = { current: null };
+
+        // CRUD events
+        const onGroupCreated = g => setGroups(prev => [g, ...prev]);
+        const onGroupUpdated = g => {
+            setGroups(prev => prev.map(x => x.id === g.id ? g : x));
+            setBillingInstructions(prev => ({ ...prev, [g.id]: g.billingInstruction || "" }));
+        };
+        const onGroupDeleted = ({ id }) => {
+            setGroups(prev => prev.filter(x => x.id !== id));
+            setBillingInstructions(prev => { const copy = { ...prev }; delete copy[id]; return copy; });
+        };
+
+        // folio/booking changes → إعادة تحميل المجموعات (للتوتال)
+        const onFolioChange = () => {
+            if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+            refreshTimeoutRef.current = setTimeout(async () => {
+                try {
+                    const res = await fetch("/api/groups");
+                    const groupsData = await res.json();
+                    setGroups(groupsData);
+                    const billingMap = {};
+                    groupsData.forEach(g => { billingMap[g.id] = g.billingInstruction || ""; });
+                    setBillingInstructions(billingMap);
+                } catch (err) {
+                    console.error("Failed to refresh groups after folio change:", err);
+                }
+                refreshTimeoutRef.current = null;
+            }, 300); // 300ms debounce
+        };
+
+        socket.on("GROUP_CREATED", onGroupCreated);
+        socket.on("GROUP_UPDATED", onGroupUpdated);
+        socket.on("GROUP_DELETED", onGroupDeleted);
+
+        const folioEvents = [
+            "CHARGE_ADDED",
+            "CHARGE_DELETED",
+            "PAYMENT_ADDED",
+            "PAYMENT_DELETED",
+            "FOLIO_CREATED",
+            "FOLIO_CLOSED",
+            "BOOKING_CREATED",
+            "BOOKING_UPDATED",
+            "BOOKING_DELETED"
+        ];
+        folioEvents.forEach(ev => socket.on(ev, onFolioChange));
+
+        return () => {
+            socket.off("GROUP_CREATED", onGroupCreated);
+            socket.off("GROUP_UPDATED", onGroupUpdated);
+            socket.off("GROUP_DELETED", onGroupDeleted);
+            folioEvents.forEach(ev => socket.off(ev, onFolioChange));
+            if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+        };
+    }, [socket]);
+
+    // --- Actions ---
+    const handleDeleteGroup = async id => {
+        if (!confirm("Are you sure you want to delete this group?")) return;
+        try {
+            const res = await fetch(`/api/groups/${id}`, { method: "DELETE" });
+            if (!res.ok) throw new Error();
+            setGroups(prev => prev.filter(g => g.id !== id));
+            setBillingInstructions(prev => { const copy = { ...prev }; delete copy[id]; return copy; });
+        } catch {
+            alert("Failed to delete group");
+        }
+    };
+
+    const handleBillingChange = async (groupId, value) => {
+        setBillingInstructions(prev => ({ ...prev, [groupId]: value }));
+        try {
+            const res = await fetch(`/api/groups/${groupId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ billingInstruction: value }),
+            });
+            if (!res.ok) throw new Error();
+            const updated = await res.json();
+            setGroups(prev => prev.map(g => g.id === groupId ? updated : g));
+        } catch {
+            alert("Failed to update billing instruction");
+        }
+    };
+
+    const handleGroupAdded = g => {
+        setGroups(prev => [g, ...prev]);
+        setAddModalOpen(false);
+        setBillingInstructions(prev => ({ ...prev, [g.id]: g.billingInstruction || "" }));
+    };
+
+    const handleGroupUpdated = g => {
+        setGroups(prev => prev.map(x => x.id === g.id ? g : x));
+        setEditModalOpen(false);
+        setBillingInstructions(prev => ({ ...prev, [g.id]: g.billingInstruction || "" }));
+    };
+
+    // --- Table Columns ---
+    const columns = useMemo(() => [
+        { Header: "Code", accessor: "code" },
+        { Header: "Name", accessor: "name" },
+        { Header: "Property", accessor: d => userProperties.find(p => p.id === d.propertyId)?.name || "-" },
+        { Header: "Company", accessor: d => d.company?.name || "-" },
+        { Header: "Leader", accessor: d => d.leader ? `${d.leader.firstName} ${d.leader.lastName}` : "-" },
+        { Header: "Status", accessor: "status" },
+        { Header: "Start", accessor: d => d.startDate ? new Date(d.startDate).toLocaleDateString() : "-" },
+        { Header: "End", accessor: d => d.endDate ? new Date(d.endDate).toLocaleDateString() : "-" },
+        {
+            Header: "Totals",
+            accessor: "groupTotals",
+            Cell: ({ row }) => {
+                const totals = row.original.groupTotals || {};
+                return (
+                    <div className="text-right">
+                        <div>Sub: ${totals.subtotal?.toFixed(2) || 0}</div>
+                        <div>Tax: ${totals.taxTotal?.toFixed(2) || 0}</div>
+                        <div>Total: ${totals.totalCharges?.toFixed(2) || 0}</div>
+                        <div>Payments: ${totals.totalPayments?.toFixed(2) || 0}</div>
+                        <div className="font-bold text-green-600">Bal: ${totals.balance?.toFixed(2) || 0}</div>
+                    </div>
+                );
+            }
+        },
+        {
+            Header: "Billing",
+            accessor: "billingInstruction",
+            Cell: ({ row }) => (
+                <select value={billingInstructions[row.original.id] || ""} onChange={e => handleBillingChange(row.original.id, e.target.value)} className="border rounded p-1">
+                    <option value="">-- Select --</option>
+                    <option value="Guest">Guest</option>
+                    <option value="Group">Group</option>
+                    <option value="Company">Company</option>
+                </select>
+            )
+        },
+        {
+            Header: "Actions",
+            Cell: ({ row }) => (
+                <div className="flex gap-1 flex-wrap">
+                    {canEdit && <button onClick={() => { setSelectedGroup(row.original); setEditModalOpen(true); }} className="px-2 py-1 text-xs bg-blue-500 text-white rounded">Edit</button>}
+                    {canDelete && <button onClick={() => handleDeleteGroup(row.original.id)} className="px-2 py-1 text-xs bg-red-500 text-white rounded">Delete</button>}
+                    <button onClick={() => router.push(`/groupBookings?groupId=${row.original.id}`)} className="px-2 py-1 text-xs bg-gray-500 text-white rounded">Rooming List</button>
+                </div>
+            )
+        }
+    ], [billingInstructions, userProperties]);
+
+    const data = useMemo(() => groups.filter(g =>
+        g.name.toLowerCase().includes(searchTerm.toLowerCase()) || g.code.toLowerCase().includes(searchTerm.toLowerCase())
+    ), [groups, searchTerm]);
+
+    const tableInstance = useTable({ columns, data }, useGlobalFilter, useSortBy, usePagination);
+
+    const { getTableProps, getTableBodyProps, headerGroups, rows, prepareRow } = tableInstance;
 
     // --- Filters Logic ---
     const filteredGroups = groups.filter((g) => {
