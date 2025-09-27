@@ -543,8 +543,11 @@
 // }
 
 
+
+
+
 'use client';
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
 import { useRouter } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
@@ -553,18 +556,18 @@ export default function FrontDeskPage({ session, userProperties }) {
     const [bookings, setBookings] = useState([]);
     const [filteredBookings, setFilteredBookings] = useState([]);
     const [departuresToday, setDeparturesToday] = useState([]);
+    const [allBookings, setAllBookings] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [properties, setProperties] = useState([]);
     const [filterProperty, setFilterProperty] = useState("");
     const [filterFrom, setFilterFrom] = useState("");
     const [filterTo, setFilterTo] = useState("");
     const [filterStatus, setFilterStatus] = useState("");
-    const [allBookings, setAllBookings] = useState([]);
+    
     const socket = useSocket();
     const router = useRouter();
 
     const role = session?.user?.role || "Guest";
-
     const canCheckinCheckout = ["Admin", "FrontDesk"].includes(role);
     const canCancelNoshow = ["Admin", "FrontDesk"].includes(role);
     const canFolio = ["Admin", "FrontDesk", "Manager"].includes(role);
@@ -577,6 +580,7 @@ export default function FrontDeskPage({ session, userProperties }) {
         Cancelled: { bg: "bg-yellow-400", text: "text-black" },
     };
 
+    // Fetch Properties
     const fetchProperties = async () => {
         try {
             const res = await fetch("/api/properties");
@@ -587,6 +591,7 @@ export default function FrontDeskPage({ session, userProperties }) {
         }
     };
 
+    // Fetch Bookings
     const fetchBookings = async () => {
         try {
             const params = new URLSearchParams();
@@ -596,19 +601,21 @@ export default function FrontDeskPage({ session, userProperties }) {
 
             const res = await fetch(`/api/bookings?${params.toString()}`);
             const data = await res.json();
-            const allBookings = Array.isArray(data) ? data : [];
+            const all = Array.isArray(data) ? data : [];
 
             const now = new Date();
             const todayStr = new Date().toDateString();
-            const active = allBookings.filter(b => ["Reserved", "InHouse"].includes(b.status))
+            const active = all.filter(b => ["Reserved", "InHouse"].includes(b.status))
                 .map(b => ({ ...b, isExpired: b.status === "InHouse" && new Date(b.checkOut) < now }));
 
-            const departures = allBookings.filter(b => b.status === "CheckedOut" && new Date(b.checkOut).toDateString() === todayStr);
+            const departures = all.filter(b => b.status === "CheckedOut" && new Date(b.checkOut).toDateString() === todayStr);
 
+            setAllBookings(all);
             setBookings(active);
             setFilteredBookings(active);
             setDeparturesToday(departures);
         } catch {
+            setAllBookings([]);
             setBookings([]);
             setFilteredBookings([]);
             setDeparturesToday([]);
@@ -620,11 +627,12 @@ export default function FrontDeskPage({ session, userProperties }) {
         fetchBookings();
 
         if (socket) {
+            // Booking updates
             socket.on("BOOKING_UPDATED", updatedBooking => {
                 setBookings(prev => {
                     if (["Reserved", "InHouse"].includes(updatedBooking.status)) {
-                        return prev.map(b => b.id === updatedBooking.id ? updatedBooking : b)
-                    } else return prev.filter(b => b.id !== updatedBooking.id)
+                        return prev.map(b => b.id === updatedBooking.id ? updatedBooking : b);
+                    } else return prev.filter(b => b.id !== updatedBooking.id);
                 });
 
                 const todayStr = new Date().toDateString();
@@ -641,18 +649,22 @@ export default function FrontDeskPage({ session, userProperties }) {
                 if (updatedBooking.status === "InHouse" && updatedBooking.previousStatus === "Reserved") toast.success(`${updatedBooking.guest?.firstName} ${updatedBooking.guest?.lastName} has Checked-In.`);
             });
 
+            // Booking created
             socket.on("BOOKING_CREATED", newBooking => {
                 if (["Reserved", "InHouse"].includes(newBooking.status)) {
                     setBookings(prev => [...prev, newBooking]);
                     setFilteredBookings(prev => [...prev, newBooking]);
+                    setAllBookings(prev => [...prev, newBooking]);
                     toast.success(`New booking created for ${newBooking.guest?.firstName} ${newBooking.guest?.lastName}`);
                 }
             });
 
+            // Booking deleted
             socket.on("BOOKING_DELETED", ({ id }) => {
                 setBookings(prev => prev.filter(b => b.id !== id));
                 setFilteredBookings(prev => prev.filter(b => b.id !== id));
                 setDeparturesToday(prev => prev.filter(b => b.id !== id));
+                setAllBookings(prev => prev.filter(b => b.id !== id));
             });
         }
 
@@ -665,7 +677,7 @@ export default function FrontDeskPage({ session, userProperties }) {
         };
     }, [socket, filterProperty, filterFrom, filterTo]);
 
-    // دوال الأكشن
+    // Action handlers
     const handleCheckIn = async (bookingId) => {
         if (!canCheckinCheckout) return;
         if (!confirm("Are you sure you want to Check-In?")) return;
@@ -687,7 +699,7 @@ export default function FrontDeskPage({ session, userProperties }) {
         await fetch(`/api/bookings/${bookingId}/noshow`, { method: "POST" });
     };
 
-    // فلترة البحث
+    // Filter search
     useEffect(() => {
         let filtered = bookings;
         if (searchTerm.trim()) {
@@ -702,15 +714,17 @@ export default function FrontDeskPage({ session, userProperties }) {
         setFilteredBookings(filtered);
     }, [searchTerm, filterStatus, bookings]);
 
-        // KPIs Summary
-    const kpis = [
+    // KPIs Summary
+    const kpis = useMemo(() => [
         { label: "Reservations", value: allBookings.filter(b => b.status === "Reserved").length },
-        { label: "Check-Ins Today", value: allBookings.filter(b => b.status === "InHouse" && new Date(b.checkIn).toDateString() === new Date().toDateString()).length },
+        { label: "Check-Ins Today", value: allBookings.filter(
+            b => b.status === "InHouse" && new Date(b.checkIn).toDateString() === new Date().toDateString()
+        ).length },
         { label: "Check-Outs Today", value: departuresToday.length },
         { label: "No-Shows / Cancelled", value: allBookings.filter(b => ["NOSHOW", "Cancelled"].includes(b.status)).length },
-    ];
+    ], [allBookings, departuresToday]);
 
-    // بطاقة الحجز
+    // Booking Card Component
     const BookingCard = ({ booking }) => {
         const config = statusConfig[booking.status] || { bg: "bg-gray-300", text: "text-black" };
 
@@ -718,16 +732,10 @@ export default function FrontDeskPage({ session, userProperties }) {
             <div className="p-5 rounded-2xl shadow-lg bg-white dark:bg-gray-800 text-black dark:text-white flex flex-col justify-between gap-4 hover:shadow-xl transition transform hover:scale-105">
                 <div className="flex justify-between items-start">
                     <div>
-                        <h2 className="text-lg font-semibold">
-                            {booking.guest?.firstName} {booking.guest?.lastName}
-                        </h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-300">
-                            {booking.ratePlan?.name || "N/A"}
-                        </p>
+                        <h2 className="text-lg font-semibold">{booking.guest?.firstName} {booking.guest?.lastName}</h2>
+                        <p className="text-sm text-gray-500 dark:text-gray-300">{booking.ratePlan?.name || "N/A"}</p>
                     </div>
-                    <span className={`px-3 py-1 text-xs rounded-lg font-medium ${config.bg} ${config.text}`}>
-                        {booking.status}
-                    </span>
+                    <span className={`px-3 py-1 text-xs rounded-lg font-medium ${config.bg} ${config.text}`}>{booking.status}</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-sm">
@@ -751,38 +759,19 @@ export default function FrontDeskPage({ session, userProperties }) {
 
                 <div className="flex flex-wrap gap-2 mt-3">
                     {booking.status === "Reserved" && booking.roomId && canCheckinCheckout && (
-                        <button
-                            onClick={() => handleCheckIn(booking.id)}
-                            className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
-                            Check-In
-                        </button>
+                        <button onClick={() => handleCheckIn(booking.id)} className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Check-In</button>
                     )}
                     {booking.status === "Reserved" && booking.roomId && canCancelNoshow && (
                         <>
-                            <button
-                                onClick={() => handleCancel(booking.id)}
-                                className="px-3 py-1 bg-yellow-500 text-black rounded-lg hover:bg-yellow-600 transition">
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => handleNoShow(booking.id)}
-                                className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
-                                No-Show
-                            </button>
+                            <button onClick={() => handleCancel(booking.id)} className="px-3 py-1 bg-yellow-500 text-black rounded-lg hover:bg-yellow-600 transition">Cancel</button>
+                            <button onClick={() => handleNoShow(booking.id)} className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">No-Show</button>
                         </>
                     )}
                     {booking.status === "InHouse" && booking.roomId && canCheckinCheckout && (
-                        <button
-                            onClick={() => handleCheckOut(booking.id)}
-                            className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
-                            Check-Out
-                        </button>
+                        <button onClick={() => handleCheckOut(booking.id)} className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Check-Out</button>
                     )}
                     {canFolio && (
-                        <button
-                            className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                            onClick={() => router.push(`/bookings/${booking.id}/folio`)}
-                        >
+                        <button className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition" onClick={() => router.push(`/bookings/${booking.id}/folio`)}>
                             Open Folio
                         </button>
                     )}
@@ -791,7 +780,7 @@ export default function FrontDeskPage({ session, userProperties }) {
         );
     };
 
-        return (
+    return (
         <div className="p-6 flex flex-col gap-6">
             <Toaster position="top-right" />
 
@@ -810,61 +799,32 @@ export default function FrontDeskPage({ session, userProperties }) {
                 <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                     <div>
                         <label className="mb-1 text-gray-500 dark:text-gray-300 text-sm font-medium">Search</label>
-                        <input
-                            type="text"
-                            placeholder="Search bookings..."
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 text-black dark:text-white"
-                        />
+                        <input type="text" placeholder="Search bookings..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 text-black dark:text-white"/>
                     </div>
                     <div>
                         <label className="mb-1 text-gray-500 dark:text-gray-300 text-sm font-medium">Property</label>
-                        <select
-                            value={filterProperty}
-                            onChange={e => setFilterProperty(e.target.value)}
-                            className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-700 text-black dark:text-white"
-                        >
+                        <select value={filterProperty} onChange={e => setFilterProperty(e.target.value)} className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-700 text-black dark:text-white">
                             <option value="">All Properties</option>
                             {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
                     </div>
                     <div>
                         <label className="mb-1 text-gray-500 dark:text-gray-300 text-sm font-medium">Status</label>
-                        <select
-                            value={filterStatus}
-                            onChange={e => setFilterStatus(e.target.value)}
-                            className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-700 text-black dark:text-white"
-                        >
+                        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-700 text-black dark:text-white">
                             <option value="">All Status</option>
                             {Object.keys(statusConfig).map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>
                     <div>
                         <label className="mb-1 text-gray-500 dark:text-gray-300 text-sm font-medium">From</label>
-                        <input
-                            type="date"
-                            value={filterFrom}
-                            onChange={e => setFilterFrom(e.target.value)}
-                            className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-700 text-black dark:text-white"
-                        />
+                        <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-700 text-black dark:text-white"/>
                     </div>
                     <div>
                         <label className="mb-1 text-gray-500 dark:text-gray-300 text-sm font-medium">To</label>
-                        <input
-                            type="date"
-                            value={filterTo}
-                            onChange={e => setFilterTo(e.target.value)}
-                            className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-700 text-black dark:text-white"
-                        />
+                        <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg dark:bg-gray-700 text-black dark:text-white"/>
                     </div>
                     <div className="flex items-end">
-                        <button
-                            onClick={fetchBookings}
-                            className="w-full bg-blue-600 text-white rounded-lg px-6 py-3 shadow hover:bg-blue-700 transition"
-                        >
-                            Apply
-                        </button>
+                        <button onClick={fetchBookings} className="w-full bg-blue-600 text-white rounded-lg px-6 py-3 shadow hover:bg-blue-700 transition">Apply</button>
                     </div>
                 </div>
             </div>
@@ -872,36 +832,17 @@ export default function FrontDeskPage({ session, userProperties }) {
             {/* Bookings */}
             <h2 className="text-xl font-semibold mb-2 text-black dark:text-white">Current Bookings</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredBookings.map(b => (
-                    <BookingCard
-                        key={b.id}
-                        booking={b}
-                        router={router}
-                        canCheckinCheckout={canCheckinCheckout}
-                        canCancelNoshow={canCancelNoshow}
-                        canFolio={canFolio}
-                        statusConfig={statusConfig}
-                    />
-                ))}
+                {filteredBookings.map(b => <BookingCard key={b.id} booking={b} />)}
             </div>
 
             {departuresToday.length > 0 && (
                 <>
                     <h2 className="text-xl font-semibold mt-6 mb-2 text-black dark:text-white">Departures Today</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {departuresToday.map(b => (
-                            <BookingCard
-                                key={b.id}
-                                booking={b}
-                                router={router}
-                                canFolio={canFolio}
-                                statusConfig={statusConfig}
-                            />
-                        ))}
+                        {departuresToday.map(b => <BookingCard key={b.id} booking={b} />)}
                     </div>
                 </>
             )}
         </div>
     );
 }
-
