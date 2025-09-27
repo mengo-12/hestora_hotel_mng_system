@@ -65,6 +65,10 @@ model Property {
   auditLogs    AuditLog[]
   groups       GroupMaster[]
   roomBlocks   RoomBlock[]
+  POSOutlets  POSOutlet[]
+  dailySnapshots DailySnapshot[]
+  maintenanceTasks MaintenanceTask[]
+  cityLedgerAccounts CityLedgerAccount[]
 }
 
 //////////////////////////////////
@@ -109,6 +113,9 @@ model Room {
 
   inventories Inventory[] // هذا الحقل العكسي
 
+  maintenanceTasks MaintenanceTask[]
+
+
   @@unique([propertyId, number])
 }
 
@@ -144,6 +151,9 @@ model Guest {
   extras         Extra[] // الحقل العكسي
 
   leaderOfGroups GroupMaster[] @relation("GroupLeader")
+  preferences GuestPreference[]
+  loyaltyPrograms LoyaltyProgram[]
+  posCharges  POSCharge[]
 }
 
 //////////////////////////////////
@@ -328,6 +338,10 @@ model Folio {
   extras      Extra[] // الحقل العكسي
   company     Company?     @relation("CompanyFolios", fields: [companyId], references: [id])
   companyId   String?
+  posCharges POSCharge[]
+  cityLedgerAccount CityLedgerAccount? @relation(fields: [cityLedgerAccountId], references: [id])
+  cityLedgerAccountId String?
+
 }
 
 model Charge {
@@ -353,6 +367,9 @@ model Payment {
   postedAt   DateTime @default(now())
   postedBy   User     @relation(fields: [postedById], references: [id])
   postedById String
+
+  cityLedgerAccount      CityLedgerAccount?  @relation(fields: [cityLedgerAccountId], references: [id])
+  cityLedgerAccountId    String?
 }
 
 //////////////////////////////////
@@ -376,6 +393,8 @@ model Company {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  cityLedgerAccounts CityLedgerAccount[]
 
   @@unique([propertyId, code])
 }
@@ -401,6 +420,8 @@ model User {
   AuditLog         AuditLog[]
 
   hotelGroupsOwned HotelGroup[] @relation("OwnerHotelGroups")
+  posChargesPosted POSCharge[]
+  maintenanceTasksAssigned MaintenanceTask[]
 }
 
 //////////////////////////////////
@@ -530,4 +551,119 @@ enum Role {
   HK
   Manager
   Owner
+}
+
+
+//////////////////////////////////
+// POS / Outlets / Charges
+//////////////////////////////////
+model POSOutlet {
+  id         String   @id @default(cuid())
+  property   Property @relation(fields: [propertyId], references: [id])
+  propertyId String
+  name       String
+  type       String   // Restaurant, Bar, Spa, etc.
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  charges    POSCharge[]
+}
+
+model POSCharge {
+  id         String     @id @default(cuid())
+  outlet     POSOutlet  @relation(fields: [outletId], references: [id])
+  outletId   String
+  folio      Folio?     @relation(fields: [folioId], references: [id])
+  folioId    String?
+  guest      Guest?     @relation(fields: [guestId], references: [id])
+  guestId    String?
+  description String
+  amount     Decimal
+  tax        Decimal?
+  postedAt   DateTime   @default(now())
+  postedBy   User       @relation(fields: [postedById], references: [id])
+  postedById String
+}
+
+//////////////////////////////////
+// City Ledger / Accounts Receivable
+//////////////////////////////////
+model CityLedgerAccount {
+  id          String   @id @default(cuid())
+  property    Property @relation(fields: [propertyId], references: [id])
+  propertyId  String
+  company     Company  @relation(fields: [companyId], references: [id])
+  companyId   String
+  balance     Decimal  @default(0)
+  creditLimit Decimal?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  code      String
+  name      String
+
+  folios      Folio[]  // folios linked to this account
+  payments    Payment[]
+}
+
+//////////////////////////////////
+// Maintenance Tasks
+//////////////////////////////////
+model MaintenanceTask {
+  id           String    @id @default(cuid())
+  room         Room      @relation(fields: [roomId], references: [id])
+  roomId       String
+  type         String    // Plumbing, Electrical, HVAC, etc.
+  status       String    @default("Open") // Open, InProgress, Closed
+  priority     String?   // Low, Medium, High
+  assignedTo   User?     @relation(fields: [assignedToId], references: [id])
+  assignedToId String?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  property     Property? @relation(fields: [propertyId], references: [id])
+  propertyId   String?
+}
+
+//////////////////////////////////
+// Guest Preferences & Loyalty
+//////////////////////////////////
+model GuestPreference {
+  id            String   @id @default(cuid())
+  guest         Guest    @relation(fields: [guestId], references: [id])
+  guestId       String
+  preferenceKey String   // Non-smoking, FloorHigh, BedType, etc.
+  preferenceVal String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model LoyaltyProgram {
+  id           String   @id @default(cuid())
+  guest        Guest    @relation(fields: [guestId], references: [id])
+  guestId      String
+  programName  String   // Example: Gold, Silver, Platinum
+  points       Int      @default(0)
+  tier         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+//////////////////////////////////
+// Reports / BI Snapshots
+//////////////////////////////////
+model DailySnapshot {
+  id           String    @id @default(cuid())
+  property     Property  @relation(fields: [propertyId], references: [id])
+  propertyId   String
+  date         DateTime
+  occupancy    Int
+  roomsSold    Int
+  adr          Float     // Average Daily Rate
+  revpar       Float     // Revenue per Available Room
+  totalRevenue Decimal
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([propertyId, date])
 }

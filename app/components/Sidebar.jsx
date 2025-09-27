@@ -22,7 +22,8 @@ import {
     Menu,
     X,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Utensils,
 } from "lucide-react";
 
 export default function Sidebar({ session, }) {
@@ -47,6 +48,7 @@ export default function Sidebar({ session, }) {
         { name: 'Night Audit', href: '/night-audit', icon: <MoonStar size={18} /> },
         { name: 'Inventory', href: '/inventory', icon: <Package size={18} /> },
         { name: 'Rate plans', href: '/rate-plans', icon: <DollarSign size={18} /> },
+        { name: 'Restaurant', href: '/pos', icon: <Utensils size={18} /> },
     ];
 
     const SidebarContent = (
