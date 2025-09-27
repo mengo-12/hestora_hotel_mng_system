@@ -24,6 +24,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Utensils,
+    Store,
 } from "lucide-react";
 
 export default function Sidebar({ session, }) {
@@ -32,6 +33,7 @@ export default function Sidebar({ session, }) {
     const [reportsOpen, setReportsOpen] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [collapsed, setCollapsed] = useState(false);
+    const [POSOpen, setPOSOpen] = useState(false)
 
     const links = [
         { name: 'Dashboard', href: '/', icon: <LayoutDashboard size={18} /> },
@@ -48,14 +50,12 @@ export default function Sidebar({ session, }) {
         { name: 'Night Audit', href: '/night-audit', icon: <MoonStar size={18} /> },
         { name: 'Inventory', href: '/inventory', icon: <Package size={18} /> },
         { name: 'Rate plans', href: '/rate-plans', icon: <DollarSign size={18} /> },
-        { name: 'Restaurant', href: '/pos', icon: <Utensils size={18} /> },
     ];
 
     const SidebarContent = (
         <motion.div
-            className={`flex flex-col h-full transition-all duration-300 shadow-xl ${
-                collapsed ? 'w-20' : 'w-64'
-            } bg-blue-700 text-white`}
+            className={`flex flex-col h-full transition-all duration-300 shadow-xl ${collapsed ? 'w-20' : 'w-64'
+                } bg-blue-700 text-white`}
             animate={{ width: collapsed ? 80 : 256 }}
         >
             {/* Logo */}
@@ -75,11 +75,10 @@ export default function Sidebar({ session, }) {
                     <Link
                         key={link.name}
                         href={link.href}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${
-                            pathname === link.href
-                                ? 'bg-gradient-to-r from-blue-800 to-blue-900 font-semibold shadow-md'
-                                : 'hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-700'
-                        }`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${pathname === link.href
+                            ? 'bg-gradient-to-r from-blue-800 to-blue-900 font-semibold shadow-md'
+                            : 'hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-700'
+                            }`}
                         onClick={() => setIsOpen(false)}
                     >
                         {link.icon}
@@ -87,18 +86,51 @@ export default function Sidebar({ session, }) {
                     </Link>
                 ))}
 
+                {/* POS Dropdown */}
+                {!collapsed && (
+                    <div>
+                        <button
+                            onClick={() => setPOSOpen(!POSOpen)}
+                            className={`w-full flex items-center justify-between px-4 py-2 rounded-lg transition-all duration-300 ${pathname.startsWith('/pos')
+                                ? 'bg-gradient-to-r from-blue-800 to-blue-900 font-semibold shadow-md'
+                                : 'hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-700'
+                                }`}
+                        >
+                            <span className="flex items-center gap-2"><Store size={18} /> POS</span>
+                            <span>{POSOpen ? '▲' : '▼'}</span>
+                        </button>
+
+                        {POSOpen && (
+                            <div className="pl-8 mt-1 space-y-1">
+                                <Link
+                                    href="/pos"
+                                    className="block px-4 py-2 rounded hover:bg-blue-600"
+                                >
+                                    Outlets
+                                </Link>
+                                <Link
+                                    href="/pos/items"
+                                    className="block px-4 py-2 rounded hover:bg-blue-600"
+                                >
+                                    Items
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+
                 {/* Reports Dropdown */}
                 {!collapsed && (
                     <div>
                         <button
                             onClick={() => setReportsOpen(!reportsOpen)}
-                            className={`w-full flex items-center justify-between px-4 py-2 rounded-lg transition-all duration-300 ${
-                                pathname.startsWith('/reports')
-                                    ? 'bg-gradient-to-r from-blue-800 to-blue-900 font-semibold shadow-md'
-                                    : 'hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-700'
-                            }`}
+                            className={`w-full flex items-center justify-between px-4 py-2 rounded-lg transition-all duration-300 ${pathname.startsWith('/reports')
+                                ? 'bg-gradient-to-r from-blue-800 to-blue-900 font-semibold shadow-md'
+                                : 'hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-700'
+                                }`}
                         >
-                            <span className="flex items-center gap-2"><BarChart2 size={18}/> Reports</span>
+                            <span className="flex items-center gap-2"><BarChart2 size={18} /> Reports</span>
                             <span>{reportsOpen ? '▲' : '▼'}</span>
                         </button>
 
@@ -116,11 +148,10 @@ export default function Sidebar({ session, }) {
                     <div>
                         <button
                             onClick={() => setSettingsOpen(!settingsOpen)}
-                            className={`w-full flex items-center justify-between px-4 py-2 rounded-lg transition-all duration-300 ${
-                                pathname.startsWith('/settings_hotel')
-                                    ? 'bg-gradient-to-r from-blue-800 to-blue-900 font-semibold shadow-md'
-                                    : 'hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-700'
-                            }`}
+                            className={`w-full flex items-center justify-between px-4 py-2 rounded-lg transition-all duration-300 ${pathname.startsWith('/settings_hotel')
+                                ? 'bg-gradient-to-r from-blue-800 to-blue-900 font-semibold shadow-md'
+                                : 'hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-700'
+                                }`}
                         >
                             <span className="flex items-center gap-2"><Settings size={18} /> Settings</span>
                             <span>{settingsOpen ? '▲' : '▼'}</span>

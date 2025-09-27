@@ -568,6 +568,7 @@ model POSOutlet {
   updatedAt  DateTime @updatedAt
 
   charges    POSCharge[]
+  items      POSItem[]
 }
 
 model POSCharge {
@@ -585,6 +586,22 @@ model POSCharge {
   postedBy   User       @relation(fields: [postedById], references: [id])
   postedById String
 }
+
+model POSItem {
+  id         String    @id @default(cuid())
+  outlet     POSOutlet @relation(fields: [outletId], references: [id])
+  outletId   String
+  code       String    
+  name       String
+  description String?
+  price      Decimal
+  tax        Decimal?  
+  active     Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 
 //////////////////////////////////
 // City Ledger / Accounts Receivable
