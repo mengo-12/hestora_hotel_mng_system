@@ -341,6 +341,7 @@ model Folio {
   posCharges POSCharge[]
   cityLedgerAccount CityLedgerAccount? @relation(fields: [cityLedgerAccountId], references: [id])
   cityLedgerAccountId String?
+  sales  POSSale[]
 
 }
 
@@ -422,6 +423,7 @@ model User {
   hotelGroupsOwned HotelGroup[] @relation("OwnerHotelGroups")
   posChargesPosted POSCharge[]
   maintenanceTasksAssigned MaintenanceTask[]
+  sales  POSSale[]
 }
 
 //////////////////////////////////
@@ -569,6 +571,7 @@ model POSOutlet {
 
   charges    POSCharge[]
   items      POSItem[]
+  sales       POSSale[]
 }
 
 model POSCharge {
@@ -600,6 +603,7 @@ model POSItem {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  sales POSSaleItem[]
 }
 
 
@@ -683,4 +687,34 @@ model DailySnapshot {
   updatedAt    DateTime  @updatedAt
 
   @@unique([propertyId, date])
+}
+
+model POSSale {
+  id        String      @id @default(cuid())
+  outlet    POSOutlet   @relation(fields: [outletId], references: [id])
+  outletId  String
+  user      User        @relation(fields: [userId], references: [id])
+  userId    String
+  folio     Folio?      @relation(fields: [folioId], references: [id])
+  folioId   String?
+  total     Decimal
+  tax       Decimal
+  createdAt DateTime    @default(now())
+
+
+  items     POSSaleItem[]
+
+}
+
+model POSSaleItem {
+  id       String    @id @default(cuid())
+  sale     POSSale   @relation(fields: [saleId], references: [id])
+  saleId   String
+  item     POSItem   @relation(fields: [itemId], references: [id])
+  itemId   String
+  quantity Int
+  price    Decimal
+  tax      Decimal
+  subtotal Decimal
+
 }

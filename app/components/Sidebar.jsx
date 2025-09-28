@@ -114,6 +114,13 @@ export default function Sidebar({ session, }) {
                                 >
                                     Items
                                 </Link>
+
+                                <Link
+                                    href="/pos/sales"
+                                    className="block px-4 py-2 rounded hover:bg-blue-600"
+                                >
+                                    Sales
+                                </Link>
                             </div>
                         )}
                     </div>
