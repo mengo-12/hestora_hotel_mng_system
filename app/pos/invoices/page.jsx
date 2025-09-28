@@ -4,14 +4,21 @@ import { ShoppingCart, Printer, Eye } from "lucide-react";
 
 export default function SalesHistoryPage() {
     const [sales, setSales] = useState([]);
+    const [outlets, setOutlets] = useState([]);
+    const [selectedOutlet, setSelectedOutlet] = useState("");
+    const [startDate, setStartDate] = useState("");
+    const [endDate, setEndDate] = useState("");
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchSales = async () => {
             try {
-                const res = await fetch("/api/pos/sales");
-                const data = await res.json();
-                setSales(data);
+                const [salesRes, outletsRes] = await Promise.all([
+                    fetch("/api/pos/sales"),
+                    fetch("/api/pos/outlets")
+                ]);
+                setSales(await salesRes.json());
+                setOutlets(await outletsRes.json());
             } catch (err) {
                 console.error("Failed to fetch sales:", err);
             } finally {
@@ -25,17 +32,73 @@ export default function SalesHistoryPage() {
         return <p className="p-6 text-center text-gray-500">Loading sales...</p>;
     }
 
+    // ==============================
+    // Filtered Sales
+    // ==============================
+    const filteredSales = sales.filter(sale => {
+        const saleDate = new Date(sale.createdAt);
+        const matchesOutlet = selectedOutlet === "" || sale.outlet?.id === selectedOutlet;
+        const matchesStartDate = !startDate || saleDate >= new Date(startDate);
+        const matchesEndDate = !endDate || saleDate <= new Date(endDate);
+        return matchesOutlet && matchesStartDate && matchesEndDate;
+    });
+
     return (
         <div className="min-h-screen p-6 bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
             <h1 className="text-3xl font-bold mb-6 flex items-center gap-2">
                 <ShoppingCart size={28} /> Sales History
             </h1>
 
-            {sales.length === 0 ? (
+            {/* ==============================
+                Filters
+            ============================== */}
+            <div className="flex flex-col md:flex-row gap-3 mb-6 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+                {/* Outlet Filter */}
+                <div className="w-full md:w-1/4">
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1 block">Outlet</label>
+                    <select
+                        value={selectedOutlet}
+                        onChange={e => setSelectedOutlet(e.target.value)}
+                        className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
+                        <option value="">All Outlets</option>
+                        {outlets.map(o => (
+                            <option key={o.id} value={o.id}>{o.name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Start Date */}
+                <div className="w-full md:w-1/4">
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1 block">Start Date</label>
+                    <input
+                        type="date"
+                        value={startDate}
+                        onChange={e => setStartDate(e.target.value)}
+                        className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                </div>
+
+                {/* End Date */}
+                <div className="w-full md:w-1/4">
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-300 mb-1 block">End Date</label>
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={e => setEndDate(e.target.value)}
+                        className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                </div>
+            </div>
+
+            {/* ==============================
+                Sales List
+            ============================== */}
+            {filteredSales.length === 0 ? (
                 <p className="text-center text-gray-500 py-20">No sales found.</p>
             ) : (
                 <div className="space-y-6">
-                    {sales.map(sale => (
+                    {filteredSales.map(sale => (
                         <div key={sale.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 hover:shadow-2xl transition">
 
                             {/* Sale Header */}
@@ -43,7 +106,7 @@ export default function SalesHistoryPage() {
                                 <div>
                                     <p className="font-bold text-lg">Invoice #{sale.id}</p>
                                     <p className="text-sm text-gray-500">
-                                        Outlet: {sale.outlet?.name || "N/A"} | Employee: {sale.user?.name || "N/A"}
+                                        Outlet: {sale.outlet?.name || "N/A"} | Employee: {sale.user?.name || "N/A"} | Date: {new Date(sale.createdAt).toLocaleDateString()}
                                     </p>
                                 </div>
                                 <div className="flex gap-2">
@@ -78,7 +141,8 @@ export default function SalesHistoryPage() {
                                                 <td className="p-2 text-sm">{Number(item.price).toFixed(2)} SAR</td>
                                                 <td className="p-2 text-sm">{Number(item.tax).toFixed(2)}%</td>
                                                 <td className="p-2 text-sm font-semibold">
-                                                    {(Number(item.price) * item.quantity + (Number(item.price) * item.quantity * (Number(item.tax) / 100))).toFixed(2)} SAR</td>
+                                                    {(Number(item.price) * item.quantity + (Number(item.price) * item.quantity * (Number(item.tax) / 100))).toFixed(2)} SAR
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>

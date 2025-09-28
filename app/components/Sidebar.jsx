@@ -128,6 +128,13 @@ export default function Sidebar({ session, }) {
                                 >
                                     Invoices
                                 </Link>
+
+                                <Link
+                                    href="/pos/dashboard"
+                                    className="block px-4 py-2 rounded hover:bg-blue-600"
+                                >
+                                    Dashboard
+                                </Link>
                             </div>
                         )}
                     </div>

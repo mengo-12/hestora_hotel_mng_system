@@ -224,6 +224,7 @@ export default function POSSalesPage({ session }) {
     const [cartOpen, setCartOpen] = useState(false);
     const [filter, setFilter] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
+    const [selectedOutletFilter, setSelectedOutletFilter] = useState("All");
 
     const socket = useSocket();
     const role = session?.user?.role || "Guest";
@@ -313,10 +314,6 @@ export default function POSSalesPage({ session }) {
             setCartOpen(false);
             setSelectedOutlet("");
 
-            // --- بث العملية عبر Socket ---
-            if (socket) {
-                socket.emit("POS_SALE_CREATED", data);
-            }
 
             // --- إشعار نجاح ---
             alert(`✅ Sale completed!\nTotal: ${(data.total + data.tax).toFixed(2)} SAR`);
@@ -364,16 +361,14 @@ export default function POSSalesPage({ session }) {
 
                     {/* Outlet */}
                     <div className="w-full md:w-1/4">
-                        <label className="mb-1 text-gray-500 dark:text-gray-300 text-sm font-medium">Outlet</label>
+                        <label className="mb-1 text-gray-500 dark:text-gray-300 text-sm font-medium">Outlet Filter</label>
                         <select
-                            value={selectedOutlet}
-                            onChange={e => setSelectedOutlet(e.target.value)}
+                            value={selectedOutletFilter}
+                            onChange={e => setSelectedOutletFilter(e.target.value)}
                             className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                         >
-                            <option value="">Select Outlet</option>
-                            {outlets.map(o => (
-                                <option key={o.id} value={o.id}>{o.name}</option>
-                            ))}
+                            <option value="All">All</option>
+                            {outlets.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                         </select>
                     </div>
                 </div>
@@ -399,9 +394,11 @@ export default function POSSalesPage({ session }) {
                 {items
                     .filter(i => i.name.toLowerCase().includes(filter.toLowerCase()))
                     .filter(i => selectedCategory === "All" || i.category === selectedCategory)
+                    .filter(i => selectedOutletFilter === "All" || i.outletId === selectedOutletFilter)
                     .map(item => (
                         <ProductCard key={item.id} item={item} addToCart={addToCart} />
-                    ))}
+                    ))
+                }
             </main>
 
             {/* Cart Popup */}

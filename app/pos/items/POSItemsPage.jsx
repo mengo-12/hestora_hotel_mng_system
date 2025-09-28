@@ -10,6 +10,8 @@ export default function POSItemsPage({ session, userProperties }) {
     const [editItem, setEditItem] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
+    const [selectedOutlet, setSelectedOutlet] = useState("All"); // فلتر حسب الـ Outlet
+    const [filteredItemsList, setFilteredItemsList] = useState([]);
     const [kpis, setKpis] = useState({ active: 0, inactive: 0, total: 0 });
     const socket = useSocket();
 
@@ -82,11 +84,19 @@ export default function POSItemsPage({ session, userProperties }) {
     };
 
     // Filter items
-    const filteredItems = items.filter(item => {
+    const filteredItems = filteredItemsList.filter(item => {
         const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || item.code.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === "" || (statusFilter === "Active" && item.active) || (statusFilter === "Inactive" && !item.active);
         return matchesSearch && matchesStatus;
     });
+
+    useEffect(() => {
+        if (selectedOutlet === "All") {
+            setFilteredItemsList(items);
+        } else {
+            setFilteredItemsList(items.filter(i => i.outletId === selectedOutlet));
+        }
+    }, [selectedOutlet, items]);
 
     // ==============================
     // ItemModal Component
@@ -294,6 +304,18 @@ export default function POSItemsPage({ session, userProperties }) {
                         <option value="">All</option>
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+
+                <div className="flex flex-col w-full md:w-1/6">
+                    <label className="mb-1 text-gray-500 dark:text-gray-300 text-sm font-medium">Outlet</label>
+                    <select
+                        value={selectedOutlet}
+                        onChange={e => setSelectedOutlet(e.target.value)}
+                        className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    >
+                        <option value="All">All</option>
+                        {outlets.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                     </select>
                 </div>
 
