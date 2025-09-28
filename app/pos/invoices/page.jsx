@@ -72,12 +72,13 @@ export default function SalesHistoryPage() {
                                     <tbody>
                                         {sale.items.map(item => (
                                             <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                                <td className="p-2 text-sm font-medium">{item.name}</td>
+                                                <td className="p-2 text-sm font-medium">{item.name ?? item.item?.name ?? "N/A"}</td>
                                                 <td className="p-2 text-sm">{item.quantity}</td>
                                                 <td className="p-2 text-sm">{item.stock ?? "N/A"}</td>
-                                                <td className="p-2 text-sm">{item.price.toFixed(2)} SAR</td>
-                                                <td className="p-2 text-sm">{item.tax.toFixed(2)}%</td>
-                                                <td className="p-2 text-sm font-semibold">{(item.price * item.quantity + (item.price * item.quantity * (item.tax / 100))).toFixed(2)} SAR</td>
+                                                <td className="p-2 text-sm">{Number(item.price).toFixed(2)} SAR</td>
+                                                <td className="p-2 text-sm">{Number(item.tax).toFixed(2)}%</td>
+                                                <td className="p-2 text-sm font-semibold">
+                                                    {(Number(item.price) * item.quantity + (Number(item.price) * item.quantity * (Number(item.tax) / 100))).toFixed(2)} SAR</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -86,9 +87,9 @@ export default function SalesHistoryPage() {
 
                             {/* Sale Footer */}
                             <div className="mt-3 flex justify-end flex-col gap-1 text-right">
-                                <p className="text-sm text-gray-500">Subtotal: {sale.total.toFixed(2)} SAR</p>
-                                <p className="text-sm text-gray-500">Tax: {sale.tax.toFixed(2)} SAR</p>
-                                <p className="font-bold text-lg">Total: {(sale.total + sale.tax).toFixed(2)} SAR</p>
+                                <p className="text-sm text-gray-500">Subtotal: {Number(sale.total).toFixed(2)} SAR</p>
+                                <p className="text-sm text-gray-500">Tax: {Number(sale.tax).toFixed(2)} SAR</p>
+                                <p className="font-bold text-lg">Total: {(Number(sale.total) + Number(sale.tax)).toFixed(2)} SAR</p>
                             </div>
 
                         </div>

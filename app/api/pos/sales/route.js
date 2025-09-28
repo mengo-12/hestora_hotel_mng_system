@@ -2,7 +2,6 @@
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-
 export async function POST(req) {
     try {
         // جلب بيانات المستخدم من الجلسة
@@ -32,6 +31,7 @@ export async function POST(req) {
 
             return {
                 itemId: i.id,
+                name: i.name,
                 quantity: i.quantity,
                 price: i.price,
                 tax: i.tax,
@@ -74,9 +74,11 @@ export async function POST(req) {
 // GET جميع المبيعات
 export async function GET(req) {
     try {
-        const sales = await prisma.POSSale.findMany({
+        const sales = await prisma.pOSSale.findMany({
             include: {
-                items: true,
+                items: {
+                    include: { item: true }  // جلب معلومات العنصر المرتبط
+                },
                 outlet: true,
                 user: true,
                 folio: true

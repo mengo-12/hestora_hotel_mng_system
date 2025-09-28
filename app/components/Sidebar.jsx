@@ -121,6 +121,13 @@ export default function Sidebar({ session, }) {
                                 >
                                     Sales
                                 </Link>
+
+                                <Link
+                                    href="/pos/invoices"
+                                    className="block px-4 py-2 rounded hover:bg-blue-600"
+                                >
+                                    Invoices
+                                </Link>
                             </div>
                         )}
                     </div>

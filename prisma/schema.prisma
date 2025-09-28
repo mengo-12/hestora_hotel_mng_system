@@ -712,6 +712,7 @@ model POSSaleItem {
   saleId   String
   item     POSItem   @relation(fields: [itemId], references: [id])
   itemId   String
+  name     String?
   quantity Int
   price    Decimal
   tax      Decimal
