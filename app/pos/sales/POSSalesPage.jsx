@@ -213,7 +213,7 @@
 'use client';
 import { useState, useEffect } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
-import { Heart, Star, ShoppingCart, Trash2 } from "lucide-react";
+import { Heart, Star, ShoppingCart, Trash2, Printer, Percent  } from "lucide-react";
 
 export default function POSSalesPage({ session }) {
     const [items, setItems] = useState([]);
@@ -226,9 +226,13 @@ export default function POSSalesPage({ session }) {
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [selectedOutletFilter, setSelectedOutletFilter] = useState("All");
 
+    const [discount, setDiscount] = useState(0); // الخصم
+    const [paymentMethod, setPaymentMethod] = useState("Cash"); // طريقة الدفع
+
     const socket = useSocket();
     const role = session?.user?.role || "Guest";
     const canCreate = ["Admin", "Manager"].includes(role);
+
 
     const fetchData = async () => {
         try {
@@ -268,8 +272,10 @@ export default function POSSalesPage({ session }) {
 
     const removeFromCart = (id) => setSaleItems(saleItems.filter(si => si.id !== id));
 
-    const total = saleItems.reduce((sum, si) => sum + si.price * si.quantity, 0);
+    const subtotal = saleItems.reduce((sum, si) => sum + si.price * si.quantity, 0);
     const totalTax = saleItems.reduce((sum, si) => sum + (si.price * si.quantity * (si.tax / 100)), 0);
+    const discountAmount = (subtotal * discount) / 100;
+    const total = subtotal + totalTax - discountAmount;
 
     const [loading, setLoading] = useState(false);
 
@@ -323,6 +329,46 @@ export default function POSSalesPage({ session }) {
         } finally {
             setLoading(false);
         }
+
+        // تحديث المخزون بعد البيع
+        await fetch("/api/pos/update-stock", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: saleItems })
+        });
+
+        alert(`✅ Sale completed!\nTotal: ${total.toFixed(2)} SAR`);
+    };
+
+
+
+    const cancelSale = () => {
+        setSaleItems([]);
+        setDiscount(0);
+        setPaymentMethod("Cash");
+        setCartOpen(false);
+        alert("❌ Sale canceled");
+    };
+
+    const printReceipt = () => {
+        const receipt = `
+        ====== POS Receipt ======
+        Outlet: ${outlets.find(o => o.id === selectedOutlet)?.name || "-"}
+        --------------------------
+        ${saleItems.map(si => `${si.name} x ${si.quantity} = ${(si.price * si.quantity).toFixed(2)} SAR`).join("\n")}
+        --------------------------
+        Subtotal: ${subtotal.toFixed(2)} SAR
+        Discount: -${discountAmount.toFixed(2)} SAR
+        Tax: +${totalTax.toFixed(2)} SAR
+        --------------------------
+        Total: ${total.toFixed(2)} SAR
+        Payment: ${paymentMethod}
+        ==========================
+        `;
+
+        const newWindow = window.open("", "", "width=400,height=600");
+        newWindow.document.write(`<pre>${receipt}</pre>`);
+        newWindow.print();
     };
 
 
@@ -410,11 +456,8 @@ export default function POSSalesPage({ session }) {
                         <button
                             onClick={() => setCartOpen(false)}
                             className="absolute top-4 right-4 text-gray-500 hover:text-red-500"
-                        >
-                            ✕
-                        </button>
+                        >✕</button>
 
-                        {/* Cart Header */}
                         <h2 className="text-2xl font-bold mb-5 flex items-center gap-2">
                             <ShoppingCart size={24} /> Your Cart
                         </h2>
@@ -422,34 +465,16 @@ export default function POSSalesPage({ session }) {
                         {/* Cart Items */}
                         <div className="flex flex-col gap-4 max-h-80 overflow-y-auto pr-2">
                             {saleItems.length > 0 ? saleItems.map(si => (
-                                <div key={si.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-sm hover:shadow-md transition">
-
-                                    {/* Item Info */}
-                                    <div className="flex flex-col">
+                                <div key={si.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                    <div>
                                         <p className="font-semibold">{si.name}</p>
                                         <p className="text-sm text-gray-500">{si.price} SAR × {si.quantity}</p>
                                     </div>
-
-                                    {/* Quantity Controls */}
                                     <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => updateQuantity(si.id, si.quantity - 1)}
-                                            className="p-1 bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-500"
-                                        >−</button>
-
-                                        <span className="w-6 text-center">{si.quantity}</span>
-
-                                        <button
-                                            onClick={() => updateQuantity(si.id, si.quantity + 1)}
-                                            className="p-1 bg-gray-200 dark:bg-gray-600 rounded hover:bg-gray-300 dark:hover:bg-gray-500"
-                                        >+</button>
-
-                                        <button
-                                            onClick={() => removeFromCart(si.id)}
-                                            className="text-red-600 hover:text-red-700"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                                        <button onClick={() => updateQuantity(si.id, si.quantity - 1)} className="px-2 bg-gray-300">−</button>
+                                        <span>{si.quantity}</span>
+                                        <button onClick={() => updateQuantity(si.id, si.quantity + 1)} className="px-2 bg-gray-300">+</button>
+                                        <button onClick={() => removeFromCart(si.id)} className="text-red-600"><Trash2 size={16} /></button>
                                     </div>
                                 </div>
                             )) : (
@@ -457,46 +482,61 @@ export default function POSSalesPage({ session }) {
                             )}
                         </div>
 
-                        {/* Outlet Selector if not selected */}
-                        {saleItems.length > 0 && !selectedOutlet && (
-                            <div className="mt-4">
-                                <label className="block mb-1 font-medium text-gray-600 dark:text-gray-300">Select Outlet</label>
-                                <select
-                                    value={selectedOutlet}
-                                    onChange={e => setSelectedOutlet(e.target.value)}
-                                    className="w-full p-3 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500"
-                                >
-                                    <option value="">Select Outlet</option>
-                                    {outlets.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                                </select>
-                            </div>
-                        )}
-
-                        {/* Cart Footer */}
+                        {/* Extra Options */}
                         {saleItems.length > 0 && (
-                            <div className="mt-5 border-t pt-4 space-y-2">
-                                <p className="flex justify-between font-medium">
-                                    Subtotal: <span>{total.toFixed(2)} SAR</span>
-                                </p>
-                                <p className="flex justify-between font-medium">
-                                    Tax: <span>{totalTax.toFixed(2)} SAR</span>
-                                </p>
-                                <p className="flex justify-between font-bold text-lg">
-                                    Total (incl. Tax): <span>{(total + totalTax).toFixed(2)} SAR</span>
-                                </p>
-                                <button
-                                    onClick={submitSale}
-                                    disabled={!canCreate || saleItems.length === 0 || !selectedOutlet || loading}
-                                    className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg disabled:opacity-50 transition"
-                                >
-                                    {loading ? "Processing..." : "Checkout ✅"}
-                                </button>
+                            <div className="mt-5 border-t pt-4 space-y-3">
+
+                                {/* Outlet */}
+                                {!selectedOutlet && (
+                                    <select value={selectedOutlet} onChange={e => setSelectedOutlet(e.target.value)}
+                                        className="w-full p-2 border rounded">
+                                        <option value="">Select Outlet</option>
+                                        {outlets.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                                    </select>
+                                )}
+
+                                {/* Discount */}
+                                <div>
+                                    <label className="block mb-1">Discount (%)</label>
+                                    <input type="number" min="0" max="100" value={discount}
+                                        onChange={e => setDiscount(Number(e.target.value))}
+                                        className="w-full p-2 border rounded" />
+                                </div>
+
+                                {/* Payment Method */}
+                                <div>
+                                    <label className="block mb-1">Payment Method</label>
+                                    <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}
+                                        className="w-full p-2 border rounded">
+                                        <option value="Cash">Cash</option>
+                                        <option value="Card">Card</option>
+                                        <option value="Mixed">Mixed</option>
+                                    </select>
+                                </div>
+
+                                {/* Totals */}
+                                <p>Subtotal: {subtotal.toFixed(2)} SAR</p>
+                                <p>Tax: {totalTax.toFixed(2)} SAR</p>
+                                <p>Discount: -{discountAmount.toFixed(2)} SAR</p>
+                                <p className="font-bold text-lg">Total: {total.toFixed(2)} SAR</p>
+
+                                {/* Buttons */}
+                                <div className="flex gap-3">
+                                    <button onClick={submitSale} className="flex-1 bg-green-600 text-white py-2 rounded">
+                                        {loading ? "Processing..." : "Checkout ✅"}
+                                    </button>
+                                    <button onClick={cancelSale} className="flex-1 bg-red-600 text-white py-2 rounded">
+                                        Cancel
+                                    </button>
+                                    <button onClick={printReceipt} className="flex-1 bg-blue-600 text-white py-2 rounded flex items-center justify-center gap-2">
+                                        <Printer size={16} /> Print
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
                 </div>
             )}
-
         </div>
     );
 }
