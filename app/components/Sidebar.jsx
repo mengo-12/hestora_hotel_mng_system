@@ -34,6 +34,8 @@ export default function Sidebar({ session, }) {
     const [isOpen, setIsOpen] = useState(false);
     const [collapsed, setCollapsed] = useState(false);
     const [POSOpen, setPOSOpen] = useState(false)
+    const [loyaltyOpen, setloyaltyOpen] = useState(false)
+
 
     const links = [
         { name: 'Dashboard', href: '/', icon: <LayoutDashboard size={18} /> },
@@ -134,6 +136,33 @@ export default function Sidebar({ session, }) {
                                     className="block px-4 py-2 rounded hover:bg-blue-600"
                                 >
                                     Dashboard
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* POS Dropdown */}
+                {!collapsed && (
+                    <div>
+                        <button
+                            onClick={() => setloyaltyOpen(!loyaltyOpen)}
+                            className={`w-full flex items-center justify-between px-4 py-2 rounded-lg transition-all duration-300 ${pathname.startsWith('/loyalty')
+                                ? 'bg-gradient-to-r from-blue-800 to-blue-900 font-semibold shadow-md'
+                                : 'hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-700'
+                                }`}
+                        >
+                            <span className="flex items-center gap-2"><Store size={18} /> loyalty</span>
+                            <span>{loyaltyOpen? '▲' : '▼'}</span>
+                        </button>
+
+                        {loyaltyOpen&& (
+                            <div className="pl-8 mt-1 space-y-1">
+                                <Link
+                                    href="/loyalty/members"
+                                    className="block px-4 py-2 rounded hover:bg-blue-600"
+                                >
+                                    Members
                                 </Link>
                             </div>
                         )}

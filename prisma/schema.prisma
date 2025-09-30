@@ -152,8 +152,8 @@ model Guest {
 
   leaderOfGroups GroupMaster[] @relation("GroupLeader")
   preferences GuestPreference[]
-  loyaltyPrograms LoyaltyProgram[]
   posCharges  POSCharge[]
+  loyaltyMember   LoyaltyMember?    @relation("GuestLoyalty")
 }
 
 //////////////////////////////////
@@ -189,6 +189,7 @@ model Booking {
   roomBlock   RoomBlock?   @relation("BookingRoomBlock", fields: [roomBlockId], references: [id])
   roomBlockId String?
   extras      Extra[] // هذا هو الحقل العكسي
+  loyaltyTransactions LoyaltyTransaction[]  @relation("BookingLoyalty")
 }
 
 //////////////////////////////////
@@ -342,6 +343,7 @@ model Folio {
   cityLedgerAccount CityLedgerAccount? @relation(fields: [cityLedgerAccountId], references: [id])
   cityLedgerAccountId String?
   sales  POSSale[]
+  loyaltyTransactions LoyaltyTransaction[]  @relation("FolioLoyalty")
 
 }
 
@@ -661,14 +663,15 @@ model GuestPreference {
 }
 
 model LoyaltyProgram {
-  id           String   @id @default(cuid())
-  guest        Guest    @relation(fields: [guestId], references: [id])
-  guestId      String
-  programName  String   // Example: Gold, Silver, Platinum
-  points       Int      @default(0)
-  tier         String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String   // Bronze, Silver, Gold, Platinum
+  minPoints   Int      // أقل عدد نقاط للمستوى
+  maxPoints   Int?     // أقصى عدد نقاط (ممكن null = بلا حد)
+  benefits    String?  // وصف المزايا
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     LoyaltyMember[]
 }
 
 //////////////////////////////////
@@ -723,4 +726,32 @@ model POSSaleItem {
   tax      Decimal
   subtotal Decimal
 
+}
+
+model LoyaltyMember {
+  id              String               @id @default(cuid())
+  guestId         String               @unique
+  membershipLevel String               @default("Bronze") // Bronze, Silver, Gold, Platinum
+  loyaltyProgramId String?
+  pointsBalance   Int                  @default(0)
+  joinDate        DateTime             @default(now())
+  lastActivity    DateTime?
+
+  guest           Guest                @relation("GuestLoyalty", fields: [guestId], references: [id])
+  loyaltyProgram  LoyaltyProgram? @relation(fields: [loyaltyProgramId], references: [id])
+  transactions    LoyaltyTransaction[]
+}
+
+model LoyaltyTransaction {
+  id               String          @id @default(cuid())
+  loyaltyMemberId  String
+  loyaltyMember    LoyaltyMember    @relation(fields: [loyaltyMemberId], references: [id])
+  bookingId        String?
+  booking          Booking?         @relation("BookingLoyalty", fields: [bookingId], references: [id])
+  folioId          String?
+  folio            Folio?           @relation("FolioLoyalty", fields: [folioId], references: [id])
+  points           Int
+  type             String           // Earned / Redeemed
+  description      String?
+  createdAt        DateTime         @default(now())
 }
