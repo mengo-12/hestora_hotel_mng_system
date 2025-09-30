@@ -588,6 +588,7 @@ model POSCharge {
   postedAt   DateTime   @default(now())
   postedBy   User       @relation(fields: [postedById], references: [id])
   postedById String
+  saleId    String?
 }
 
 model POSItem {
@@ -697,9 +698,13 @@ model POSSale {
   userId    String
   folio     Folio?      @relation(fields: [folioId], references: [id])
   folioId   String?
-  total     Decimal
-  tax       Decimal
+  total     Decimal     @default(0)
+  tax       Decimal     @default(0)
   createdAt DateTime    @default(now())
+
+  subtotal  Decimal     @default(0) 
+  discount  Decimal?    @default(0)
+  paymentMethod String?      // طريقة الدفع
 
 
   items     POSSaleItem[]

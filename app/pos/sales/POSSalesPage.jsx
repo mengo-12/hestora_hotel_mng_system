@@ -1,230 +1,23 @@
-// 'use client';
-// import { useState, useEffect } from "react";
-// import { useSocket } from "@/app/components/SocketProvider";
-
-// export default function POSSalesPage({ session, userProperties }) {
-//     const [outlets, setOutlets] = useState([]);
-//     const [items, setItems] = useState([]);
-//     const [selectedOutlet, setSelectedOutlet] = useState("");
-//     const [saleItems, setSaleItems] = useState([]);
-//     const [sales, setSales] = useState([]);
-
-//     const socket = useSocket();
-
-//     const role = session?.user?.role || "Guest";
-//     const canCreate = ["Admin", "Manager"].includes(role);
-
-//     // Fetch outlets & items
-// const fetchData = async () => {
-//     try {
-//         const outletsRes = await fetch("/api/pos/outlets");
-//         setOutlets(await outletsRes.json() || []);
-//         const itemsRes = await fetch("/api/pos/items");
-//         setItems(await itemsRes.json() || []);
-//     } catch {
-//         setOutlets([]);
-//         setItems([]);
-//     }
-// };
-
-// useEffect(() => {
-//     fetchData();
-//     if (!socket) return;
-//     // Broadcast listener
-//     socket.on("POS_SALE_CREATED", (sale) => setSales(prev => [...prev, sale]));
-//     return () => { socket.off("POS_SALE_CREATED"); };
-// }, [socket]);
-
-//     // Sale actions
-//     const addItem = (item) => {
-//         if (!saleItems.find(si => si.id === item.id)) setSaleItems([...saleItems, { ...item, quantity: 1 }]);
-//     };
-//     const updateQuantity = (id, qty) => setSaleItems(saleItems.map(si => si.id === id ? { ...si, quantity: qty } : si));
-//     const removeItem = (id) => setSaleItems(saleItems.filter(si => si.id !== id));
-
-//     const submitSale = async () => {
-//         if (!canCreate) { alert("ليس لديك صلاحية إنشاء المبيعات."); return; }
-//         if (!selectedOutlet || saleItems.length === 0) { alert("يرجى اختيار Outlet وإضافة الأصناف."); return; }
-
-//         try {
-//             const res = await fetch("/api/pos/sales", {
-//                 method: "POST",
-//                 headers: { "Content-Type": "application/json" },
-//                 body: JSON.stringify({
-//                     outletId: selectedOutlet,
-//                     items: saleItems.map(si => ({
-//                         id: si.id,
-//                         name: si.name,
-//                         price: si.price,
-//                         tax: si.tax,
-//                         quantity: si.quantity
-//                     }))
-//                 })
-//             });
-//             await res.json();
-//             setSaleItems([]);
-//             setSelectedOutlet("");
-//         } catch { alert("فشل إنشاء المبيع."); }
-//     };
-
-//     // KPI
-//     const kpis = {
-//         totalSales: sales.length,
-//         totalItems: saleItems.length,
-//         totalRevenue: sales.reduce((sum, s) => sum + parseFloat(s.total), 0)
-//     };
-
-//     return (
-//         <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-900 min-h-screen text-gray-900 dark:text-gray-100">
-
-//             {/* KPI Cards */}
-//             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-//                 {[
-//                     { title: "Total Sales", value: kpis.totalSales },
-//                     { title: "Items in Sale", value: kpis.totalItems },
-//                     { title: "Revenue", value: `${kpis.totalRevenue} SAR` }
-//                 ].map((kpi, idx) => (
-//                     <div key={idx} className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col items-center">
-//                         <span className="text-gray-500 dark:text-gray-300">{kpi.title}</span>
-//                         <span className="text-2xl font-bold">{kpi.value}</span>
-//                     </div>
-//                 ))}
-//             </div>
-
-//             {/* Filters */}
-//             <div className="flex flex-col md:flex-row gap-3 flex-wrap md:flex-nowrap items-end bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-//                 <div className="flex flex-col w-full md:w-1/4">
-//                     <label className="mb-1 text-gray-500 dark:text-gray-300 text-sm font-medium">Select Outlet</label>
-//                     <select
-//                         value={selectedOutlet}
-//                         onChange={e => setSelectedOutlet(e.target.value)}
-//                         className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-//                     >
-//                         <option value="">اختر Outlet</option>
-//                         {outlets.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-//                     </select>
-//                 </div>
-
-//                 <div className="flex w-full md:w-auto gap-2">
-//                     {canCreate && (
-//                         <button
-//                             onClick={submitSale}
-//                             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg w-full md:w-auto"
-//                         >
-//                             إنشاء المبيع
-//                         </button>
-//                     )}
-//                 </div>
-//             </div>
-
-//             {/* POS Items */}
-//             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-//                 {items.map(i => (
-//                     <button
-//                         key={i.id}
-//                         onClick={() => addItem(i)}
-//                         disabled={!canCreate}
-//                         className={`border p-3 rounded-lg font-medium text-gray-700 dark:text-gray-200 ${canCreate ? "hover:bg-blue-100 dark:hover:bg-blue-800" : "opacity-50 cursor-not-allowed"}`}
-//                     >
-//                         {i.name} ({i.price} SAR)
-//                     </button>
-//                 ))}
-//             </div>
-
-//             {/* Sale Items Table */}
-//             <div className="overflow-x-auto bg-white dark:bg-gray-800 shadow rounded-2xl p-4">
-//                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-//                     <thead className="bg-gray-100 dark:bg-gray-700">
-//                         <tr>
-//                             <th className="px-4 py-2 text-left">Name</th>
-//                             <th className="px-4 py-2 text-left">Quantity</th>
-//                             <th className="px-4 py-2 text-left">Price</th>
-//                             <th className="px-4 py-2 text-left">Tax %</th>
-//                             <th className="px-4 py-2 text-left">Action</th>
-//                         </tr>
-//                     </thead>
-//                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-//                         {saleItems.map(si => (
-//                             <tr key={si.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-//                                 <td className="px-4 py-2">{si.name}</td>
-//                                 <td className="px-4 py-2">{si.quantity}</td>
-//                                 <td className="px-4 py-2">{si.price}</td>
-//                                 <td className="px-4 py-2">{si.tax}</td>
-//                                 <td className="px-4 py-2">
-//                                     <button
-//                                         onClick={() => removeItem(si.id)}
-//                                         className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg"
-//                                         disabled={!canCreate}
-//                                     >
-//                                         حذف
-//                                     </button>
-//                                 </td>
-//                             </tr>
-//                         ))}
-//                         {saleItems.length === 0 && (
-//                             <tr>
-//                                 <td colSpan="5" className="text-center py-6 text-gray-500 dark:text-gray-400">No items in sale</td>
-//                             </tr>
-//                         )}
-//                     </tbody>
-//                 </table>
-//             </div>
-
-//             {/* Sales Table */}
-//             <div className="overflow-x-auto bg-white dark:bg-gray-800 shadow rounded-2xl p-4">
-//                 <h2 className="font-semibold text-lg mb-2">قائمة المبيعات</h2>
-//                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-//                     <thead className="bg-gray-100 dark:bg-gray-700">
-//                         <tr>
-//                             <th className="px-4 py-2">ID</th>
-//                             <th className="px-4 py-2">Outlet</th>
-//                             <th className="px-4 py-2">Total</th>
-//                             <th className="px-4 py-2">Tax</th>
-//                             <th className="px-4 py-2">Items</th>
-//                         </tr>
-//                     </thead>
-//                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-//                         {sales.map(s => (
-//                             <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-//                                 <td className="px-4 py-2">{s.id}</td>
-//                                 <td className="px-4 py-2">{s.outlet.name}</td>
-//                                 <td className="px-4 py-2">{s.total}</td>
-//                                 <td className="px-4 py-2">{s.tax}</td>
-//                                 <td className="px-4 py-2">{s.items.map(i => `${i.item.name} x${i.quantity}`).join(", ")}</td>
-//                             </tr>
-//                         ))}
-//                         {sales.length === 0 && (
-//                             <tr>
-//                                 <td colSpan="5" className="text-center py-6 text-gray-500 dark:text-gray-400">No sales yet</td>
-//                             </tr>
-//                         )}
-//                     </tbody>
-//                 </table>
-//             </div>
-//         </div>
-//     );
-// }
-
-
-
-
-
-
 'use client';
 import { useState, useEffect } from "react";
 import { useSocket } from "@/app/components/SocketProvider";
-import { Heart, Star, ShoppingCart, Trash2, Printer, Percent  } from "lucide-react";
+import { Heart, Star, ShoppingCart, Trash2, Printer, Percent } from "lucide-react";
 
 export default function POSSalesPage({ session }) {
     const [items, setItems] = useState([]);
     const [outlets, setOutlets] = useState([]);
     const [categories, setCategories] = useState([]);
+    const [folios, setFolios] = useState([]);
     const [selectedOutlet, setSelectedOutlet] = useState("");
     const [saleItems, setSaleItems] = useState([]);
     const [cartOpen, setCartOpen] = useState(false);
     const [filter, setFilter] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [selectedOutletFilter, setSelectedOutletFilter] = useState("All");
+    const [selectedFolio, setSelectedFolio] = useState("");
+    const [selectedProperty, setSelectedProperty] = useState("");
+    const [properties, setProperties] = useState([]);
+
 
     const [discount, setDiscount] = useState(0); // الخصم
     const [paymentMethod, setPaymentMethod] = useState("Cash"); // طريقة الدفع
@@ -237,14 +30,59 @@ export default function POSSalesPage({ session }) {
     const fetchData = async () => {
         try {
             const outletsRes = await fetch("/api/pos/outlets");
-            setOutlets(await outletsRes.json() || []);
+            const outletsData = await outletsRes.json();
+            setOutlets(outletsData || []);
+
             const itemsRes = await fetch("/api/pos/items");
             setItems(await itemsRes.json() || []);
-        } catch {
-            setOutlets([]);
+
+
+        } catch (err) {
+            console.error(err);
             setItems([]);
+            setFolios([]);
+
         }
     };
+
+
+    // جلب العقارات عند تحميل الصفحة
+    useEffect(() => {
+        const fetchProperties = async () => {
+            try {
+                const res = await fetch("/api/properties"); // افترض وجود API يعيد العقارات
+                const data = await res.json();
+                setProperties(data || []);
+                if (data?.length > 0) setSelectedProperty(data[0].id); // اختيار أول عقار تلقائياً
+            } catch (err) {
+                console.error("Failed to fetch properties:", err);
+                setProperties([]);
+            }
+        };
+        fetchProperties();
+    }, []);
+
+
+    useEffect(() => {
+        if (!selectedProperty) {
+            setFolios([]);
+            setSelectedFolio("");
+            return;
+        }
+
+        const fetchFolios = async () => {
+            try {
+                const res = await fetch(`/api/folios/active?propertyId=${selectedProperty}`);
+                const data = await res.json();
+                setFolios(Array.isArray(data) ? data : []);
+            } catch (err) {
+                console.error(err);
+                setFolios([]);
+            }
+        };
+
+        fetchFolios();
+    }, [selectedProperty]);
 
     useEffect(() => {
         fetchData();
@@ -279,15 +117,13 @@ export default function POSSalesPage({ session }) {
 
     const [loading, setLoading] = useState(false);
 
+
+
     const submitSale = async () => {
-        if (!canCreate) {
-            alert("You do not have permission to create sales.");
-            return;
-        }
-        if (!selectedOutlet || saleItems.length === 0) {
-            alert("Please select an outlet and add items.");
-            return;
-        }
+        if (!canCreate) return alert("You do not have permission to create sales.");
+        if (!selectedOutlet || saleItems.length === 0) return alert("Please select an outlet and add items.");
+        if (paymentMethod === "Room" && !selectedFolio) return alert("Please select a guest / room for Room charge.");
+        if (!selectedProperty) return alert("Please select a property.");
 
         try {
             setLoading(true);
@@ -303,7 +139,11 @@ export default function POSSalesPage({ session }) {
                         price: si.price,
                         tax: si.tax,
                         quantity: si.quantity
-                    }))
+                    })),
+                    folioId: paymentMethod === "Room" ? selectedFolio : undefined, // استخدم undefined بدل null
+                    paymentMethod,
+                    discount,
+                    userId: session?.user?.id
                 })
             });
 
@@ -311,34 +151,26 @@ export default function POSSalesPage({ session }) {
 
             if (!res.ok) {
                 alert(data.error || "Failed to create sale");
-                setLoading(false);
                 return;
             }
 
-            // --- مسح السلة وإغلاق الكارت ---
+            // مسح السلة وإعادة الإعدادات
             setSaleItems([]);
             setCartOpen(false);
             setSelectedOutlet("");
+            setSelectedFolio("");
+            setDiscount(0);
+            setPaymentMethod("Cash");
 
-
-            // --- إشعار نجاح ---
-            alert(`✅ Sale completed!\nTotal: ${(data.total + data.tax).toFixed(2)} SAR`);
+            alert(`✅ Sale completed!\nTotal: ${data.total.toFixed(2)} SAR`);
         } catch (err) {
             console.error(err);
             alert("❌ Failed to complete sale");
         } finally {
             setLoading(false);
         }
-
-        // تحديث المخزون بعد البيع
-        await fetch("/api/pos/update-stock", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ items: saleItems })
-        });
-
-        alert(`✅ Sale completed!\nTotal: ${total.toFixed(2)} SAR`);
     };
+
 
 
 
@@ -486,6 +318,21 @@ export default function POSSalesPage({ session }) {
                         {saleItems.length > 0 && (
                             <div className="mt-5 border-t pt-4 space-y-3">
 
+                                {/* // في Cart Popup: Dropdown لتغيير property */}
+                                <div>
+                                    <label className="block mb-1 text-gray-500 dark:text-gray-300 text-sm font-medium">Property</label>
+                                    <select
+                                        value={selectedProperty}
+                                        onChange={e => setSelectedProperty(e.target.value)}
+                                        className="w-full p-2 border rounded"
+                                    >
+                                        <option value="">Select Property</option>
+                                        {properties.map(p => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
                                 {/* Outlet */}
                                 {!selectedOutlet && (
                                     <select value={selectedOutlet} onChange={e => setSelectedOutlet(e.target.value)}
@@ -506,13 +353,36 @@ export default function POSSalesPage({ session }) {
                                 {/* Payment Method */}
                                 <div>
                                     <label className="block mb-1">Payment Method</label>
-                                    <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}
-                                        className="w-full p-2 border rounded">
+                                    <select
+                                        value={paymentMethod}
+                                        onChange={e => setPaymentMethod(e.target.value)}
+                                        className="w-full p-2 border rounded"
+                                    >
                                         <option value="Cash">Cash</option>
                                         <option value="Card">Card</option>
+                                        <option value="Room">Room (Charge to Folio)</option>
                                         <option value="Mixed">Mixed</option>
                                     </select>
                                 </div>
+
+                                {/* Select guest/room - يظهر فقط لو الدفع Room */}
+                                {paymentMethod === "Room" && (
+                                    <div>
+                                        <label className="block mb-1">Guest / Room</label>
+                                        <select
+                                            value={selectedFolio}
+                                            onChange={e => setSelectedFolio(e.target.value)}
+                                            className="w-full p-2 border rounded"
+                                        >
+                                            <option value="">Select Guest / Room</option>
+                                            {Array.isArray(folios) && folios.map(f => (
+                                                <option key={f.id} value={f.id}>
+                                                    {f.guestName} - Room {f.roomNumber}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
 
                                 {/* Totals */}
                                 <p>Subtotal: {subtotal.toFixed(2)} SAR</p>
@@ -548,9 +418,9 @@ function ProductCard({ item, addToCart }) {
         <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-4 flex flex-col justify-between hover:shadow-2xl transition transform hover:-translate-y-1">
 
             {/* Image */}
-            <div className="h-40 bg-gray-200 dark:bg-gray-700 rounded-lg mb-4 flex items-center justify-center text-gray-500">
+            {/* <div className="h-40 bg-gray-200 dark:bg-gray-700 rounded-lg mb-4 flex items-center justify-center text-gray-500">
                 Image
-            </div>
+            </div> */}
 
             {/* Name & Price */}
             <div className="flex justify-between items-center mb-2">

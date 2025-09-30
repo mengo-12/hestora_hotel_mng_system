@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "public"."POSSale" ALTER COLUMN "total" SET DEFAULT 0,
+ALTER COLUMN "tax" SET DEFAULT 0;
