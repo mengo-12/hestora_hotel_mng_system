@@ -250,9 +250,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSocket } from '@/app/components/SocketProvider';
 import { FaBed, FaMoneyBillWave, FaReceipt } from "react-icons/fa";
+import { useSession } from "next-auth/react";
 
-export default function BookingFolioPage({ params, session }) {
+export default function BookingFolioPage({ params}) {
     const { bookingId } = params;
+    const { data: session } = useSession();
     const sessionUser = session?.user || null;
     const socket = useSocket();
 
@@ -347,6 +349,8 @@ export default function BookingFolioPage({ params, session }) {
 
     const handleAddPayment = async () => {
         if (!canAddPayment) return alert("ليس لديك صلاحية لإضافة Payments");
+        if (!sessionUser) return alert("لم يتم التعرف على المستخدم الحالي");
+        if (!newPayment.guestId) return alert("اختر الضيف أولاً");
         try {
             await fetch(`/api/folios/${bookingId}/payments`, {
                 method: "POST",
