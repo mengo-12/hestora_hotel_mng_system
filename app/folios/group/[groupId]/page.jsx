@@ -432,11 +432,21 @@ export default function GroupFolioPage({ params }) {
         folioId: f.id,
         guestName: f.booking?.guest ? `${f.booking.guest.firstName} ${f.booking.guest.lastName}` : "-"
     })));
-    const allPayments = folios.flatMap(f => (f.payments ?? []).map(p => ({
-        ...p,
-        folioId: f.id,
-        guestName: p.booking?.guest ? `${p.booking.guest.firstName} ${p.booking.guest.lastName}` : "-"
-    })));
+    // const allPayments = folios.flatMap(f => (f.payments ?? []).map(p => ({
+    //     ...p,
+    //     folioId: f.id,
+    //     guestName: p.booking?.guest ? `${p.booking.guest.firstName} ${p.booking.guest.lastName}` : "-"
+    // })));
+
+    const allPayments = folios.flatMap(f =>
+        (f.payments ?? []).map(p => {
+            // إيجاد booking المرتبط بالفوليو أو بالمدفوعه
+            const booking = bookings.find(b => b.id === f.bookingId || b.id === p.bookingId);
+            const guestName = booking?.guest ? `${booking.guest.firstName} ${booking.guest.lastName}` : "-";
+            return { ...p, folioId: f.id, guestName };
+        })
+    );
+
 
     const subtotal = allCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
     const taxTotal = allCharges.reduce((sum, c) => sum + (Number(c.amount || 0) * Number(c.tax || 0)) / 100, 0);
@@ -580,8 +590,8 @@ export default function GroupFolioPage({ params }) {
                                 <tr
                                     key={b.id}
                                     className={`${i % 2 === 0
-                                            ? "bg-gray-50 dark:bg-gray-900/40"
-                                            : "bg-white dark:bg-gray-800"
+                                        ? "bg-gray-50 dark:bg-gray-900/40"
+                                        : "bg-white dark:bg-gray-800"
                                         } hover:bg-blue-50 dark:hover:bg-gray-700 transition`}
                                 >
                                     <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
@@ -593,10 +603,10 @@ export default function GroupFolioPage({ params }) {
                                     <td className="px-4 py-3">
                                         <span
                                             className={`px-2 py-1 text-xs font-semibold rounded-full ${b.status === "CheckedIn"
-                                                    ? "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300"
-                                                    : b.status === "CheckedOut"
-                                                        ? "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                                                        : "bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300"
+                                                ? "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300"
+                                                : b.status === "CheckedOut"
+                                                    ? "bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                                    : "bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300"
                                                 }`}
                                         >
                                             {b.status}
@@ -655,8 +665,8 @@ export default function GroupFolioPage({ params }) {
                                 <tr
                                     key={`${c.id}-${c.folioId}`}
                                     className={`${i % 2 === 0
-                                            ? "bg-gray-50 dark:bg-gray-900/40"
-                                            : "bg-white dark:bg-gray-800"
+                                        ? "bg-gray-50 dark:bg-gray-900/40"
+                                        : "bg-white dark:bg-gray-800"
                                         } hover:bg-orange-50 dark:hover:bg-gray-700 transition`}
                                 >
                                     <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
