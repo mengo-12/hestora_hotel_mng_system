@@ -6,6 +6,7 @@ import toast, { Toaster } from "react-hot-toast";
 import RoomRack from "@/app/components/RoomRack";
 
 
+
 export default function FrontDeskPage({ session, userProperties }) {
     const [bookings, setBookings] = useState([]);
     const [filteredBookings, setFilteredBookings] = useState([]);
@@ -23,6 +24,8 @@ export default function FrontDeskPage({ session, userProperties }) {
     const [filterCompany, setFilterCompany] = useState("");
     const [loading, setLoading] = useState(false);
     const [confirmLoading, setConfirmLoading] = useState(false);
+    const [endedBookings, setEndedBookings] = useState([]);
+    const [overdueBookings, setOverdueBookings] = useState([]);
 
     const [confirmModal, setConfirmModal] = useState({
         open: false,
@@ -77,15 +80,27 @@ export default function FrontDeskPage({ session, userProperties }) {
 
             const departures = all.filter(b => b.status === "CheckedOut" && new Date(b.checkOut).toDateString() === todayStr);
 
+            const ended = all.filter(b => b.status === "CheckedOut" && new Date(b.checkOut) < now && new Date(b.checkOut).toDateString() !== todayStr);
+
+            const overdue = all.filter(b =>
+                b.status === "InHouse" &&
+                new Date(b.checkOut) < now
+            );
+            setOverdueBookings(overdue);
+
             setAllBookings(all);
             setBookings(active);
             setFilteredBookings(active);
             setDeparturesToday(departures);
+            setEndedBookings(ended);
+
         } catch {
             setAllBookings([]);
             setBookings([]);
             setFilteredBookings([]);
             setDeparturesToday([]);
+            setEndedBookings([]);
+
         } finally {
             setLoading(false); // ← إيقاف Spinner
         }
@@ -109,59 +124,90 @@ export default function FrontDeskPage({ session, userProperties }) {
 
 
     useEffect(() => {
-        fetchProperties();
-        fetchBookings();
+        if (!socket) return;
 
-        if (socket) {
-            // Booking updates
-            socket.on("BOOKING_UPDATED", updatedBooking => {
-                setBookings(prev => {
-                    if (["Reserved", "InHouse"].includes(updatedBooking.status)) {
-                        return prev.map(b => b.id === updatedBooking.id ? updatedBooking : b);
-                    } else return prev.filter(b => b.id !== updatedBooking.id);
-                });
+        const classifyBookings = (all) => {
+            const now = new Date();
+            const todayStr = now.toDateString();
 
-                const todayStr = new Date().toDateString();
-                if (updatedBooking.status === "CheckedOut" && new Date(updatedBooking.checkOut).toDateString() === todayStr) {
-                    setDeparturesToday(prev => {
-                        const exists = prev.find(b => b.id === updatedBooking.id);
-                        if (!exists) return [...prev, updatedBooking];
-                        return prev.map(b => b.id === updatedBooking.id ? updatedBooking : b);
-                    });
-                    toast.success(`${updatedBooking.guest?.firstName} ${updatedBooking.guest?.lastName} has Checked-Out.`);
-                }
-                if (updatedBooking.status === "NOSHOW") toast.error(`${updatedBooking.guest?.firstName} ${updatedBooking.guest?.lastName} is marked as No-Show.`);
-                if (updatedBooking.status === "Cancelled") toast(`${updatedBooking.guest?.firstName} ${updatedBooking.guest?.lastName} booking Cancelled.`, { icon: '⚠️' });
-                if (updatedBooking.status === "InHouse" && updatedBooking.previousStatus === "Reserved") toast.success(`${updatedBooking.guest?.firstName} ${updatedBooking.guest?.lastName} has Checked-In.`);
+            const current = all.filter(
+                b => ["Reserved", "InHouse"].includes(b.status) && !(b.status === "InHouse" && new Date(b.checkOut) < now)
+            );
+
+            const overdue = all.filter(
+                b => b.status === "InHouse" && new Date(b.checkOut) < now
+            );
+
+            const departures = all.filter(
+                b => b.status === "CheckedOut" && new Date(b.checkOut).toDateString() === todayStr
+            );
+
+            const ended = all.filter(
+                b => b.status === "CheckedOut" && new Date(b.checkOut) < now && new Date(b.checkOut).toDateString() !== todayStr
+            );
+
+            setBookings(current);
+            setOverdueBookings(overdue);
+            setDeparturesToday(departures);
+            setEndedBookings(ended);
+        };
+
+        const handleBookingUpdated = (updatedBooking) => {
+            setAllBookings(prev => {
+                const exists = prev.some(b => b.id === updatedBooking.id);
+                const all = exists ? prev.map(b => b.id === updatedBooking.id ? updatedBooking : b) : [...prev, updatedBooking];
+                classifyBookings(all);
+                return all;
             });
 
-            // Booking created
-            socket.on("BOOKING_CREATED", newBooking => {
-                if (["Reserved", "InHouse"].includes(newBooking.status)) {
-                    setBookings(prev => [...prev, newBooking]);
-                    setFilteredBookings(prev => [...prev, newBooking]);
-                    setAllBookings(prev => [...prev, newBooking]);
-                    toast.success(`New booking created for ${newBooking.guest?.firstName} ${newBooking.guest?.lastName}`);
-                }
-            });
-
-            // Booking deleted
-            socket.on("BOOKING_DELETED", ({ id }) => {
-                setBookings(prev => prev.filter(b => b.id !== id));
-                setFilteredBookings(prev => prev.filter(b => b.id !== id));
-                setDeparturesToday(prev => prev.filter(b => b.id !== id));
-                setAllBookings(prev => prev.filter(b => b.id !== id));
-            });
-        }
-
-        return () => {
-            if (socket) {
-                socket.off("BOOKING_UPDATED");
-                socket.off("BOOKING_CREATED");
-                socket.off("BOOKING_DELETED");
+            // رسائل التنبيهات
+            const todayStr = new Date().toDateString();
+            if (updatedBooking.status === "CheckedOut" && new Date(updatedBooking.checkOut).toDateString() === todayStr) {
+                toast.success(`${updatedBooking.guest?.firstName} ${updatedBooking.guest?.lastName} has Checked-Out.`);
+            }
+            if (updatedBooking.status === "NOSHOW") toast.error(`${updatedBooking.guest?.firstName} ${updatedBooking.guest?.lastName} is marked as No-Show.`);
+            if (updatedBooking.status === "Cancelled") toast(`${updatedBooking.guest?.firstName} ${updatedBooking.guest?.lastName} booking Cancelled.`, { icon: '⚠️' });
+            if (updatedBooking.status === "InHouse" && updatedBooking.previousStatus === "Reserved") {
+                toast.success(`${updatedBooking.guest?.firstName} ${updatedBooking.guest?.lastName} has Checked-In.`);
             }
         };
-    }, [socket, filterProperty, filterFrom, filterTo]);
+
+        const handleBookingCreated = (newBooking) => {
+            setAllBookings(prev => {
+                const all = [...prev, newBooking];
+                classifyBookings(all);
+                return all;
+            });
+
+            if (["Reserved", "InHouse"].includes(newBooking.status)) {
+                toast.success(`New booking created for ${newBooking.guest?.firstName} ${newBooking.guest?.lastName}`);
+            }
+        };
+
+        const handleBookingDeleted = ({ id }) => {
+            setAllBookings(prev => {
+                const all = prev.filter(b => b.id !== id);
+                classifyBookings(all);
+                return all;
+            });
+        };
+
+        socket.on("BOOKING_UPDATED", handleBookingUpdated);
+        socket.on("BOOKING_CREATED", handleBookingCreated);
+        socket.on("BOOKING_DELETED", handleBookingDeleted);
+
+        return () => {
+            socket.off("BOOKING_UPDATED", handleBookingUpdated);
+            socket.off("BOOKING_CREATED", handleBookingCreated);
+            socket.off("BOOKING_DELETED", handleBookingDeleted);
+        };
+    }, [socket]); // ← فقط عند mount/unmount
+
+    useEffect(() => {
+        fetchProperties();
+        fetchBookings();
+    }, [filterProperty, filterFrom, filterTo]);
+
 
     useEffect(() => {
         const uniqueGroups = Array.from(new Set(allBookings
@@ -452,32 +498,53 @@ export default function FrontDeskPage({ session, userProperties }) {
                 </div>
             </div>
 
-            {/* Bookings */}
-            <h2 className="text-xl font-semibold mb-2 text-black dark:text-white">Current Bookings</h2>
+            {/* Current Bookings */}
+            <div className="bg-white dark:bg-gray-800 shadow-lg rounded-2xl p-6">
+                <h2 className="text-2xl font-bold mb-4 text-black dark:text-white border-b pb-2">Current Bookings</h2>
 
-            {/* Spinner */}
-            {loading ? (
-                <div className="flex justify-center items-center py-10">
-                    <div className="w-12 h-12 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
-                </div>
-            ) : filteredBookings.length === 0 ? (
-                <p className="text-gray-500 dark:text-gray-300">No bookings found.</p>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredBookings.map(b => <BookingCard key={b.id} booking={b} />)}
-                </div>
-            )}
-
+                {loading ? (
+                    <div className="flex justify-center items-center py-10">
+                        <div className="w-12 h-12 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
+                    </div>
+                ) : filteredBookings.length === 0 ? (
+                    <p className="text-gray-500 dark:text-gray-300">No bookings found.</p>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredBookings.map(b => <BookingCard key={b.id} booking={b} />)}
+                    </div>
+                )}
+            </div>
 
             <RoomRack />
 
+            {/* Overdue Bookings */}
+            {overdueBookings.length > 0 && (
+                <div className="bg-red-50 dark:bg-gray-800 shadow-lg rounded-2xl p-6 mt-6">
+                    <h2 className="text-2xl font-bold mb-4 text-black dark:text-white border-b pb-2">Overdue Bookings</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {overdueBookings.map(b => <BookingCard key={b.id} booking={b} />)}
+                    </div>
+                </div>
+            )}
+
+            {/* Departures Today */}
             {departuresToday.length > 0 && (
-                <>
-                    <h2 className="text-xl font-semibold mt-6 mb-2 text-black dark:text-white">Departures Today</h2>
+                <div className="bg-blue-50 dark:bg-gray-800 shadow-lg rounded-2xl p-6 mt-6">
+                    <h2 className="text-2xl font-bold mb-4 text-black dark:text-white border-b pb-2">Departures Today</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {departuresToday.map(b => <BookingCard key={b.id} booking={b} />)}
                     </div>
-                </>
+                </div>
+            )}
+
+            {/* Ended Bookings */}
+            {endedBookings.length > 0 && (
+                <div className="bg-gray-50 dark:bg-gray-800 shadow-lg rounded-2xl p-6 mt-6">
+                    <h2 className="text-2xl font-bold mb-4 text-black dark:text-white border-b pb-2">Ended Bookings</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {endedBookings.map(b => <BookingCard key={b.id} booking={b} />)}
+                    </div>
+                </div>
             )}
 
             {/* --- Confirmation Modal --- */}
