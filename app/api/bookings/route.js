@@ -379,8 +379,8 @@ export async function GET(req) {
                 guest: true,
                 room: { include: { roomType: true } },
                 ratePlan: true,
-                company: true,
-                group: true,
+                group: { select: { id: true, name: true } }, // هكذا تحصل على اسم المجموعة
+                company: { select: { id: true, name: true } },
                 extras: true,
                 folio: {
                     include: {
