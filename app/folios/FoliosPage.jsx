@@ -111,7 +111,7 @@
 
 
 'use client';
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSocket } from "@/app/components/SocketProvider";
 import { FaUsers, FaBuilding, FaUser, FaBed, FaCalendarAlt, FaFilter } from "react-icons/fa";
@@ -126,10 +126,11 @@ export default function FoliosPage({ properties, session }) {
     const [filterType, setFilterType] = useState(""); // individual/group/company
     const [filterProperty, setFilterProperty] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 6; // عدد الحجوزات في الصفحة
     const refreshTimeoutRef = useRef(null);
 
-
-        // ✅ صلاحيات حسب الدور
+    // صلاحيات حسب الدور
     const role = session?.user?.role || "Guest";
     const canView = ["Admin", "FrontDesk", "Manager"].includes(role);
     const canEdit = ["Admin", "FrontDesk"].includes(role);
@@ -229,13 +230,14 @@ export default function FoliosPage({ properties, session }) {
         return matchesType && matchesProperty && matchesSearch;
     });
 
-        if (!canView) {
-        return <p className="p-6 text-red-500">🚫 ليس لديك صلاحية لعرض الفواتير</p>;
-    }
+    // Pagination
+    const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
+    const paginatedBookings = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        return filteredBookings.slice(start, start + itemsPerPage);
+    }, [filteredBookings, currentPage]);
 
-
-    if (loading) return <p className="p-6 text-gray-500">Loading bookings...</p>;
-    if (error) return <p className="p-6 text-red-500">{error}</p>;
+    if (!canView) return <p className="p-6 text-red-500">🚫 ليس لديك صلاحية لعرض الفواتير</p>;
 
     return (
         <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
@@ -262,50 +264,45 @@ export default function FoliosPage({ properties, session }) {
 
             {/* Filters */}
             <div className="flex flex-col md:flex-row gap-3 mb-6 flex-wrap md:flex-nowrap items-end bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                <div className="flex flex-col w-full md:w-1/4">
-                    <label className="mb-1 text-gray-500 dark:text-gray-300 text-sm font-medium">Search</label>
-                    <input
-                        type="text"
-                        placeholder="Search by name..."
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                        className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                    />
-                </div>
-
-                <div className="flex flex-col w-full md:w-1/5">
-                    <label className="mb-1 text-gray-500 dark:text-gray-300 text-sm font-medium">Type</label>
-                    <select
-                        value={filterType}
-                        onChange={e => setFilterType(e.target.value)}
-                        className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm dark:bg-gray-700 dark:text-white"
-                    >
-                        <option value="">All Types</option>
-                        <option value="individual">Individual</option>
-                        <option value="group">Group</option>
-                        <option value="company">Company</option>
-                    </select>
-                </div>
-
-                <div className="flex flex-col w-full md:w-1/5">
-                    <label className="mb-1 text-gray-500 dark:text-gray-300 text-sm font-medium">Property</label>
-                    <select
-                        value={filterProperty}
-                        onChange={e => setFilterProperty(e.target.value)}
-                        className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm dark:bg-gray-700 dark:text-white"
-                    >
-                        <option value="">All Properties</option>
-                        {properties?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                </div>
-
+                <input
+                    type="text"
+                    placeholder="Search by name..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                />
+                <select
+                    value={filterType}
+                    onChange={e => setFilterType(e.target.value)}
+                    className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm dark:bg-gray-700 dark:text-white"
+                >
+                    <option value="">All Types</option>
+                    <option value="individual">Individual</option>
+                    <option value="group">Group</option>
+                    <option value="company">Company</option>
+                </select>
+                <select
+                    value={filterProperty}
+                    onChange={e => setFilterProperty(e.target.value)}
+                    className="p-3 border border-gray-300 dark:border-gray-700 rounded-lg shadow-sm dark:bg-gray-700 dark:text-white"
+                >
+                    <option value="">All Properties</option>
+                    {properties?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
             </div>
 
-            {filteredBookings.length === 0 ? (
+            {/* Loading Spinner */}
+            {loading && (
+                <div className="flex justify-center items-center py-10">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                </div>
+            )}
+
+            {paginatedBookings.length === 0 && !loading ? (
                 <p className="text-gray-600 dark:text-gray-300">No bookings found.</p>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredBookings.map(b => {
+                    {paginatedBookings.map(b => {
                         const formatDate = (dateStr) => {
                             if (!dateStr) return "";
                             const d = new Date(dateStr);
@@ -378,11 +375,38 @@ export default function FoliosPage({ properties, session }) {
                 </div>
             )}
 
-
-
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="flex justify-center mt-6 gap-2">
+                    <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                    >
+                        Prev
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                        <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`px-3 py-1 rounded ${page === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}
+                        >
+                            {page}
+                        </button>
+                    ))}
+                    <button
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        className="px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
 
         </div>
     );
 }
+
 
 
