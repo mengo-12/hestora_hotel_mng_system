@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from "react";
-import { ShoppingCart, Printer, Eye } from "lucide-react";
+import { ShoppingCart, Printer, Eye, Trash2, Loader2 } from "lucide-react";
+import ConfirmationModal from "@/app/components/ConfirmationModal";
+
 
 export default function SalesHistoryPage({ session }) {
     const [sales, setSales] = useState([]);
@@ -12,11 +14,16 @@ export default function SalesHistoryPage({ session }) {
     const [endDate, setEndDate] = useState("");
     const [loading, setLoading] = useState(true);
 
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [confirmLoading, setConfirmLoading] = useState(false);
+    const [pendingDeleteId, setPendingDeleteId] = useState(null);
+
     // ✅ Permissions
     const role = session?.user?.role || "Guest";
     const canView = ["Admin", "Manager", "Cashier"].includes(role);
     const canPrint = ["Admin", "Manager"].includes(role);
     const canExport = ["Admin"].includes(role);
+    const canDelete = ["Admin", "Manager"].includes(role);
 
 
     // Pagination
@@ -30,7 +37,7 @@ export default function SalesHistoryPage({ session }) {
     useEffect(() => {
         const fetchSales = async () => {
             try {
-                const [salesRes, outletsRes,employeesRes] = await Promise.all([
+                const [salesRes, outletsRes, employeesRes] = await Promise.all([
                     fetch("/api/pos/sales"),
                     fetch("/api/pos/outlets"),
                     fetch("/api/pos/employees")
@@ -47,9 +54,37 @@ export default function SalesHistoryPage({ session }) {
         fetchSales();
     }, []);
 
+    
     if (loading) {
-        return <p className="p-6 text-center text-gray-500">Loading sales...</p>;
+        return (
+            <div className="flex justify-center items-center min-h-screen">
+                <Loader2 className="animate-spin text-blue-600" size={40} />
+            </div>
+        );
     }
+
+    const handleDelete = (saleId) => {
+        setPendingDeleteId(saleId);
+        setConfirmOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!pendingDeleteId) return;
+        setConfirmLoading(true);
+        try {
+            const res = await fetch(`/api/pos/sales/${pendingDeleteId}`, {
+                method: "DELETE",
+            });
+            if (!res.ok) throw new Error("Failed to delete sale");
+            setSales(prev => prev.filter(s => s.id !== pendingDeleteId));
+            setConfirmOpen(false);
+        } catch (err) {
+            console.error("❌ Delete Sale Error:", err);
+        } finally {
+            setConfirmLoading(false);
+            setPendingDeleteId(null);
+        }
+    };
 
     // ==============================
     // Filtered Sales
@@ -86,7 +121,7 @@ export default function SalesHistoryPage({ session }) {
                     </tr>
                 `).join("")}
             </table>
-            <p><b>Total: ${(Number(sale.total) + Number(sale.tax)).toFixed(2)} SAR</b></p>
+            <p><b>Total: ${Number(sale.total).toFixed(2)} SAR</b></p>
         `;
         const printWindow = window.open("", "_blank");
         printWindow.document.write(printContent);
@@ -176,16 +211,25 @@ export default function SalesHistoryPage({ session }) {
                                     </p>
                                 </div>
                                 <div className="flex gap-2">
-                                    <button 
+                                    <button
                                         onClick={() => setSelectedSale(sale)}
                                         className="flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">
                                         <Eye size={16} /> View
                                     </button>
-                                    <button 
-                                        onClick={() => handlePrint(sale)}
-                                        className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm">
-                                        <Printer size={16} /> Print
-                                    </button>
+                                    {canPrint && (
+                                        <button
+                                            onClick={() => handlePrint(sale)}
+                                            className="flex items-center gap-1 px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm">
+                                            <Printer size={16} /> Print
+                                        </button>
+                                    )}
+                                    {canDelete && (
+                                        <button
+                                            onClick={() => handleDelete(sale.id)}
+                                            className="flex items-center gap-1 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm">
+                                            <Trash2 size={16} /> Delete
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
@@ -219,7 +263,7 @@ export default function SalesHistoryPage({ session }) {
                             <div className="mt-3 flex justify-end flex-col gap-1 text-right">
                                 <p className="text-sm text-gray-500">Subtotal: {Number(sale.total).toFixed(2)} SAR</p>
                                 <p className="text-sm text-gray-500">Tax: {Number(sale.tax).toFixed(2)} SAR</p>
-                                <p className="font-bold text-lg">Total: {(Number(sale.total) + Number(sale.tax)).toFixed(2)} SAR</p>
+                                <p className="font-bold text-lg">Total: {Number(sale.total).toFixed(2)} SAR</p>
                             </div>
                         </div>
                     ))}
@@ -231,14 +275,14 @@ export default function SalesHistoryPage({ session }) {
             ============================== */}
             {totalPages > 1 && (
                 <div className="flex justify-center mt-6 gap-2">
-                    <button 
+                    <button
                         onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
                         disabled={currentPage === 1}
                         className="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700 disabled:opacity-50">
                         Prev
                     </button>
                     <span className="px-3 py-1">Page {currentPage} of {totalPages}</span>
-                    <button 
+                    <button
                         onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
                         disabled={currentPage === totalPages}
                         className="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700 disabled:opacity-50">
@@ -286,7 +330,7 @@ export default function SalesHistoryPage({ session }) {
                         </div>
 
                         <div className="flex justify-end mt-6">
-                            <button 
+                            <button
                                 onClick={() => setSelectedSale(null)}
                                 className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg">
                                 Close
@@ -295,6 +339,14 @@ export default function SalesHistoryPage({ session }) {
                     </div>
                 </div>
             )}
+            {/* ✅ Confirmation Modal */}
+            <ConfirmationModal
+                open={confirmOpen}
+                message="هل أنت متأكد أنك تريد حذف هذه الفاتورة؟"
+                onClose={() => setConfirmOpen(false)}
+                onConfirm={confirmDelete}
+                loading={confirmLoading}
+            />
         </div>
     );
 }

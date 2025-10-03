@@ -640,7 +640,7 @@ export default function GroupsPage({ session, userProperties }) {
         folioEvents.forEach(ev => socket.on(ev, onFolioChange, onGroupsRefresh));
 
         return () => {
-            socket.off("GROUP_CREATED", onGroupCreated);
+            socket.off("GROUP_CREATED", onGroupsRefresh);
             socket.off("GROUP_UPDATED", onGroupUpdated);
             socket.off("GROUP_DELETED", onGroupDeleted);
             folioEvents.forEach(ev => socket.off(ev, onFolioChange, onGroupsRefresh));
