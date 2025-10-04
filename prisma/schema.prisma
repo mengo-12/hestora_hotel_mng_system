@@ -407,8 +407,8 @@ model Company {
 //////////////////////////////////
 model User {
   id               String             @id @default(cuid())
-  property         Property           @relation(fields: [propertyId], references: [id])
-  propertyId       String
+  property         Property?           @relation(fields: [propertyId], references: [id])
+  propertyId       String?
   email            String             @unique
   password         String
   name             String

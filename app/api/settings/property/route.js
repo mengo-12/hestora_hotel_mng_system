@@ -48,3 +48,44 @@ export async function PATCH(req) {
         return new Response(JSON.stringify({ error: "Failed to update property" }), { status: 500 });
     }
 }
+
+
+export async function POST(req) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+
+        const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+        if (!user || user.role !== "Owner") {
+            return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+        }
+
+        const { name, phone, email, address, currency, timezone, adminEmail, adminPassword } = await req.json();
+
+        if (!name || !adminEmail || !adminPassword) {
+            return new Response(JSON.stringify({ error: "Hotel name and admin credentials are required" }), { status: 400 });
+        }
+
+        // إنشاء الفندق
+        const property = await prisma.property.create({
+            data: { name, phone, email, address, currency, timezone }
+        });
+
+        // إنشاء Admin للعميل
+        const hashedPassword = await bcrypt.hash(adminPassword, 10);
+        await prisma.user.create({
+            data: {
+                email: adminEmail,
+                password: hashedPassword,
+                role: "Admin",
+                propertyId: property.id
+            }
+        });
+
+        return new Response(JSON.stringify(property), { status: 201 });
+
+    } catch (err) {
+        console.error(err);
+        return new Response(JSON.stringify({ error: "Failed to create hotel" }), { status: 500 });
+    }
+}

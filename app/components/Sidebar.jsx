@@ -35,6 +35,8 @@ export default function Sidebar({ session, }) {
     const [collapsed, setCollapsed] = useState(false);
     const [POSOpen, setPOSOpen] = useState(false)
     const [loyaltyOpen, setloyaltyOpen] = useState(false)
+    const [systemOpen, setsystemOpen] = useState(false)
+
 
 
     const links = [
@@ -153,10 +155,10 @@ export default function Sidebar({ session, }) {
                                 }`}
                         >
                             <span className="flex items-center gap-2"><Store size={18} /> loyalty</span>
-                            <span>{loyaltyOpen? '▲' : '▼'}</span>
+                            <span>{loyaltyOpen ? '▲' : '▼'}</span>
                         </button>
 
-                        {loyaltyOpen&& (
+                        {loyaltyOpen && (
                             <div className="pl-8 mt-1 space-y-1">
                                 <Link
                                     href="/loyalty/members"
@@ -211,6 +213,30 @@ export default function Sidebar({ session, }) {
                             <div className="pl-8 mt-1 space-y-1">
                                 <Link href="/settings_hotel" className="block px-4 py-2 rounded hover:bg-blue-600">Hotel</Link>
                                 <Link href="/settings_hotel/users" className="block px-4 py-2 rounded hover:bg-blue-600">Users</Link>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Settings Dropdown */}
+                {!collapsed && session?.user?.role === "Owner" && (
+                    <div>
+                        <button
+                            onClick={() => setsystemOpen(!systemOpen)}
+                            className={`w-full flex items-center justify-between px-4 py-2 rounded-lg transition-all duration-300 ${pathname.startsWith('/settings_system')
+                                ? 'bg-gradient-to-r from-blue-800 to-blue-900 font-semibold shadow-md'
+                                : 'hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-700'
+                                }`}
+                        >
+                            <span className="flex items-center gap-2"><Settings size={18} /> Settings System</span>
+                            <span>{systemOpen ? '▲' : '▼'}</span>
+                        </button>
+
+                        {systemOpen && (
+                            <div className="pl-8 mt-1 space-y-1">
+                                {/* روابط خاصة بالمالك فقط */}
+                                <Link href="/settings_hotel/PropertyList" className="block px-4 py-2 rounded hover:bg-blue-600">Add / Edit Hotels</Link>
+                                {/* <Link href="/settings_hotel/users" className="block px-4 py-2 rounded hover:bg-blue-600">Add Hotel Users</Link> */}
                             </div>
                         )}
                     </div>
